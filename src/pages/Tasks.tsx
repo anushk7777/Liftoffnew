@@ -87,18 +87,18 @@ export default function Tasks() {
       />
 
       {/* Filter bar */}
-      <div className="flex items-center gap-1 mb-5 p-1 rounded-lg bg-elevated border border-border w-fit">
+      <div className="flex items-center gap-1 mb-6 p-1.5 rounded-2xl bg-black/20 border border-white/5 w-fit">
         {FILTERS.map((f) => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
             className={cn(
-              'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-              filter === f.key ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted hover:text-ink',
+              'px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300',
+              filter === f.key ? 'bg-primary/10 text-primary border border-primary/20 glow-indigo shadow-md' : 'text-on-surface-variant hover:text-on-surface hover:bg-white/5 border border-transparent',
             )}
           >
             {f.label}
-            <span className="ml-1.5 text-xs text-ink-subtle">{counts[f.key]}</span>
+            <span className={cn("ml-2 text-[10px] font-mono-data px-1.5 py-0.5 rounded", filter === f.key ? "bg-primary/20" : "bg-white/5")}>{counts[f.key]}</span>
           </button>
         ))}
       </div>
@@ -171,38 +171,47 @@ function TaskRow({
     !isToday(new Date(task.dueDate));
 
   return (
-    <div className="group card card-hover flex items-start gap-3 px-3.5 py-3">
+    <div className={cn(
+      "glass-panel group p-5 rounded-xl flex items-start gap-4 transition-all duration-300 relative overflow-hidden",
+      task.status === 'doing' ? "border-primary/40 ring-1 ring-primary/20 glow-indigo" : "hover:border-primary/40",
+      task.status === 'done' && "opacity-60 hover:opacity-100"
+    )}>
+      {task.status === 'doing' && (
+        <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-100 transition-opacity">
+          <Clock className="w-4 h-4 animate-spin text-primary" />
+        </div>
+      )}
       <button
         onClick={onCycle}
         title="Cycle status"
         className={cn(
-          'mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0',
+          'mt-1 w-6 h-6 rounded-full border flex items-center justify-center transition-all shrink-0 hover:scale-110 active:scale-95',
           task.status === 'done'
-            ? 'bg-accent border-accent text-[var(--accent-text)]'
+            ? 'bg-primary border-primary text-on-primary shadow-[0_0_10px_rgba(192,193,255,0.6)]'
             : task.status === 'doing'
-              ? 'border-warning text-warning'
-              : 'border-ink-subtle text-ink-subtle hover:border-ink hover:text-ink',
+              ? 'border-secondary text-secondary glow-cyan bg-secondary/10'
+              : 'border-on-surface-variant/50 text-on-surface-variant hover:border-primary hover:text-primary bg-black/20',
         )}
       >
         <StatusIcon status={task.status} />
       </button>
 
-      <div className="flex-1 min-w-0" onClick={onEdit} role="button">
-        <div className="flex items-center gap-2">
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={onEdit} role="button">
+        <div className="flex items-center gap-3">
           <PriorityDot priority={task.priority} />
           <p
             className={cn(
-              'text-sm font-medium truncate',
-              task.status === 'done' ? 'line-through text-ink-subtle' : 'text-ink',
+              'text-base font-headline-md truncate transition-colors',
+              task.status === 'done' ? 'line-through text-on-surface-variant/50' : 'text-on-surface group-hover:text-primary',
             )}
           >
             {task.title}
           </p>
         </div>
         {(task.notes || task.category || task.dueDate || task.estimate || task.scheduledAt) && (
-          <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-ink-subtle">
-            {task.category && <span className="chip">{task.category}</span>}
-            {task.estimate && <span>⏱ {task.estimate}</span>}
+          <div className="flex flex-wrap items-center gap-3 mt-2.5 text-[11px] font-mono-data text-on-surface-variant">
+            {task.category && <span className="px-2 py-0.5 bg-white/5 rounded text-on-surface">{task.category}</span>}
+            {task.estimate && <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {task.estimate}</span>}
             {task.scheduledAt ? (
               <span className={cn('inline-flex items-center gap-1', overdue && 'text-danger font-medium')}>
                 <Clock className="w-3 h-3" />
@@ -216,12 +225,12 @@ function TaskRow({
                 </span>
               )
             )}
-            {task.notes && <span className="truncate max-w-[200px]">— {task.notes}</span>}
+            {task.notes && <span className="truncate max-w-[200px] font-body-sm text-on-surface-variant/70">— {task.notes}</span>}
           </div>
         )}
       </div>
 
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         {task.scheduledAt && (
           <>
             <button
@@ -234,7 +243,7 @@ function TaskRow({
                 });
                 downloadICS(`task-${task.id}.ics`, icsStr);
               }}
-              className="p-1.5 rounded-md text-ink-subtle hover:text-accent hover:bg-hover"
+              className="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-white/5 transition-colors"
               title="Download .ics"
             >
               <Calendar className="w-4 h-4" />
@@ -248,19 +257,19 @@ function TaskRow({
               })}
               target="_blank"
               rel="noreferrer"
-              className="p-1.5 rounded-md text-ink-subtle hover:text-accent hover:bg-hover text-xs font-medium"
+              className="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-white/5 text-[10px] font-label-caps transition-colors"
               title="Add to Google Calendar"
             >
-              GCal
+              GCAL
             </a>
           </>
         )}
-        <button onClick={onEdit} className="p-1.5 rounded-md text-ink-subtle hover:text-ink hover:bg-hover" title="Edit task">
+        <button onClick={onEdit} className="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-white/5 transition-colors" title="Edit task">
           <Pencil className="w-4 h-4" />
         </button>
         <button
           onClick={onDelete}
-          className="p-1.5 rounded-md text-ink-subtle hover:text-danger hover:bg-hover"
+          className="p-2 rounded-lg text-on-surface-variant hover:text-danger hover:bg-danger/10 transition-colors"
           title="Delete task"
         >
           <Trash2 className="w-4 h-4" />

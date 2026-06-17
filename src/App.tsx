@@ -71,17 +71,21 @@ function Shell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
-  // Auto-collapse on content-heavy pages
-  const autoCollapse = useMemo(
-    () => WIDE_PAGES.has(location.pathname),
-    [location.pathname],
-  );
-  const collapsed = focusMode || autoCollapse || userCollapsed;
+  // Auto-collapse logic fix: Only auto-collapse on route change if it's a wide page and not already collapsed.
+  // We do NOT force `collapsed = autoCollapse || userCollapsed` anymore, so the user can manually open it.
+  useEffect(() => {
+    if (WIDE_PAGES.has(location.pathname)) {
+      setUserCollapsed(true);
+    }
+  }, [location.pathname]);
+
+  const collapsed = focusMode || userCollapsed;
 
   const toggleCollapsed = () => {
     setUserCollapsed((c) => {
-      localStorage.setItem('liftoff_sidebar_collapsed', !c ? '1' : '0');
-      return !c;
+      const next = !c;
+      localStorage.setItem('liftoff_sidebar_collapsed', next ? '1' : '0');
+      return next;
     });
   };
 
@@ -125,10 +129,12 @@ function Shell() {
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg text-ink">
+    <div className="bg-background text-on-surface font-body-lg min-h-screen overflow-hidden selection:bg-primary/30 flex relative">
+      <div className="fixed inset-0 radial-atmosphere pointer-events-none z-0"></div>
+
       {/* Desktop sidebar */}
       {!focusMode && (
-        <div className="hidden md:block shrink-0">
+        <div className="hidden md:block shrink-0 z-40 relative">
           <Sidebar collapsed={collapsed} onToggle={toggleCollapsed} onOpenSearch={() => setPaletteOpen(true)} />
         </div>
       )}
@@ -151,35 +157,35 @@ function Shell() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={cn("flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative z-10", !focusMode && "md:ml-0")}>
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center justify-between h-14 px-4 border-b border-border bg-sidebar shrink-0">
+        <header className="md:hidden flex items-center justify-between h-14 px-4 border-b border-white/10 bg-surface-container/60 backdrop-blur-md shrink-0">
           <button
             onClick={() => setMobileOpen(true)}
-            className="p-2 -ml-2 rounded-md text-ink-muted hover:text-ink hover:bg-hover"
+            className="p-2 -ml-2 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-colors"
             aria-label="Open menu"
           >
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-accent flex items-center justify-center">
-              <Moon className="w-3.5 h-3.5 text-[var(--accent-text)]" />
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-on-primary" />
             </div>
-            <span className="font-display font-bold text-sm">Liftoff</span>
+            <span className="font-display-lg font-bold text-sm bg-gradient-to-br from-primary to-secondary bg-clip-text text-transparent">Liftoff</span>
           </div>
           <button
             onClick={() => setPaletteOpen(true)}
-            className="p-2 -mr-2 rounded-md text-ink-muted hover:text-ink hover:bg-hover"
+            className="p-2 -mr-2 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-colors"
             aria-label="Search"
           >
             <Search className="w-5 h-5" />
           </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto custom-scrollbar">
           <div className={cn(
-            'mx-auto w-full px-5 py-7 pb-24 sm:px-8 sm:py-10 md:pb-10 transition-[max-width] duration-200',
-            collapsed ? 'max-w-6xl' : 'max-w-5xl',
+            'mx-auto w-full px-5 py-7 pb-24 sm:px-8 sm:py-10 md:pb-12 transition-all duration-300',
+            collapsed ? 'max-w-7xl' : 'max-w-6xl',
           )}>
             <ErrorBoundary>
               {rm ? (
@@ -203,7 +209,7 @@ function Shell() {
         </main>
 
         {/* Mobile bottom navigation */}
-        <nav className="md:hidden flex items-center justify-around border-t border-border bg-sidebar shrink-0 pb-[env(safe-area-inset-bottom)]">
+        <nav className="md:hidden flex items-center justify-around border-t border-white/10 bg-surface-container/80 backdrop-blur-md shrink-0 pb-[env(safe-area-inset-bottom)] z-20">
           {MOBILE_NAV.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -212,7 +218,7 @@ function Shell() {
               className={({ isActive }) =>
                 cn(
                   'flex flex-col items-center gap-0.5 py-2 px-3 text-[10px] font-medium transition-colors',
-                  isActive ? 'text-accent' : 'text-ink-subtle',
+                  isActive ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface',
                 )
               }
             >
@@ -228,9 +234,9 @@ function Shell() {
         onClick={() => setQuickAddOpen(true)}
         aria-label="Quick add task (Ctrl/Cmd N)"
         title="Quick add (Ctrl/⌘ N)"
-        className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 w-14 h-14 rounded-full bg-accent text-[var(--accent-text)] shadow-lg flex items-center justify-center hover:bg-accent-hover transition-colors active:scale-90"
+        className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary text-on-primary shadow-[0_0_20px_-3px_rgba(192,193,255,0.4)] flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
       >
-        <Plus className="w-6 h-6" />
+        <Plus className="w-8 h-8" />
       </button>
 
       <PanicButton />
