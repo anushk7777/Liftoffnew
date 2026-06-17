@@ -18,6 +18,7 @@ import { buildProfile, getSuggestions } from '../lib/coach';
 import type { CoachState } from '../lib/coach';
 import { ProgressBar, PriorityDot } from '../components/ui';
 import { CoachCard } from '../components/Coach';
+import { Heatmap } from '../components/Heatmap';
 
 function greeting() {
   const h = new Date().getHours();
@@ -37,6 +38,7 @@ export default function Dashboard() {
     activityHistory,
     toggleLogDay,
     targetDate,
+    setTargetDate,
     phases,
     focusSessions,
     ideas,
@@ -64,6 +66,7 @@ export default function Dashboard() {
 
   const [quickTask, setQuickTask] = useState('');
   const [quickIdea, setQuickIdea] = useState('');
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const todayStr = startOfDay(new Date()).toISOString();
   const daysLeft = Math.max(0, differenceInCalendarDays(new Date(targetDate), new Date()));
@@ -132,12 +135,63 @@ export default function Dashboard() {
             {greeting()}.
           </h1>
         </div>
-        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-accent-soft px-4 py-2.5">
-          <Target className="w-5 h-5 text-accent" />
-          <div>
-            <p className="font-display text-xl font-bold leading-none text-ink">{daysLeft}</p>
-            <p className="text-[11px] text-ink-muted">days to goal</p>
-          </div>
+        <div className="relative">
+          <button
+            onClick={() => setDatePickerOpen((v) => !v)}
+            className="flex items-center gap-2.5 rounded-xl border border-border bg-accent-soft px-4 py-2.5 hover:border-accent transition-colors cursor-pointer group"
+            title="Click to change target date"
+          >
+            <Target className="w-5 h-5 text-accent" />
+            <div>
+              <p className="font-display text-xl font-bold leading-none text-ink">{daysLeft}</p>
+              <p className="text-[11px] text-ink-muted">days to goal</p>
+            </div>
+          </button>
+          {datePickerOpen && (
+            <div className="absolute right-0 top-full mt-2 z-50 card shadow-lg p-4 w-64 animate-rise">
+              <p className="text-xs text-ink-muted mb-2">
+                Target: <span className="text-accent font-medium">{format(new Date(targetDate), 'MMMM d, yyyy')}</span>
+              </p>
+              <input
+                type="date"
+                value={targetDate}
+                onChange={(e) => {
+                  setTargetDate(e.target.value);
+                  setDatePickerOpen(false);
+                }}
+                className="input text-sm w-full"
+                autoFocus
+              />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {[
+                  { label: '6mo', months: 6 },
+                  { label: '9mo', months: 9 },
+                  { label: '1yr', months: 12 },
+                ].map(({ label, months }) => {
+                  const d = new Date();
+                  d.setMonth(d.getMonth() + months);
+                  return (
+                    <button
+                      key={label}
+                      onClick={() => {
+                        setTargetDate(format(d, 'yyyy-MM-dd'));
+                        setDatePickerOpen(false);
+                      }}
+                      className="px-2 py-1 rounded-md text-xs font-medium bg-elevated border border-border text-ink-muted hover:text-ink hover:bg-hover transition-colors"
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setDatePickerOpen(false)}
+                className="text-xs text-ink-subtle hover:text-ink mt-2 w-full text-center"
+              >
+                close
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -253,6 +307,10 @@ export default function Dashboard() {
             <p className="text-[11px] text-ink-subtle text-center mt-3">
               {streak > 0 ? `${streak}-day streak` : 'Start your streak today'}
             </p>
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="text-[10px] font-medium text-ink-subtle uppercase tracking-wider mb-2">Activity (90 Days)</p>
+              <Heatmap history={activityHistory} />
+            </div>
           </div>
 
           <div className="card p-4">

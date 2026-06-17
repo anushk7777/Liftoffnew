@@ -1,0 +1,539 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Liftoff - Main Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "on-tertiary": "#131e8c",
+                "tertiary-fixed-dim": "#bdc2ff",
+                "surface-variant": "#34343d",
+                "on-surface": "#e4e1ed",
+                "on-secondary": "#00363e",
+                "on-background": "#e4e1ed",
+                "surface-dim": "#13131b",
+                "on-surface-variant": "#c7c4d7",
+                "on-error": "#690005",
+                "surface-tint": "#c0c1ff",
+                "surface-container-high": "#292932",
+                "on-tertiary-fixed-variant": "#2f3aa3",
+                "outline-variant": "#464554",
+                "secondary-fixed-dim": "#2fd9f4",
+                "on-tertiary-container": "#081486",
+                "surface-container-low": "#1b1b23",
+                "surface-bright": "#393841",
+                "secondary-fixed": "#a2eeff",
+                "primary": "#c0c1ff",
+                "inverse-on-surface": "#303038",
+                "tertiary-container": "#7c87f3",
+                "secondary": "#5de6ff",
+                "on-primary-fixed-variant": "#2f2ebe",
+                "tertiary": "#bdc2ff",
+                "surface-container-lowest": "#0d0d15",
+                "on-primary": "#1000a9",
+                "surface": "#13131b",
+                "inverse-surface": "#e4e1ed",
+                "on-secondary-fixed-variant": "#004e5a",
+                "on-secondary-fixed": "#001f25",
+                "outline": "#908fa0",
+                "surface-container": "#1f1f27",
+                "primary-container": "#8083ff",
+                "on-error-container": "#ffdad6",
+                "on-tertiary-fixed": "#000767",
+                "inverse-primary": "#494bd6",
+                "on-primary-container": "#0d0096",
+                "surface-container-highest": "#34343d",
+                "tertiary-fixed": "#e0e0ff",
+                "error": "#ffb4ab",
+                "error-container": "#93000a",
+                "primary-fixed-dim": "#c0c1ff",
+                "on-primary-fixed": "#07006c",
+                "on-secondary-container": "#00515d",
+                "background": "#13131b",
+                "secondary-container": "#00cbe6",
+                "primary-fixed": "#e1e0ff",
+                "silk": {
+                    "bg": "var(--bg-color)",
+                    "text": "var(--text-color)",
+                    "subtext": "var(--subtext-color)",
+                    "primary": "var(--primary-color)",
+                    "accent": "var(--accent-color)"
+                }
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px",
+                "twelve": "12px",
+                "2xl": "1rem",
+                "3xl": "1.5rem"
+        },
+        "spacing": {
+                "md": "16px",
+                "margin": "32px",
+                "sm": "8px",
+                "gutter": "20px",
+                "max_width": "1440px",
+                "lg": "24px",
+                "base": "4px",
+                "xs": "4px",
+                "xl": "40px"
+        },
+        "fontFamily": {
+                "sans": ['"Plus Jakarta Sans"', 'sans-serif'],
+                "display": ['"Plus Jakarta Sans"', 'sans-serif'],
+                "body": ['"Plus Jakarta Sans"', 'sans-serif'],
+                "code": ['"Plus Jakarta Sans"', 'monospace'],
+                "display-lg": [
+                        "Space Grotesk"
+                ],
+                "body-lg": [
+                        "Inter"
+                ],
+                "headline-lg": [
+                        "Space Grotesk"
+                ],
+                "body-md": [
+                        "Inter"
+                ],
+                "label-md": [
+                        "Inter"
+                ],
+                "headline-md": [
+                        "Space Grotesk"
+                ],
+                "display-md": [
+                        "Space Grotesk"
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        :root {
+            --bg-color: #13131b;
+            --text-color: #e4e1ed;
+            --subtext-color: #908fa0;
+            --primary-color: #c0c1ff;
+            --accent-color: #5de6ff;
+            --shadow-dark: #0a0a0e;
+            --shadow-light: #1c1c28;
+            --glow-color: rgba(255, 248, 231, 0.05);
+        }
+
+        html.dark {
+            --bg-color: #13131b;
+            --text-color: #e4e1ed;
+            --subtext-color: #8f8fa3;
+            --primary-color: #c0c1ff;
+            --accent-color: #5de6ff;
+            --shadow-dark: #0a0a0e;
+            --shadow-light: #1c1c28;
+            --glow-color: rgba(255, 248, 231, 0.05);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+            background-image: radial-gradient(circle at 90% 10%, rgba(255, 248, 231, 0.06) 0%, transparent 50%);
+        }
+        
+        .neo-card {
+            background: var(--bg-color);
+            border-radius: 24px;
+            box-shadow: 12px 12px 24px var(--shadow-dark), -12px -12px 24px var(--shadow-light), 0 0 20px var(--glow-color);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        html.dark .neo-card {
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .neo-card-inset {
+            background: var(--bg-color);
+            border-radius: 24px;
+            box-shadow: inset 8px 8px 16px var(--shadow-dark), inset -8px -8px 16px var(--shadow-light);
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .neo-button {
+            background: var(--bg-color);
+            box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
+            transition: all 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        .neo-button:hover {
+            box-shadow: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light), 0 0 10px var(--glow-color);
+            transform: translateY(1px);
+        }
+
+        .neo-button:active {
+            box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
+        }
+
+        .neo-pressed {
+            background: var(--bg-color);
+            box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .custom-checkbox {
+            appearance: none;
+            background-color: var(--bg-color);
+            margin: 0;
+            font: inherit;
+            color: currentColor;
+            width: 1.25em;
+            height: 1.25em;
+            border-radius: 6px;
+            display: grid;
+            place-content: center;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+        }
+
+        .custom-checkbox::before {
+            content: "";
+            width: 0.65em;
+            height: 0.65em;
+            transform: scale(0);
+            transition: 120ms transform ease-in-out;
+            box-shadow: inset 1em 1em var(--bg-color);
+            background-color: var(--primary-color);
+            transform-origin: center;
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+        }
+
+        .custom-checkbox:checked::before {
+            transform: scale(1);
+        }
+
+        .custom-checkbox:checked {
+            box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+        }
+        
+        .heatmap-cell {
+            transition: all 0.2s ease;
+        }
+        .heatmap-cell:hover {
+            transform: scale(1.1);
+        }
+        
+        .progress-track {
+            box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .progress-fill {
+            box-shadow: 2px 2px 8px rgba(192, 193, 255, 0.4);
+        }
+
+        html.dark .progress-fill {
+            box-shadow: 2px 2px 8px rgba(192, 193, 255, 0.4);
+        }
+
+        .dial-ring {
+            box-shadow: 8px 8px 16px var(--shadow-dark), -8px -8px 16px var(--shadow-light), 0 0 15px var(--glow-color);
+            transition: box-shadow 0.3s ease;
+        }
+        .dial-inner {
+            box-shadow: inset 8px 8px 16px var(--shadow-dark), inset -8px -8px 16px var(--shadow-light);
+            transition: box-shadow 0.3s ease;
+        }
+
+        html.dark svg circle[stroke="#D1D5DB"] {
+            stroke: var(--shadow-light);
+        }
+        html.dark svg circle[stroke="#4C51BF"] {
+            stroke: var(--primary-color);
+        }
+
+        .fab-btn {
+            box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light), 0 0 15px rgba(192, 193, 255, 0.2);
+        }
+        .fab-btn:hover {
+            box-shadow: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light), 0 0 20px rgba(192, 193, 255, 0.3);
+        }
+        .fab-btn:active {
+            box-shadow: inset 4px 4px 8px rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+<body class="font-body text-silk-text bg-silk-bg antialiased overflow-hidden flex h-screen w-full transition-colors duration-300 dark">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col h-full py-6 px-4 w-64 fixed left-0 top-0 z-50 transition-colors duration-300">
+<!-- Brand / Header -->
+<div class="flex items-center gap-3 mb-10 pl-2">
+<img alt="User Profile" class="w-10 h-10 rounded-xl object-cover neo-button" data-alt="A sleek, minimalist logo for a productivity app named 'Liftoff'." src="data:image/png;base64,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">
+<div>
+<h1 class="font-display text-2xl font-bold text-silk-primary tracking-tight">Liftoff</h1>
+<p class="text-[10px] font-bold text-silk-subtext uppercase tracking-widest">High Performance</p>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<ul class="flex-1 space-y-3">
+<!-- Active Tab -->
+<li class="">
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-silk-primary font-bold neo-pressed transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-body text-sm">Dashboard</span>
+</a>
+</li>
+<!-- Inactive Tabs -->
+<li class="">
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-silk-subtext font-medium hover:text-silk-primary hover:neo-button transition-all duration-200 active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">check_circle</span>
+<span class="font-body text-sm">Tasks</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-silk-subtext font-medium hover:text-silk-primary hover:neo-button transition-all duration-200 active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">psychology</span>
+<span class="font-body text-sm">Coach</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-silk-subtext font-medium hover:text-silk-primary hover:neo-button transition-all duration-200 active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">timer</span>
+<span class="font-body text-sm">Focus</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-silk-subtext font-medium hover:text-silk-primary hover:neo-button transition-all duration-200 active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">timeline</span>
+<span class="font-body text-sm">Roadmap</span>
+</a>
+</li>
+<li class="">
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-silk-subtext font-medium hover:text-silk-primary hover:neo-button transition-all duration-200 active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">leaderboard</span>
+<span class="font-body text-sm">Stats</span>
+</a>
+</li>
+</ul>
+<!-- Footer Tabs -->
+<div class="mt-auto pt-4 space-y-3">
+<button class="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-silk-subtext font-medium hover:text-silk-primary hover:neo-button transition-all duration-200 active:scale-95" id="theme-toggle">
+<span class="material-symbols-outlined" id="theme-icon" style="font-variation-settings: 'FILL' 0;">light_mode</span>
+<span class="font-body text-sm" id="theme-text">Light Mode</span>
+</button>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-silk-subtext font-medium hover:text-silk-primary hover:neo-button transition-all duration-200 active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+<span class="font-body text-sm">Settings</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl text-silk-subtext font-medium hover:text-silk-primary hover:neo-button transition-all duration-200 active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">help</span>
+<span class="font-body text-sm">Support</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-0 md:ml-64 flex-1 h-screen p-8 relative z-10 overflow-visible">
+<div class="max-w-[1440px] mx-auto h-full flex flex-col gap-8 relative z-20">
+<!-- Greeting & Progress -->
+<header class="flex flex-col gap-4 pt-6 relative z-20">
+<h2 class="font-display text-4xl font-bold text-silk-text drop-shadow-md">Good evening, Commander</h2>
+<div class="flex items-center gap-4 w-full max-w-md">
+<span class="font-body text-xs font-bold text-silk-subtext tracking-widest uppercase">Daily Objective</span>
+<div class="flex-1 h-3 bg-silk-bg rounded-full overflow-hidden progress-track">
+<div class="h-full bg-silk-primary w-[85%] rounded-full progress-fill relative"></div>
+</div>
+<span class="font-code text-sm font-semibold text-silk-primary">85%</span>
+</div>
+</header>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-8 flex-1 pb-10 relative z-20">
+<!-- Left Column (Tasks & Habits) -->
+<div class="md:col-span-7 flex flex-col gap-8 h-full">
+<!-- Tasks -->
+<div class="neo-card p-6 flex-1 flex flex-col relative overflow-hidden">
+<div class="flex justify-between items-center mb-6 z-10">
+<h3 class="font-display text-xl font-semibold text-silk-text flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl neo-button flex items-center justify-center">
+<span class="material-symbols-outlined text-silk-primary">format_list_bulleted</span>
+</div>
+                                Mission Critical
+                            </h3>
+<button class="w-10 h-10 rounded-xl neo-button flex items-center justify-center text-silk-subtext hover:text-silk-primary transition-colors">
+<span class="material-symbols-outlined">more_horiz</span>
+</button>
+</div>
+<ul class="flex-1 space-y-4 z-10 overflow-y-auto pr-2">
+<!-- Task Item -->
+<li class="flex items-start gap-4 p-4 rounded-2xl neo-card-inset group/item">
+<input class="custom-checkbox mt-1" type="checkbox">
+<div class="flex-1">
+<p class="font-body text-base font-medium text-silk-text group-hover/item:text-silk-primary transition-colors">Finalize Q3 Strategy Deck</p>
+<p class="font-code text-xs text-silk-subtext flex items-center gap-2 mt-2">
+<span class="material-symbols-outlined text-[14px]">schedule</span> 10:00 AM
+                                        <span class="w-1 h-1 rounded-full bg-silk-subtext mx-1"></span>
+<span class="px-2 py-1 rounded-lg bg-silk-bg neo-button text-silk-accent text-[10px] uppercase font-bold tracking-wider">High Priority</span>
+</p>
+</div>
+</li>
+<!-- Task Item (Checked) -->
+<li class="flex items-start gap-4 p-4 rounded-2xl neo-card-inset group/item opacity-60">
+<input checked="" class="custom-checkbox mt-1" type="checkbox">
+<div class="flex-1 line-through">
+<p class="font-body text-base font-medium text-silk-subtext">Review Team Metrics</p>
+<p class="font-code text-xs text-silk-subtext flex items-center gap-2 mt-2">
+<span class="material-symbols-outlined text-[14px]">schedule</span> 09:00 AM
+                                    </p>
+</div>
+</li>
+</ul>
+</div>
+<!-- Habits Heatmap -->
+<div class="neo-card p-6 shrink-0">
+<h3 class="font-display text-xl font-semibold text-silk-text mb-6 flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl neo-button flex items-center justify-center">
+<span class="material-symbols-outlined text-silk-accent">local_fire_department</span>
+</div>
+                            Consistency Streak
+                        </h3>
+<div class="flex justify-between items-end h-16 px-4">
+<!-- Mon -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-10 h-10 rounded-xl bg-silk-bg neo-card-inset flex items-center justify-center heatmap-cell"></div>
+<span class="font-body text-xs font-semibold text-silk-subtext">M</span>
+</div>
+<!-- Tue -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-10 h-10 rounded-xl bg-silk-primary/10 neo-card-inset flex items-center justify-center heatmap-cell"></div>
+<span class="font-body text-xs font-semibold text-silk-subtext">T</span>
+</div>
+<!-- Wed -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-10 h-10 rounded-xl bg-silk-primary/30 neo-card-inset flex items-center justify-center heatmap-cell"></div>
+<span class="font-body text-xs font-semibold text-silk-subtext">W</span>
+</div>
+<!-- Thu -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-10 h-10 rounded-xl bg-silk-primary neo-button flex items-center justify-center heatmap-cell">
+<span class="material-symbols-outlined text-black text-[18px]">check</span>
+</div>
+<span class="font-body text-xs font-bold text-silk-primary">T</span>
+</div>
+<!-- Fri -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-10 h-10 rounded-xl bg-silk-bg neo-card-inset flex items-center justify-center heatmap-cell"></div>
+<span class="font-body text-xs font-semibold text-silk-subtext">F</span>
+</div>
+<!-- Sat -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-10 h-10 rounded-xl bg-silk-bg neo-card-inset flex items-center justify-center heatmap-cell"></div>
+<span class="font-body text-xs font-semibold text-silk-subtext">S</span>
+</div>
+<!-- Sun -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-10 h-10 rounded-xl bg-silk-bg neo-card-inset flex items-center justify-center heatmap-cell"></div>
+<span class="font-body text-xs font-semibold text-silk-subtext">S</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column (Timer & Coach) -->
+<div class="md:col-span-5 flex flex-col gap-8 h-full">
+<!-- Focus Timer -->
+<div class="neo-card p-6 flex flex-col items-center justify-center relative overflow-hidden flex-1 shrink-0 min-h-[300px]">
+<div class="relative flex items-center justify-center w-56 h-56 mb-8">
+<!-- Tactile Dial -->
+<div class="absolute inset-0 rounded-full bg-silk-bg dial-ring flex items-center justify-center">
+<div class="absolute inset-4 rounded-full bg-silk-bg dial-inner flex items-center justify-center">
+<!-- Progress indicator -->
+<svg class="absolute inset-0 w-full h-full transform -rotate-90 transition-colors duration-300" viewBox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="46" stroke="#1d1d29" stroke-linecap="round" stroke-width="4"></circle>
+<circle cx="50" cy="50" fill="none" r="46" stroke="#c0c1ff" stroke-dasharray="289" stroke-dashoffset="60" stroke-linecap="round" stroke-width="4" style="filter: drop-shadow(0 0 4px rgba(192, 193, 255, 0.5));"></circle>
+</svg>
+<!-- Time Display -->
+<div class="text-center z-10 flex flex-col items-center justify-center w-36 h-36 rounded-full bg-silk-bg neo-button">
+<h1 class="font-display text-5xl font-bold text-silk-text tracking-tighter m-0 leading-none">25<span class="opacity-50">:</span>00</h1>
+<span class="font-body text-xs font-bold text-silk-primary mt-2 uppercase tracking-widest">Focus</span>
+</div>
+</div>
+</div>
+</div>
+<button class="neo-button bg-silk-bg text-silk-primary font-body text-base font-bold py-3 px-10 rounded-2xl flex items-center gap-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+                            Engage
+                        </button>
+</div>
+<!-- Coach / Insights -->
+<div class="neo-card p-6 flex flex-col">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-10 h-10 rounded-xl neo-button flex items-center justify-center">
+<span class="material-symbols-outlined text-silk-accent text-[20px]">psychology</span>
+</div>
+<h3 class="font-display text-xl font-semibold text-silk-text">Daily Insight</h3>
+</div>
+<div class="flex-1 flex flex-col gap-4">
+<div class="neo-card-inset p-4 rounded-2xl rounded-tl-none max-w-[90%]">
+<p class="font-body text-sm text-silk-text leading-relaxed">Commander, your evening velocity is optimal. Consider tackling the "Q3 Strategy" task first while cognitive load is low.</p>
+</div>
+<div class="self-end bg-silk-primary text-black p-4 rounded-2xl rounded-tr-none neo-button max-w-[90%]">
+<p class="font-body text-sm font-semibold">Understood. Setting context now.</p>
+</div>
+</div>
+<div class="mt-6 pt-4 flex items-center gap-2 justify-center opacity-60">
+<span class="material-symbols-outlined text-silk-subtext text-[16px]">smart_toy</span>
+<span class="font-code text-xs font-semibold text-silk-subtext">Coach AI is active</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Add FAB -->
+<button class="fixed bottom-8 right-8 w-16 h-16 bg-silk-primary text-black rounded-2xl flex items-center justify-center fab-btn transition-all z-50 hover:bg-[#d0d1ff]">
+<span class="material-symbols-outlined text-[32px]" style="font-variation-settings: 'FILL' 1;">add</span>
+</button>
+</div>
+<div class="absolute top-0 right-0 w-[400px] h-[400px] z-0 pointer-events-none overflow-visible flex items-center justify-center" style="background: transparent;">
+<img alt="Glowing moon" class="w-[380px] h-[380px] object-contain mix-blend-screen opacity-90 transform translate-x-10 -translate-y-10" src="https://lh3.googleusercontent.com/aida/AP1WRLsozTQcci_eKwFiNlWjSiaryhyrkTTRaDy-r2t1v_2VRRgtuo-cN2RlK6n0qgGvuXT5R_tGjPGZLoOOp0YiOEKj3xAp2i0iPGBrpOVKMiM8bnKeHZo1Ag7M85Dms_eVV0vOVrPm36wiVqUiTCI9oCjPqArExJkfy9TB4o5iv8t8EknV918RBLuLbqlDAJKCwHN8WPQp-XL7IHp9t-XB0QL7EqH1Ne_g6ZAeqx2kSE_Ju-6ASU8Rm9c4GXB2" style="filter: drop-shadow(rgba(255, 248, 231, 0.1) 0px 0px 40px);">
+</div>
+</main>
+<script>
+        document.querySelectorAll('.custom-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const li = e.target.closest('li');
+                if(e.target.checked) {
+                    li.classList.add('opacity-60');
+                    li.querySelector('p:first-of-type').classList.add('line-through', 'text-silk-subtext');
+                    li.querySelector('p:first-of-type').classList.remove('text-silk-text', 'group-hover/item:text-silk-primary');
+                } else {
+                    li.classList.remove('opacity-60');
+                    li.querySelector('p:first-of-type').classList.remove('line-through', 'text-silk-subtext');
+                    li.querySelector('p:first-of-type').classList.add('text-silk-text', 'group-hover/item:text-silk-primary');
+                }
+            });
+        });
+
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        const themeText = document.getElementById('theme-text');
+
+        themeToggleBtn.addEventListener('click', function() {
+            document.documentElement.classList.toggle('dark');
+            if (document.documentElement.classList.contains('dark')) {
+                themeIcon.textContent = 'light_mode';
+                themeText.textContent = 'Light Mode';
+            } else {
+                themeIcon.textContent = 'dark_mode';
+                themeText.textContent = 'Dark Mode';
+            }
+        });
+    </script>
+
+
+</body></html>

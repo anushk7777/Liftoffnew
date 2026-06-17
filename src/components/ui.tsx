@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { animate } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -114,8 +115,8 @@ export function Modal({
   }, [open, onClose]);
 
   if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[10vh] overflow-y-auto">
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 overflow-y-auto">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div
         className={cn(
@@ -136,7 +137,8 @@ export function Modal({
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

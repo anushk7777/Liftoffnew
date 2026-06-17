@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import {
@@ -33,6 +33,19 @@ import BrainDump from './pages/BrainDump';
 import Roadmap from './pages/Roadmap';
 const Stats = lazy(() => import('./pages/Stats'));
 import SettingsPage from './pages/Settings';
+import { EmptyState } from './components/ui';
+
+function NotFound() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center h-full p-8 animate-rise">
+      <EmptyState
+        icon={<Map className="w-10 h-10" />}
+        title="Page not found"
+        hint="Looks like you drifted off course. Use the sidebar to navigate back."
+      />
+    </div>
+  );
+}
 
 const MOBILE_NAV = [
   { to: '/', label: 'Today', icon: LayoutDashboard, end: true },
@@ -42,20 +55,31 @@ const MOBILE_NAV = [
   { to: '/roadmap', label: 'Roadmap', icon: Map },
 ];
 
+// Pages where sidebar should auto-collapse for maximum workspace
+const WIDE_PAGES = new Set(['/tasks', '/focus', '/roadmap', '/coach', '/brain-dump']);
+
 function Shell() {
   const location = useLocation();
   const rm = useReducedMotion();
   useReminders();
 
-  const [collapsed, setCollapsed] = useState(
+  const [userCollapsed, setUserCollapsed] = useState(
     () => localStorage.getItem('liftoff_sidebar_collapsed') === '1',
   );
+  const [focusMode, setFocusMode] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
+  // Auto-collapse on content-heavy pages
+  const autoCollapse = useMemo(
+    () => WIDE_PAGES.has(location.pathname),
+    [location.pathname],
+  );
+  const collapsed = focusMode || autoCollapse || userCollapsed;
+
   const toggleCollapsed = () => {
-    setCollapsed((c) => {
+    setUserCollapsed((c) => {
       localStorage.setItem('liftoff_sidebar_collapsed', !c ? '1' : '0');
       return !c;
     });
@@ -64,12 +88,16 @@ function Shell() {
   // Global shortcuts + the command-palette "Add a task" bridge.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setPaletteOpen((o) => !o);
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         setQuickAddOpen(true);
+      } else if (e.key.toLowerCase() === 'f' && !isInput && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        setFocusMode((f) => !f);
       }
     };
     const onQuickAdd = () => setQuickAddOpen(true);
@@ -92,15 +120,18 @@ function Shell() {
       <Route path="/roadmap" element={<Roadmap />} />
       <Route path="/stats" element={<Suspense fallback={<div className="flex h-full items-center justify-center text-ink-subtle animate-pulse">Loading stats...</div>}><Stats /></Suspense>} />
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg text-ink">
       {/* Desktop sidebar */}
-      <div className="hidden md:block shrink-0">
-        <Sidebar collapsed={collapsed} onToggle={toggleCollapsed} onOpenSearch={() => setPaletteOpen(true)} />
-      </div>
+      {!focusMode && (
+        <div className="hidden md:block shrink-0">
+          <Sidebar collapsed={collapsed} onToggle={toggleCollapsed} onOpenSearch={() => setPaletteOpen(true)} />
+        </div>
+      )}
 
       {/* Mobile sidebar overlay */}
       {mobileOpen && (
@@ -146,7 +177,10 @@ function Shell() {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-5xl px-5 py-7 pb-24 sm:px-8 sm:py-10 md:pb-10">
+          <div className={cn(
+            'mx-auto w-full px-5 py-7 pb-24 sm:px-8 sm:py-10 md:pb-10 transition-[max-width] duration-200',
+            collapsed ? 'max-w-6xl' : 'max-w-5xl',
+          )}>
             <ErrorBoundary>
               {rm ? (
                 routesEl

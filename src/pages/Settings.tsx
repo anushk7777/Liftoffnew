@@ -8,14 +8,12 @@ import {
   Timer,
   Target,
   Bell,
-  KeyRound,
   RefreshCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { requestNotificationPermission, notificationPermission } from '../lib/reminders';
-import { getKey, setKey, getModel, setModel, COACH_MODELS } from '../lib/claudeChat';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
 
@@ -40,9 +38,6 @@ export default function Settings() {
 
   const [importStatus, setImportStatus] = useState('');
   const [reminders, setReminders] = useState(() => notificationPermission() === 'granted');
-  const [apiKey, setApiKeyState] = useState(() => getKey());
-  const [coachModel, setCoachModelState] = useState(() => getModel());
-  const [coachStatus, setCoachStatus] = useState('');
   const [syncInput, setSyncInput] = useState(syncCode);
   const [syncStatus, setSyncStatus] = useState('');
   const [syncing, setSyncing] = useState(false);
@@ -133,13 +128,42 @@ export default function Settings() {
         {/* Goal */}
         <Section title="Goal" icon={<Target className="w-4 h-4" />}>
           <Row label="Target date" desc="The day you land the role.">
+            <span className="text-sm font-medium text-accent">
+              {format(new Date(targetDate), 'MMMM d, yyyy')}
+            </span>
+          </Row>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            {[
+              { label: '3 months', months: 3 },
+              { label: '6 months', months: 6 },
+              { label: '9 months', months: 9 },
+              { label: '12 months', months: 12 },
+            ].map(({ label, months }) => {
+              const d = new Date();
+              d.setMonth(d.getMonth() + months);
+              const val = format(d, 'yyyy-MM-dd');
+              return (
+                <button
+                  key={label}
+                  onClick={() => setTargetDate(val)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                    targetDate === val
+                      ? 'bg-accent text-[var(--accent-text)]'
+                      : 'bg-elevated border border-border text-ink-muted hover:text-ink hover:bg-hover',
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
             <input
               type="date"
               value={targetDate}
               onChange={(e) => setTargetDate(e.target.value)}
-              className="input w-auto"
+              className="input !w-auto !py-1.5 !px-3 text-xs"
             />
-          </Row>
+          </div>
         </Section>
 
         {/* Pomodoro */}
@@ -263,62 +287,6 @@ export default function Settings() {
           >
             Reset roadmap progress
           </button>
-        </Section>
-
-        {/* AI Coach */}
-        <Section title="AI Coach (Claude)" icon={<KeyRound className="w-4 h-4" />}>
-          <p className="text-xs text-ink-subtle mb-3">
-            Connect your Anthropic API key to chat with a Claude-powered coach that knows your
-            progress (on the Coach page). Your key is stored only on this device and sent only to
-            Anthropic —{' '}
-            <a
-              href="https://console.anthropic.com/settings/keys"
-              target="_blank"
-              rel="noreferrer"
-              className="text-accent hover:underline"
-            >
-              get a key
-            </a>
-            .
-          </p>
-          <label className="block mb-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle mb-1.5 block">
-              API key
-            </span>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKeyState(e.target.value)}
-              placeholder="sk-ant-…"
-              autoComplete="off"
-              className="input"
-            />
-          </label>
-          <label className="block mb-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle mb-1.5 block">
-              Model
-            </span>
-            <select
-              value={coachModel}
-              onChange={(e) => setCoachModelState(e.target.value)}
-              className="input"
-            >
-              {COACH_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="flex gap-2">
-            <button onClick={saveCoach} className="btn btn-primary">
-              Save
-            </button>
-            <button onClick={clearCoach} className="btn btn-secondary">
-              Clear key
-            </button>
-          </div>
-          {coachStatus && <p className="text-xs text-success font-medium mt-2">{coachStatus}</p>}
         </Section>
       </div>
     </div>

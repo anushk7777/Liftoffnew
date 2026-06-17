@@ -6,7 +6,6 @@ import { buildProfile, getSuggestions, getBriefing, formatHour } from '../lib/co
 import type { CoachState } from '../lib/coach';
 import { PageHeader, ProgressBar } from '../components/ui';
 import { SuggestionRow } from '../components/Coach';
-import CoachChat from '../components/CoachChat';
 import { useCoachActions } from '../components/useCoachActions';
 
 export default function Coach() {
@@ -83,10 +82,7 @@ export default function Coach() {
         </div>
       </div>
 
-      {/* Conversational Claude coach */}
-      <div className="mb-6">
-        <CoachChat />
-      </div>
+
 
       {/* How it works */}
       <div className="card p-4 mb-6 flex items-start gap-3 bg-accent-soft/30">

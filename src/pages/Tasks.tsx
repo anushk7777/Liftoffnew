@@ -9,13 +9,15 @@ import {
   Circle,
   CircleDot,
   Clock,
+  Calendar,
 } from 'lucide-react';
-import { format, isToday, isPast, startOfDay } from 'date-fns';
+import { format, isToday, isPast, startOfDay, addMinutes } from 'date-fns';
 import { useStore } from '../store/useStore';
+import { buildICS, downloadICS } from '../lib/ics';
 import type { TodoTask, Priority, Status } from '../store/data';
 import { cn } from '../lib/utils';
 import { springSoft } from '../lib/motion';
-import { PageHeader, Modal, PriorityDot, PriorityBadge, EmptyState } from '../components/ui';
+import { PageHeader, Modal, PriorityDot, EmptyState } from '../components/ui';
 
 const toLocalInput = (d: Date) => {
   const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
@@ -219,12 +221,34 @@ function TaskRow({
       </div>
 
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={onEdit} className="p-1.5 rounded-md text-ink-subtle hover:text-ink hover:bg-hover">
+        {task.scheduledAt && (
+          <button
+            onClick={() => {
+              const dtStart = new Date(task.scheduledAt!);
+              // Default to 30 mins if no estimate, otherwise parse estimate or just use 60 mins
+              const dtEnd = addMinutes(dtStart, 30);
+              const icsStr = buildICS({
+                title: task.title,
+                description: task.notes || '',
+                dtStart,
+                dtEnd,
+                alarmMinutesBefore: 5,
+              });
+              downloadICS(`task-${task.id}.ics`, icsStr);
+            }}
+            className="p-1.5 rounded-md text-ink-subtle hover:text-accent hover:bg-hover"
+            title="Add to Calendar"
+          >
+            <Calendar className="w-4 h-4" />
+          </button>
+        )}
+        <button onClick={onEdit} className="p-1.5 rounded-md text-ink-subtle hover:text-ink hover:bg-hover" title="Edit task">
           <Pencil className="w-4 h-4" />
         </button>
         <button
           onClick={onDelete}
           className="p-1.5 rounded-md text-ink-subtle hover:text-danger hover:bg-hover"
+          title="Delete task"
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -245,7 +269,7 @@ function TaskModal({
   onSave: (data: Partial<TodoTask>) => void;
 }) {
   return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Edit task' : 'New task'}>
+    <Modal open={open} onClose={onClose} title={editing ? 'Edit task' : 'New task'} maxWidth="max-w-2xl">
       {/* Remount on open / when switching target so fields initialise from props */}
       {open && (
         <TaskForm
@@ -268,6 +292,7 @@ function TaskForm({
   onClose: () => void;
   onSave: (data: Partial<TodoTask>) => void;
 }) {
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
   const [title, setTitle] = useState(editing?.title ?? '');
   const [notes, setNotes] = useState(editing?.notes ?? '');
   const [priority, setPriority] = useState<Priority>(editing?.priority ?? 'medium');
@@ -299,8 +324,31 @@ function TaskForm({
     });
   };
 
+  const quickDate = (label: string, value: string) => (
+    <button
+      type="button"
+      onClick={() => setDueDate(value)}
+      className={cn(
+        'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+        dueDate === value
+          ? 'bg-accent text-[var(--accent-text)]'
+          : 'bg-elevated border border-border text-ink-muted hover:text-ink hover:bg-hover',
+      )}
+    >
+      {label}
+    </button>
+  );
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  const nextWeekStr = format(nextWeek, 'yyyy-MM-dd');
+
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-3">
+        {/* Title */}
         <input
           autoFocus
           value={title}
@@ -308,77 +356,119 @@ function TaskForm({
           placeholder="What needs to get done?"
           className="input text-base"
         />
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notes (optional)"
-          rows={2}
-          className="input resize-none"
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Priority">
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as Priority)}
-              className="input"
+
+        {/* Quick-schedule row — the most important controls, right after title */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Clock className="w-4 h-4 text-ink-subtle shrink-0" />
+          {quickDate('Today', todayStr)}
+          {quickDate('Tomorrow', tomorrowStr)}
+          {quickDate('Next week', nextWeekStr)}
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className="input !w-auto !py-1 !px-2 text-xs"
+            title="Pick a date"
+          />
+          {dueDate && (
+            <button
+              type="button"
+              onClick={() => setDueDate('')}
+              className="text-xs text-ink-subtle hover:text-danger transition-colors"
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </Field>
-          <Field label="Status">
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as Status)}
-              className="input"
-            >
-              <option value="todo">To do</option>
-              <option value="doing">In progress</option>
-              <option value="done">Done</option>
-            </select>
-          </Field>
-          <Field label="Category">
-            <input
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="e.g. DSA"
-              className="input"
-            />
-          </Field>
-          <Field label="Estimate">
-            <input
-              value={estimate}
-              onChange={(e) => setEstimate(e.target.value)}
-              placeholder="e.g. 45m"
-              className="input"
-            />
-          </Field>
-          <Field label="Due date">
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="input"
-            />
-          </Field>
-          <Field label="Schedule (time)">
-            <input
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-              className="input"
-            />
-          </Field>
+              ✕
+            </button>
+          )}
         </div>
-        <div className="flex items-center justify-between gap-2 pt-1">
-          {editing ? <PriorityBadge priority={priority} /> : <span />}
-          <div className="flex gap-2">
+
+        {/* Schedule exact time */}
+        {dueDate && (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">Set time</span>
+            <input
+              type="time"
+              value={scheduledAt ? scheduledAt.slice(11, 16) : ''}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setScheduledAt(`${dueDate}T${e.target.value}`);
+                } else {
+                  setScheduledAt('');
+                }
+              }}
+              className="input !w-auto !py-1 !px-2 text-xs"
+            />
+            {scheduledAt && (
+              <button
+                type="button"
+                onClick={() => setScheduledAt('')}
+                className="text-xs text-ink-subtle hover:text-danger transition-colors"
+              >
+                ✕ clear
+              </button>
+            )}
+            <span className="text-[10px] text-ink-subtle ml-auto">Reminders will fire at this time</span>
+          </div>
+        )}
+
+        {/* Compact row: Priority + Status + Category + Estimate */}
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex items-center gap-1">
+            {(['low', 'medium', 'high'] as Priority[]).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPriority(p)}
+                className={cn(
+                  'px-2 py-1 rounded-md text-xs font-medium capitalize transition-colors',
+                  priority === p
+                    ? p === 'high' ? 'bg-danger/20 text-danger border border-danger/30'
+                      : p === 'medium' ? 'bg-warning/20 text-warning border border-warning/30'
+                      : 'bg-elevated text-ink-muted border border-border'
+                    : 'bg-transparent text-ink-subtle hover:bg-hover border border-transparent',
+                )}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as Status)}
+            className="input !w-auto !py-1 !px-2 text-xs"
+          >
+            <option value="todo">To do</option>
+            <option value="doing">In progress</option>
+            <option value="done">Done</option>
+          </select>
+          <input
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="Category"
+            className="input !w-24 !py-1 !px-2 text-xs"
+          />
+          <input
+            value={estimate}
+            onChange={(e) => setEstimate(e.target.value)}
+            placeholder="⏱ Est."
+            className="input !w-20 !py-1 !px-2 text-xs"
+          />
+        </div>
+
+        {/* Notes + Actions in one row */}
+        <div className="flex items-end gap-3 pt-1">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes (optional)"
+            rows={1}
+            className="input resize-none text-sm flex-1"
+          />
+          <div className="flex gap-2 shrink-0">
             <button type="button" onClick={onClose} className="btn btn-secondary">
               Cancel
             </button>
             <button type="submit" className="btn btn-primary">
-              {editing ? 'Save changes' : 'Add task'}
+              {editing ? 'Save' : 'Add task'}
             </button>
           </div>
         </div>
