@@ -70,3 +70,33 @@ export function downloadICS(filename: string, content: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+export function googleCalendarUrl({
+  title,
+  start,
+  durationMins = 30,
+  description,
+}: {
+  title: string;
+  start: string | Date;
+  durationMins?: number;
+  description?: string;
+}): string {
+  const dtStart = new Date(start);
+  const dtEnd = new Date(dtStart.getTime() + durationMins * 60000);
+  
+  // Google wants YYYYMMDDTHHMMSSZ format
+  const format = (d: Date) => toICSDate(d).replace(/[-:]/g, ''); 
+
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: `${format(dtStart)}/${format(dtEnd)}`,
+  });
+  
+  if (description) {
+    params.append('details', description);
+  }
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}

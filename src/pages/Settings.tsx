@@ -64,18 +64,6 @@ export default function Settings() {
     setTimeout(() => setSyncStatus(''), 3000);
   };
 
-  const saveCoach = () => {
-    setKey(apiKey);
-    setModel(coachModel);
-    setCoachStatus(apiKey.trim() ? 'Connected. Open the Coach page to chat.' : 'Key cleared.');
-    setTimeout(() => setCoachStatus(''), 4000);
-  };
-  const clearCoach = () => {
-    setApiKeyState('');
-    setKey('');
-    setCoachStatus('Key cleared.');
-    setTimeout(() => setCoachStatus(''), 4000);
-  };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -196,7 +184,7 @@ export default function Settings() {
         <Section title="Reminders" icon={<Bell className="w-4 h-4" />}>
           <Row
             label="Task reminders"
-            desc="Notify me when a scheduled task is due (while Liftoff is open)."
+            desc="Notify me when a scheduled task is due."
           >
             <Toggle
               checked={reminders}
@@ -207,13 +195,28 @@ export default function Settings() {
             />
           </Row>
           {notificationPermission() === 'denied' && (
-            <p className="text-xs text-danger">
+            <p className="text-xs text-danger mb-2">
               Notifications are blocked in your browser settings — enable them there first.
             </p>
           )}
-          <p className="text-xs text-ink-subtle">
-            Scheduled tasks also ring an in-app alarm (with snooze) while Liftoff is open.
-          </p>
+          <div className="bg-elevated p-3 rounded-md text-xs text-ink-subtle space-y-2 border border-border">
+            <p><strong>1. In-App Alarms:</strong> Trigger immediately when Liftoff is open.</p>
+            <p><strong>2. Browser Notifications:</strong> Trigger natively if permission is granted.</p>
+            <p><strong>3. Email & Mobile Push:</strong> Delivered via your Calendar app. Use 'Add to Calendar' on a scheduled task to sync it.</p>
+          </div>
+          <button
+            onClick={() => {
+              window.dispatchEvent(
+                new CustomEvent('liftoff:alarm', { detail: { id: 'test', title: 'This is a test reminder!' } })
+              );
+              if (notificationsSupported() && Notification.permission === 'granted') {
+                try { new Notification('Liftoff reminder', { body: 'This is a test reminder!' }); } catch {}
+              }
+            }}
+            className="btn btn-secondary w-full mt-3"
+          >
+            Test reminder
+          </button>
         </Section>
 
         {/* Sync across devices */}

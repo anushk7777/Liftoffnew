@@ -13,11 +13,12 @@ import {
 } from 'lucide-react';
 import { format, isToday, isPast, startOfDay, addMinutes } from 'date-fns';
 import { useStore } from '../store/useStore';
-import { buildICS, downloadICS } from '../lib/ics';
+import { buildICS, downloadICS, googleCalendarUrl } from '../lib/ics';
 import type { TodoTask, Priority, Status } from '../store/data';
 import { cn } from '../lib/utils';
 import { springSoft } from '../lib/motion';
-import { PageHeader, Modal, PriorityDot, EmptyState } from '../components/ui';
+import { PageHeader, EmptyState, Modal, PriorityDot } from '../components/ui';
+import { DateTimePicker } from '../components/DateTimePicker';
 
 const toLocalInput = (d: Date) => {
   const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
@@ -222,25 +223,37 @@ function TaskRow({
 
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {task.scheduledAt && (
-          <button
-            onClick={() => {
-              const dtStart = new Date(task.scheduledAt!);
-              // Default to 30 mins if no estimate, otherwise parse estimate or just use 60 mins
-              const dtEnd = addMinutes(dtStart, 30);
-              const icsStr = buildICS({
+          <>
+            <button
+              onClick={() => {
+                const icsStr = buildICS({
+                  title: task.title,
+                  description: task.notes || '',
+                  start: task.scheduledAt!,
+                  durationMins: 30,
+                });
+                downloadICS(`task-${task.id}.ics`, icsStr);
+              }}
+              className="p-1.5 rounded-md text-ink-subtle hover:text-accent hover:bg-hover"
+              title="Download .ics"
+            >
+              <Calendar className="w-4 h-4" />
+            </button>
+            <a
+              href={googleCalendarUrl({
                 title: task.title,
                 description: task.notes || '',
-                dtStart,
-                dtEnd,
-                alarmMinutesBefore: 5,
-              });
-              downloadICS(`task-${task.id}.ics`, icsStr);
-            }}
-            className="p-1.5 rounded-md text-ink-subtle hover:text-accent hover:bg-hover"
-            title="Add to Calendar"
-          >
-            <Calendar className="w-4 h-4" />
-          </button>
+                start: task.scheduledAt!,
+                durationMins: 30,
+              })}
+              target="_blank"
+              rel="noreferrer"
+              className="p-1.5 rounded-md text-ink-subtle hover:text-accent hover:bg-hover text-xs font-medium"
+              title="Add to Google Calendar"
+            >
+              GCal
+            </a>
+          </>
         )}
         <button onClick={onEdit} className="p-1.5 rounded-md text-ink-subtle hover:text-ink hover:bg-hover" title="Edit task">
           <Pencil className="w-4 h-4" />
@@ -357,58 +370,32 @@ function TaskForm({
           className="input text-base"
         />
 
-        {/* Quick-schedule row — the most important controls, right after title */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Clock className="w-4 h-4 text-ink-subtle shrink-0" />
-          {quickDate('Today', todayStr)}
-          {quickDate('Tomorrow', tomorrowStr)}
-          {quickDate('Next week', nextWeekStr)}
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="input !w-auto !py-1 !px-2 text-xs"
-            title="Pick a date"
-          />
-          {dueDate && (
-            <button
-              type="button"
-              onClick={() => setDueDate('')}
-              className="text-xs text-ink-subtle hover:text-danger transition-colors"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {/* Schedule exact time */}
-        {dueDate && (
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">Set time</span>
-            <input
-              type="time"
-              value={scheduledAt ? scheduledAt.slice(11, 16) : ''}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setScheduledAt(`${dueDate}T${e.target.value}`);
-                } else {
-                  setScheduledAt('');
-                }
-              }}
-              className="input !w-auto !py-1 !px-2 text-xs"
-            />
-            {scheduledAt && (
-              <button
-                type="button"
-                onClick={() => setScheduledAt('')}
-                className="text-xs text-ink-subtle hover:text-danger transition-colors"
-              >
-                ✕ clear
-              </button>
-            )}
-            <span className="text-[10px] text-ink-subtle ml-auto">Reminders will fire at this time</span>
+        {/* Date & Time Scheduling using DateTimePicker */}
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">Schedule</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {quickDate('Today', todayStr)}
+            {quickDate('Tomorrow', tomorrowStr)}
+            {quickDate('Next week', nextWeekStr)}
           </div>
-        )}
+          <DateTimePicker 
+            value={scheduledAt || (dueDate ? `${dueDate}T00:00:00` : '')} 
+            onChange={(val) => {
+              if (!val) {
+                setDueDate('');
+                setScheduledAt('');
+              } else {
+                setDueDate(val.slice(0, 10));
+                if (val.includes('T00:00:00')) {
+                  setScheduledAt(''); // Only date
+                } else {
+                  setScheduledAt(val); // Date + Time
+                }
+              }
+            }}
+            className="mt-2"
+          />
+        </div>
 
         {/* Compact row: Priority + Status + Category + Estimate */}
         <div className="flex flex-wrap items-end gap-2">

@@ -45,31 +45,31 @@
     color-scheme: light;
   }
 
-  /* Dark theme — Los Angeles twilight (the default experience) */
+  /* Dark theme — Atmospheric Precision (Deep Night Sky + Neon Accents) */
   .dark {
-    --bg: #0b0a16;
-    --surface: #15131f;
-    --elevated: #1c1930;
-    --sidebar: #0e0b1a;
-    --border: #272338;
-    --border-strong: #352f4c;
-    --hover: rgba(255, 255, 255, 0.045);
+    --bg: #070d1f;
+    --surface: #0c1324;
+    --elevated: #151b2d;
+    --sidebar: #0c1324;
+    --border: #2e3447;
+    --border-strong: #464554;
+    --hover: rgba(255, 255, 255, 0.05);
     --hover-strong: rgba(255, 255, 255, 0.08);
 
-    --text: #ecebf5;
-    --text-muted: #9b97b8;
-    --text-subtle: #645f80;
+    --text: #dce1fb;
+    --text-muted: #c7c4d7;
+    --text-subtle: #908fa0;
 
-    --accent: #9b8cff;
-    --accent-hover: #b3a6ff;
-    --accent-soft: rgba(155, 140, 255, 0.15);
-    --accent-text: #15101f;
+    --accent: #6366f1; /* Electric Indigo */
+    --accent-hover: #8083ff;
+    --accent-soft: rgba(99, 102, 241, 0.15);
+    --accent-text: #ffffff;
 
-    --danger: #ef7a86;
-    --success: #5fd0a6;
-    --warning: #e6ad6b;
+    --danger: #ffb4ab;
+    --success: #5de6ff; /* Neon Cyan */
+    --warning: #00cbe6;
 
-    --glow: rgba(124, 100, 224, 0.16);
+    --glow: rgba(99, 102, 241, 0.2);
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
     --shadow-md: 0 6px 22px rgba(0, 0, 0, 0.5);

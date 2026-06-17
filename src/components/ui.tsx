@@ -111,31 +111,38 @@ export function Modal({
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // Prevent background scrolling when modal is open
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
   }, [open, onClose]);
 
   if (!open) return null;
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 overflow-y-auto">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
       <div
         className={cn(
-          'relative w-full card shadow-lg p-5 animate-rise',
+          'relative w-full max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] flex flex-col bg-surface border border-border shadow-2xl rounded-xl animate-rise',
           maxWidth,
         )}
       >
         {title && (
-          <div className="flex items-center justify-between mb-4">
+          <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-border">
             <h2 className="font-display text-lg font-bold text-ink">{title}</h2>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-md text-ink-subtle hover:text-ink hover:bg-hover"
+              className="p-1.5 -mr-1.5 rounded-md text-ink-subtle hover:text-ink hover:bg-hover transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         )}
-        {children}
+        <div className="flex-1 overflow-y-auto px-5 py-5 custom-scrollbar">
+          {children}
+        </div>
       </div>
     </div>,
     document.body

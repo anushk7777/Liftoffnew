@@ -53,7 +53,8 @@ export function useReminders() {
       for (const t of tasks) {
         if (t.status === 'done' || !t.scheduledAt) continue;
         const ts = new Date(t.scheduledAt).getTime();
-        if (ts <= now && now - ts < 2 * 60000 && !notified.has(t.id)) {
+        // Fire if due within the last 24 hours
+        if (ts <= now && now - ts < 24 * 60 * 60 * 1000 && !notified.has(t.id)) {
           // In-app alarm (always)
           window.dispatchEvent(
             new CustomEvent('liftoff:alarm', { detail: { id: t.id, title: t.title } }),
@@ -72,8 +73,19 @@ export function useReminders() {
       }
       if (changed) saveNotified(notified);
     };
+    
     check();
     const id = setInterval(check, 15000);
-    return () => clearInterval(id);
+    
+    // Check when user returns to the tab
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [tasks]);
 }
