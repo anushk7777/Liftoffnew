@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { requestNotificationPermission, notificationPermission, notificationsSupported } from '../lib/reminders';
+import { enablePush, disablePush, isPushSupported, isPushConfigured, pushPermission } from '../lib/push';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
 
@@ -38,6 +39,8 @@ export default function Settings() {
 
   const [importStatus, setImportStatus] = useState('');
   const [reminders, setReminders] = useState(() => notificationPermission() === 'granted');
+  const [push, setPush] = useState(() => isPushConfigured() && pushPermission() === 'granted');
+  const [pushBusy, setPushBusy] = useState(false);
   const [syncInput, setSyncInput] = useState(syncCode);
   const [syncStatus, setSyncStatus] = useState('');
   const [syncing, setSyncing] = useState(false);
@@ -199,6 +202,34 @@ export default function Settings() {
               Notifications are blocked in your browser settings — enable them there first.
             </p>
           )}
+          {isPushSupported() && (
+            <Row
+              label="Push reminders"
+              desc="Get reminders even when Liftoff is closed (requires server setup)."
+            >
+              <Toggle
+                checked={push}
+                disabled={!isPushConfigured() || pushBusy}
+                onChange={async (v) => {
+                  setPushBusy(true);
+                  try {
+                    if (v) setPush(await enablePush());
+                    else {
+                      await disablePush();
+                      setPush(false);
+                    }
+                  } finally {
+                    setPushBusy(false);
+                  }
+                }}
+              />
+            </Row>
+          )}
+          {isPushSupported() && !isPushConfigured() && (
+            <p className="text-xs text-ink-subtle mb-2">
+              Push isn’t configured for this deployment yet. See docs/PUSH_SETUP.md to add VAPID keys and the sender function.
+            </p>
+          )}
           <div className="bg-elevated p-3 rounded-md text-xs text-ink-subtle space-y-2 border border-border">
             <p><strong>1. In-App Alarms:</strong> Trigger immediately when Liftoff is open.</p>
             <p><strong>2. Browser Notifications:</strong> Trigger natively if permission is granted.</p>
@@ -358,13 +389,15 @@ function ThemeBtn({
   );
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button
       onClick={() => onChange(!checked)}
+      disabled={disabled}
       className={cn(
         'relative w-10 h-6 rounded-full transition-colors',
         checked ? 'bg-accent' : 'bg-border-strong',
+        disabled && 'opacity-40 cursor-not-allowed',
       )}
     >
       <span

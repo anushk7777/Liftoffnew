@@ -5,6 +5,8 @@ import { Plus, Clock, CalendarClock, Bell, Zap, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { pop, useReducedMotion } from '../lib/motion';
 import { requestNotificationPermission } from '../lib/reminders';
+import { useIsMobile } from '../lib/useIsMobile';
+import { BottomSheet } from '../mobile/components/BottomSheet';
 
 // datetime-local helpers (work in the user's local timezone)
 const toLocalInput = (d: Date) => {
@@ -15,6 +17,7 @@ const toLocalInput = (d: Date) => {
 export default function QuickAdd({ onClose }: { onClose: () => void }) {
   const addTask = useStore((s) => s.addTask);
   const rm = useReducedMotion();
+  const isMobile = useIsMobile();
 
   const [title, setTitle] = useState('');
   const [scheduling, setScheduling] = useState(false);
@@ -62,24 +65,9 @@ export default function QuickAdd({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
-  return (
-    <motion.div
-      className="fixed inset-0 z-[80] flex items-start justify-center p-4 pt-[12vh] sm:pt-[14vh]"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: rm ? 0 : 0.16 }}
-    >
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <motion.form
-        onSubmit={submit}
-        className="relative w-full max-w-lg card shadow-lg p-4 max-h-[80vh] overflow-y-auto"
-        initial={{ opacity: 0, scale: rm ? 1 : 0.95, y: rm ? 0 : 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: rm ? 1 : 0.97, y: rm ? 0 : 6 }}
-        transition={rm ? { duration: 0 } : pop}
-      >
-        {/* Title row */}
+  const body = (
+    <>
+      {/* Title row */}
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-accent-soft flex items-center justify-center shrink-0">
             <Plus className="w-4 h-4 text-accent" />
@@ -152,6 +140,37 @@ export default function QuickAdd({ onClose }: { onClose: () => void }) {
             <Plus className="w-4 h-4" /> Add task
           </button>
         </div>
+    </>
+  );
+
+  // Mobile: a bottom sheet that sits above the keyboard. Desktop: a centered,
+  // top-anchored command-style modal.
+  if (isMobile) {
+    return (
+      <BottomSheet open onClose={onClose}>
+        <form onSubmit={submit}>{body}</form>
+      </BottomSheet>
+    );
+  }
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[80] flex items-start justify-center p-4 pt-[12vh] sm:pt-[14vh]"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: rm ? 0 : 0.16 }}
+    >
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <motion.form
+        onSubmit={submit}
+        className="relative w-full max-w-lg card shadow-lg p-4 max-h-[80vh] overflow-y-auto"
+        initial={{ opacity: 0, scale: rm ? 1 : 0.95, y: rm ? 0 : 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: rm ? 1 : 0.97, y: rm ? 0 : 6 }}
+        transition={rm ? { duration: 0 } : pop}
+      >
+        {body}
       </motion.form>
     </motion.div>
   );
