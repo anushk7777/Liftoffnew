@@ -90,7 +90,7 @@ export default function InstallPrompt() {
 
   return (
     <>
-      <div className="fixed left-4 right-4 bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-40 md:left-auto md:right-6 md:bottom-6 md:max-w-sm">
+      <div className="fixed left-4 right-4 bottom-[calc(env(safe-area-inset-bottom)+9.5rem)] z-40 md:left-auto md:right-6 md:bottom-6 md:max-w-sm">
         <div className="card flex items-center gap-3 p-3 shadow-lg">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
             <Download className="w-5 h-5 text-on-primary" />

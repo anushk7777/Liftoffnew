@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react';
 
-// A phone-sized viewport OR a coarse (touch) primary pointer counts as mobile.
-// We render the dedicated mobile UI layer (src/mobile) whenever this is true.
-const QUERY = '(max-width: 767px), (pointer: coarse)';
+// Mobile = a phone-sized viewport, OR a touch (coarse) primary pointer on a
+// not-large screen. The ≤1024px guard keeps big touchscreen desktops/laptops on
+// the desktop UI instead of forcing the phone layout onto them.
+const QUERY = '(max-width: 767px), (pointer: coarse) and (max-width: 1024px)';
 
 function getQuery(): MediaQueryList | null {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null;

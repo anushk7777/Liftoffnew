@@ -19,7 +19,6 @@ import Coach from '../pages/Coach';
 import Habits from '../pages/Habits';
 import BrainDump from '../pages/BrainDump';
 import SettingsPage from '../pages/Settings';
-import Login from '../pages/Login';
 import { EmptyState } from '../components/ui';
 const Stats = lazy(() => import('../pages/Stats'));
 
@@ -58,15 +57,6 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
   const [moreOpen, setMoreOpen] = useState(false);
 
   const title = TITLES[location.pathname] ?? 'Liftoff';
-  const isLogin = location.pathname === '/login';
-
-  if (isLogin) {
-    return (
-      <Routes>
-        <Route path="/login" element={<Login />} />
-      </Routes>
-    );
-  }
 
   const go = (to: string) => {
     setMoreOpen(false);

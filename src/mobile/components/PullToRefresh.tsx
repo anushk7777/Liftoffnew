@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { haptics } from '../../lib/haptics';
+import { useReducedMotion } from '../../lib/motion';
 
 const TRIGGER = 72;
 
@@ -22,6 +23,7 @@ export function PullToRefresh({
   const [pull, setPull] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (ref.current && ref.current.scrollTop <= 0 && !refreshing) {
@@ -66,9 +68,12 @@ export function PullToRefresh({
         className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center text-on-surface-variant pointer-events-none z-10"
         style={{ top: 8, opacity: pull > 8 || refreshing ? 1 : 0 }}
       >
-        <RefreshCw className={cn('w-5 h-5', refreshing && 'animate-spin')} style={{ transform: `rotate(${pull * 3}deg)` }} />
+        <RefreshCw
+          className={cn('w-5 h-5', refreshing && !reduceMotion && 'animate-spin')}
+          style={{ transform: reduceMotion ? undefined : `rotate(${pull * 3}deg)` }}
+        />
       </div>
-      <div style={{ transform: `translateY(${pull}px)`, transition: dragging ? 'none' : 'transform 0.2s' }}>
+      <div style={{ transform: `translateY(${pull}px)`, transition: dragging || reduceMotion ? 'none' : 'transform 0.2s' }}>
         {children}
       </div>
     </div>

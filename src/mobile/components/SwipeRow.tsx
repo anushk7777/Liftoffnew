@@ -37,8 +37,9 @@ export function SwipeRow({
       <motion.div
         drag="x"
         style={{ x }}
-        dragConstraints={{ left: onDelete ? -THRESHOLD * 1.4 : 0, right: onComplete ? THRESHOLD * 1.4 : 0 }}
-        dragElastic={0.2}
+        dragSnapToOrigin
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.6}
         onDrag={(_, info) => {
           const next =
             onComplete && info.offset.x > THRESHOLD ? 'complete' : onDelete && info.offset.x < -THRESHOLD ? 'delete' : null;
