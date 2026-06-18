@@ -28,7 +28,18 @@ function isIOS(): boolean {
 // explaining the manual Share → Add to Home Screen flow.
 export default function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [visible, setVisible] = useState(false);
+  // iOS never fires beforeinstallprompt, so seed visibility from the initial
+  // device check; Android/Chromium flips it on once the event arrives.
+  const [visible, setVisible] = useState(() => {
+    if (typeof window === 'undefined' || isStandalone()) return false;
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem(DISMISS_KEY) === '1';
+    } catch {
+      /* ignore */
+    }
+    return !dismissed && isIOS();
+  });
   const [iosSheet, setIosSheet] = useState(false);
 
   useEffect(() => {
@@ -52,9 +63,6 @@ export default function InstallPrompt() {
     };
     window.addEventListener('beforeinstallprompt', onPrompt);
     window.addEventListener('appinstalled', onInstalled);
-
-    // iOS never fires beforeinstallprompt — surface the manual banner instead.
-    if (isIOS()) setVisible(true);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', onPrompt);
