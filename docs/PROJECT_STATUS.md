@@ -64,6 +64,25 @@ Liftoff can now be installed like a native app:
 - Login shows a friendly error instead of a raw pop-up.
 - Stricter type-checking was turned on to catch bugs at build time.
 
+## Smarter Coach + Dashboard (latest round)
+- **Smarter coach (free, on-device — no API key or cost):**
+  - **Today's Plan** — automatically orders today's tasks (in-progress → overdue
+    → priority) into your most productive hours, respecting each task's time
+    estimate, with one-tap "Add to schedule".
+  - **New alerts** — an "overloaded day" warning (more queued than your usual
+    capacity), a nudge for tasks that have stalled 10+ days, and a
+    week-over-week pace trend (up / dipped).
+- **Dashboard now shows the real coach** — the old fake "Understood. Context
+  set." chat bubble was replaced by your live pace briefing and the top ranked
+  next moves (with working buttons).
+- **Fixed the weird text** — some dashboard icons were drawn with a Google
+  "Material Symbols" web font; if that font was slow/blocked/offline you'd see
+  raw words like `format_list_b`. Those are now normal bundled icons, and the
+  font CDN dependency was removed entirely.
+- Verified live in a headless desktop browser: icons render correctly, the
+  coach briefing + suggestions show, and the Today's Plan card + overload
+  warning appear with real tasks.
+
 ## What was changed/updated vs. fixed afterward
 After building the above, the work was self-reviewed twice (including a
 senior-engineer-style inspection of every changed file). The issues found were
