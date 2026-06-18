@@ -109,6 +109,12 @@ export interface CoachProfile {
   totalFocusMin: number;
   dataPoints: number;
   insights: string[];
+  trend: {
+    tasksThisWeek: number;
+    tasksLastWeek: number;
+    focusThisWeekMin: number;
+    focusLastWeekMin: number;
+  };
 }
 
 export type CoachAction =
@@ -197,6 +203,25 @@ export function buildProfile(state: CoachState, now = new Date()): CoachProfile 
   const tasksPerDay = recentDone / 7;
   const avgSessionMins = sessionCount ? Math.round(totalFocusMin / sessionCount) : state.pomodoro.focusMins;
 
+  // Week-over-week trend (throughput + focus minutes).
+  const dayMs = 86400000;
+  const todayMs = startOfDay(new Date(now)).getTime();
+  const thisWeekStart = todayMs - 6 * dayMs;
+  const lastWeekStart = todayMs - 13 * dayMs;
+  let tasksThisWeek = 0, tasksLastWeek = 0, focusThisWeekMin = 0, focusLastWeekMin = 0;
+  for (const t of state.tasks) {
+    if (t.status !== 'done' || !t.completedAt) continue;
+    const c = new Date(t.completedAt).getTime();
+    if (c >= thisWeekStart) tasksThisWeek++;
+    else if (c >= lastWeekStart) tasksLastWeek++;
+  }
+  for (const s of state.focusSessions) {
+    if (s.kind !== 'focus') continue;
+    const d = new Date(s.date).getTime();
+    if (d >= thisWeekStart) focusThisWeekMin += s.durationMins;
+    else if (d >= lastWeekStart) focusLastWeekMin += s.durationMins;
+  }
+
   const insights: string[] = [];
   if (peakHours.length)
     insights.push(`You focus best around ${formatHour(peakHours[0])}.`);
@@ -219,7 +244,96 @@ export function buildProfile(state: CoachState, now = new Date()): CoachProfile 
     totalFocusMin,
     dataPoints,
     insights,
+    trend: { tasksThisWeek, tasksLastWeek, focusThisWeekMin, focusLastWeekMin },
   };
+}
+
+// ---- Daily plan: order today's work into your peak focus windows ---------
+export interface PlanBlock {
+  taskId: string;
+  title: string;
+  startHour: number; // 0..23, local
+  mins: number;
+}
+export interface DailyPlan {
+  blocks: PlanBlock[];
+  scheduledMins: number; // sum of what fits in the day
+  demandMins: number; // sum of all actionable work
+  capacityMins: number; // your typical daily focus capacity
+  overloaded: boolean;
+}
+
+// Parse a human estimate ("30m", "2h", "1.5h", "45") into minutes.
+export function parseEstimateMins(s?: string): number {
+  if (!s) return 0;
+  let mins = 0;
+  const h = s.match(/(\d+(?:\.\d+)?)\s*h/i);
+  const m = s.match(/(\d+)\s*m/i);
+  if (h) mins += parseFloat(h[1]) * 60;
+  if (m) mins += parseInt(m[1], 10);
+  if (!h && !m) {
+    const n = parseFloat(s);
+    if (!isNaN(n)) mins = n; // a bare number is treated as minutes
+  }
+  return Math.round(mins);
+}
+
+// Typical daily focus capacity: average focus minutes per active day over the
+// last 14 days, floored/capped to a sensible range.
+function dailyCapacityMins(state: CoachState, now: Date): number {
+  const since = now.getTime() - 14 * 86400000;
+  let total = 0;
+  const days = new Set<string>();
+  for (const s of state.focusSessions) {
+    if (s.kind !== 'focus') continue;
+    const d = new Date(s.date);
+    if (d.getTime() < since) continue;
+    total += s.durationMins;
+    days.add(d.toDateString());
+  }
+  const avg = days.size ? total / days.size : 0;
+  return Math.min(480, Math.max(120, Math.round(avg || 180)));
+}
+
+export function buildDailyPlan(state: CoachState, profile: CoachProfile, now = new Date()): DailyPlan {
+  const todayStr = startOfDay(now).toISOString();
+  const isOverdue = (t: TodoTask) => !!t.dueDate && t.dueDate < todayStr;
+  const defaultMins = Math.max(25, state.pomodoro.focusMins);
+
+  // Actionable today: in-progress, due today/overdue, or unscheduled high-priority.
+  const candidates = state.tasks.filter(
+    (t) =>
+      t.status !== 'done' &&
+      (t.status === 'doing' || (t.dueDate && t.dueDate <= todayStr) || (!t.dueDate && t.priority === 'high')),
+  );
+
+  candidates.sort((a, b) => {
+    const doing = (b.status === 'doing' ? 1 : 0) - (a.status === 'doing' ? 1 : 0);
+    if (doing) return doing;
+    const od = (isOverdue(b) ? 1 : 0) - (isOverdue(a) ? 1 : 0);
+    if (od) return od;
+    return prio(b) - prio(a);
+  });
+
+  const capacityMins = dailyCapacityMins(state, now);
+  const demandMins = candidates.reduce((s, t) => s + (parseEstimateMins(t.estimate) || defaultMins), 0);
+
+  // Lay tasks out from the next usable hour, jumping to peak hours when possible.
+  const peaks = [...profile.peakHours].sort((a, b) => a - b);
+  let cursor = Math.min(Math.max(now.getHours() + 1, 8), 21);
+  let scheduledMins = 0;
+  const blocks: PlanBlock[] = [];
+  for (const t of candidates) {
+    const mins = parseEstimateMins(t.estimate) || defaultMins;
+    if (blocks.length >= 1 && scheduledMins + mins > capacityMins) break; // keep at least one
+    const peak = peaks.find((p) => p >= cursor);
+    const hour = Math.min(peak ?? cursor, 22);
+    blocks.push({ taskId: t.id, title: t.title, startHour: hour, mins });
+    cursor = Math.min(23, hour + Math.max(1, Math.ceil(mins / 60)));
+    scheduledMins += mins;
+  }
+
+  return { blocks, scheduledMins, demandMins, capacityMins, overloaded: demandMins > capacityMins };
 }
 
 function nextRoadmapTask(phases: Phase[]) {
@@ -410,6 +524,67 @@ export function getSuggestions(state: CoachState, profile: CoachProfile, now = n
       actionLabel: 'Open brain dump',
       action: { kind: 'navigate', to: '/brain-dump' },
       score: 48,
+    });
+  }
+
+  // 7b. Overloaded day — more queued than your usual capacity
+  const plan = buildDailyPlan(state, profile, now);
+  if (plan.overloaded) {
+    const h = (m: number) => Math.round((m / 60) * 10) / 10;
+    candidates.push({
+      id: 'overload',
+      title: 'Today looks overloaded',
+      reason: `~${h(plan.demandMins)}h queued vs your usual ~${h(plan.capacityMins)}h. Reschedule the lower-priority items.`,
+      icon: 'calendar',
+      tone: 'plan',
+      actionLabel: 'Open schedule',
+      action: { kind: 'navigate', to: '/schedule' },
+      score: 70,
+    });
+  }
+
+  // 7c. Stale tasks — sitting untouched for 10+ days
+  const staleCut = now.getTime() - 10 * 86400000;
+  const stale = state.tasks.filter(
+    (t) => t.status === 'todo' && t.createdAt && new Date(t.createdAt).getTime() < staleCut,
+  );
+  if (stale.length) {
+    const top = [...stale].sort((a, b) => prio(b) - prio(a))[0];
+    candidates.push({
+      id: 'stale',
+      title: stale.length === 1 ? `Unblock "${trim(top.title)}"` : `${stale.length} tasks have stalled`,
+      reason: 'Untouched for 10+ days — break the top one into a 25-minute step.',
+      icon: 'clock',
+      tone: 'plan',
+      actionLabel: 'Review tasks',
+      action: { kind: 'navigate', to: '/tasks' },
+      score: 58,
+    });
+  }
+
+  // 7d. Week-over-week trend
+  const { tasksThisWeek, tasksLastWeek } = profile.trend;
+  if (tasksLastWeek > 0 && tasksThisWeek < tasksLastWeek * 0.6) {
+    candidates.push({
+      id: 'trend-down',
+      title: 'Your pace dipped this week',
+      reason: `${tasksThisWeek} done vs ${tasksLastWeek} last week. One focused session turns it around.`,
+      icon: 'target',
+      tone: 'plan',
+      actionLabel: 'Start a focus session',
+      action: { kind: 'navigate', to: '/focus' },
+      score: 56,
+    });
+  } else if (tasksLastWeek > 0 && tasksThisWeek > tasksLastWeek) {
+    candidates.push({
+      id: 'trend-up',
+      title: `You're up ${Math.round(((tasksThisWeek - tasksLastWeek) / tasksLastWeek) * 100)}% this week`,
+      reason: `${tasksThisWeek} done vs ${tasksLastWeek} last week. Keep the momentum going.`,
+      icon: 'zap',
+      tone: 'win',
+      actionLabel: 'Open tasks',
+      action: { kind: 'navigate', to: '/tasks' },
+      score: 44,
     });
   }
 

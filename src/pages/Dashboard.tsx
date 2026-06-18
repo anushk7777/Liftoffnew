@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format, startOfDay, isToday } from 'date-fns';
+import { ListTodo, Plus, Flame, Clock, Play, Brain, Bot, CalendarClock, TriangleAlert } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import { buildProfile, getSuggestions } from '../lib/coach';
+import { buildProfile, getSuggestions, getBriefing, buildDailyPlan, formatHour } from '../lib/coach';
 import type { CoachState } from '../lib/coach';
+import { SuggestionRow } from '../components/Coach';
+import { useCoachActions } from '../components/useCoachActions';
 import { Heatmap } from '../components/Heatmap';
 import type { TodoTask } from '../store/data';
 
@@ -19,15 +22,15 @@ function greeting() {
 
 function TaskItem({ task, onComplete }: { task: TodoTask, onComplete: () => void }) {
   const isDone = task.status === 'done';
-  
+
   return (
     <li className={cn("flex items-start gap-4 p-4 rounded-2xl neo-card-inset group/item cursor-pointer transition-opacity", isDone && "opacity-60")} onClick={onComplete}>
       <div className="mt-1 relative flex items-center justify-center">
-        <input 
-          checked={isDone} 
+        <input
+          checked={isDone}
           readOnly
-          className="custom-checkbox appearance-none bg-[var(--bg)] m-0 w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer shadow-[inset_3px_3px_6px_var(--shadow-dark),inset_-3px_-3px_6px_var(--shadow-light)]" 
-          type="checkbox" 
+          className="custom-checkbox appearance-none bg-[var(--bg)] m-0 w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer shadow-[inset_3px_3px_6px_var(--shadow-dark),inset_-3px_-3px_6px_var(--shadow-light)]"
+          type="checkbox"
         />
         {isDone && (
           <div className="absolute inset-0 bg-[var(--accent)] rounded-md transform scale-75 transition-transform"></div>
@@ -38,7 +41,7 @@ function TaskItem({ task, onComplete }: { task: TodoTask, onComplete: () => void
           {task.title}
         </p>
         <p className="font-code text-xs text-[var(--text-muted)] flex items-center gap-2 mt-2 uppercase">
-          <span className="material-symbols-outlined text-[14px]">schedule</span> 
+          <Clock className="w-3.5 h-3.5" />
           {task.dueDate ? format(new Date(task.dueDate), 'MMM d') : 'NO ETA'}
           {task.priority === 'high' && (
             <>
@@ -54,14 +57,22 @@ function TaskItem({ task, onComplete }: { task: TodoTask, onComplete: () => void
 
 export default function Dashboard() {
   const {
-    tasks, addTask, cycleTaskStatus, streak, activityHistory, targetDate,
+    tasks, addTask, updateTask, cycleTaskStatus, streak, activityHistory, targetDate,
     phases, focusSessions, ideas, pomodoro, habits, habitLog
   } = useStore();
 
   const [quickTask, setQuickTask] = useState('');
+  const onAct = useCoachActions();
 
-  const state: CoachState = { phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate };
-  const suggestions = useMemo(() => getSuggestions(state, buildProfile(state)), [state]);
+  const { suggestions, briefing, plan } = useMemo(() => {
+    const state: CoachState = { phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate };
+    const profile = buildProfile(state);
+    return {
+      suggestions: getSuggestions(state, profile),
+      briefing: getBriefing(state),
+      plan: buildDailyPlan(state, profile),
+    };
+  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate]);
 
   const todayStr = startOfDay(new Date()).toISOString();
 
@@ -87,6 +98,21 @@ export default function Dashboard() {
     setQuickTask('');
   };
 
+  // Schedule the auto-plan: stamp each block onto today at its suggested hour.
+  const acceptPlan = () => {
+    const base = startOfDay(new Date());
+    plan.blocks.forEach((b) => {
+      const d = new Date(base);
+      d.setHours(b.startHour, 0, 0, 0);
+      updateTask(b.taskId, { scheduledAt: d.toISOString(), dueDate: base.toISOString() });
+    });
+  };
+
+  const briefingColor =
+    briefing.status === 'behind' ? 'text-[var(--danger)]'
+      : briefing.status === 'ahead' ? 'text-[var(--success,#34d399)]'
+        : 'text-[var(--accent)]';
+
   return (
     <div className="relative z-10 w-full h-full flex flex-col gap-8">
       {/* Greeting & Progress */}
@@ -95,8 +121,8 @@ export default function Dashboard() {
         <div className="flex items-center gap-4 w-full max-w-md">
           <span className="font-body text-xs font-bold text-[var(--text-muted)] tracking-widest uppercase">Daily Objective</span>
           <div className="flex-1 h-3 bg-[var(--bg)] rounded-full overflow-hidden progress-track">
-            <div 
-              className="h-full bg-[var(--accent)] rounded-full progress-fill transition-all duration-1000" 
+            <div
+              className="h-full bg-[var(--accent)] rounded-full progress-fill transition-all duration-1000"
               style={{ width: `${progressPercent}%` }}
             ></div>
           </div>
@@ -106,29 +132,29 @@ export default function Dashboard() {
 
       {/* Bento Grid Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 flex-1 pb-10 relative z-20">
-        
-        {/* Left Column (Tasks & Habits) */}
+
+        {/* Left Column (Tasks, Plan, Habits) */}
         <div className="md:col-span-7 flex flex-col gap-8 h-full">
           {/* Tasks */}
           <div className="neo-card p-6 flex-1 flex flex-col relative overflow-hidden">
             <div className="flex justify-between items-center mb-6 z-10">
               <h3 className="font-display text-xl font-semibold text-[var(--text)] flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl neo-button flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[var(--accent)]">format_list_bulleted</span>
+                  <ListTodo className="w-5 h-5 text-[var(--accent)]" />
                 </div>
                 Mission Critical
               </h3>
               <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  placeholder="Quick add..." 
+                <input
+                  type="text"
+                  placeholder="Quick add..."
                   value={quickTask}
                   onChange={e => setQuickTask(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleAddTask()}
                   className="bg-transparent border-none text-sm font-body text-[var(--text)] focus:ring-0 placeholder-[var(--text-muted)]"
                 />
-                <button onClick={() => handleAddTask()} className="w-10 h-10 rounded-xl neo-button flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
-                  <span className="material-symbols-outlined">add</span>
+                <button onClick={() => handleAddTask()} aria-label="Add task" className="w-10 h-10 rounded-xl neo-button flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
+                  <Plus className="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -142,11 +168,43 @@ export default function Dashboard() {
             </ul>
           </div>
 
+          {/* Today's plan (auto-generated by the coach) */}
+          {plan.blocks.length > 0 && (
+            <div className="neo-card p-6 shrink-0">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-display text-xl font-semibold text-[var(--text)] flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl neo-button flex items-center justify-center">
+                    <CalendarClock className="w-5 h-5 text-[var(--accent)]" />
+                  </div>
+                  Today's Plan
+                </h3>
+                <button onClick={acceptPlan} className="neo-button text-[var(--accent)] text-sm font-bold py-2 px-4 rounded-xl">
+                  Add to schedule
+                </button>
+              </div>
+              {plan.overloaded && (
+                <p className="flex items-center gap-2 text-xs text-[var(--danger)] mb-3">
+                  <TriangleAlert className="w-3.5 h-3.5" />
+                  ~{Math.round((plan.demandMins / 60) * 10) / 10}h queued vs your usual ~{Math.round((plan.capacityMins / 60) * 10) / 10}h — consider trimming.
+                </p>
+              )}
+              <ul className="space-y-2">
+                {plan.blocks.map((b) => (
+                  <li key={b.taskId} className="flex items-center gap-3 p-3 rounded-xl neo-card-inset">
+                    <span className="font-code text-xs font-bold text-[var(--accent)] w-14 shrink-0">{formatHour(b.startHour)}</span>
+                    <span className="flex-1 text-sm text-[var(--text)] truncate">{b.title}</span>
+                    <span className="font-code text-[10px] text-[var(--text-muted)] shrink-0">{b.mins}m</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Habits Heatmap */}
           <div className="neo-card p-6 shrink-0">
             <h3 className="font-display text-xl font-semibold text-[var(--text)] mb-6 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl neo-button flex items-center justify-center">
-                <span className="material-symbols-outlined text-[var(--warning)]">local_fire_department</span>
+                <Flame className="w-5 h-5 text-[var(--warning)]" />
               </div>
               Consistency Streak ({streak} days)
             </h3>
@@ -175,33 +233,37 @@ export default function Dashboard() {
               </div>
             </div>
             <Link to="/focus" className="neo-button bg-[var(--bg)] text-[var(--accent)] font-body text-base font-bold py-3 px-10 rounded-2xl flex items-center gap-2">
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+              <Play className="w-5 h-5" />
               Engage
             </Link>
           </div>
 
-          {/* Coach / Insights */}
+          {/* Coach / Insights — real briefing + ranked next moves */}
           <div className="neo-card p-6 flex flex-col">
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl neo-button flex items-center justify-center">
-                <span className="material-symbols-outlined text-[var(--accent)] text-[20px]">psychology</span>
+                <Brain className="w-5 h-5 text-[var(--accent)]" />
               </div>
-              <h3 className="font-display text-xl font-semibold text-[var(--text)]">Daily Insight</h3>
+              <h3 className="font-display text-xl font-semibold text-[var(--text)]">Coach</h3>
+              <Link to="/coach" className="ml-auto text-xs font-medium text-[var(--text-muted)] hover:text-[var(--accent)]">More →</Link>
             </div>
-            <div className="flex-1 flex flex-col gap-4">
-              <div className="neo-card-inset p-4 rounded-2xl rounded-tl-none max-w-[90%]">
-                <p className="font-body text-sm text-[var(--text)] leading-relaxed">
-                  {suggestions[0]?.title || "Commander, your evening velocity is optimal. Keep pushing forward."}
-                </p>
 
-              </div>
-              <div className="self-end bg-[var(--accent)] text-black p-4 rounded-2xl rounded-tr-none neo-button max-w-[90%]">
-                <p className="font-body text-sm font-semibold">Understood. Context set.</p>
-              </div>
+            {/* Pace briefing */}
+            <div className="neo-card-inset p-4 rounded-2xl mb-4">
+              <p className={cn('font-body text-sm font-semibold', briefingColor)}>{briefing.headline}</p>
+              <p className="font-body text-xs text-[var(--text-muted)] mt-1 leading-relaxed">{briefing.detail}</p>
             </div>
-            <div className="mt-6 pt-4 flex items-center gap-2 justify-center opacity-60">
-              <span className="material-symbols-outlined text-[var(--text-muted)] text-[16px]">smart_toy</span>
-              <span className="font-code text-xs font-semibold text-[var(--text-muted)]">Coach AI is active</span>
+
+            {/* Top next moves */}
+            <div className="flex flex-col gap-1">
+              {suggestions.slice(0, 3).map((s) => (
+                <SuggestionRow key={s.id} suggestion={s} onAct={onAct} />
+              ))}
+            </div>
+
+            <div className="mt-4 pt-4 flex items-center gap-2 justify-center opacity-60">
+              <Bot className="w-4 h-4 text-[var(--text-muted)]" />
+              <span className="font-code text-xs font-semibold text-[var(--text-muted)]">Coach learns from your activity — on-device</span>
             </div>
           </div>
         </div>
@@ -210,11 +272,11 @@ export default function Dashboard() {
       {/* Quick Add FAB */}
       <button onClick={() => {
         const title = window.prompt("New Task:");
-        if(title) addTask({ title, priority: 'medium', dueDate: todayStr });
-      }} className="fixed bottom-8 right-8 w-16 h-16 bg-[var(--accent)] text-white rounded-2xl flex items-center justify-center fab-btn transition-all z-50 hover:scale-105">
-        <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: "'FILL' 1" }}>add</span>
+        if (title) addTask({ title, priority: 'medium', dueDate: todayStr });
+      }} aria-label="Quick add task" className="fixed bottom-8 right-8 w-16 h-16 bg-[var(--accent)] text-white rounded-2xl flex items-center justify-center fab-btn transition-all z-50 hover:scale-105">
+        <Plus className="w-8 h-8" />
       </button>
-      
+
     </div>
   );
 }
