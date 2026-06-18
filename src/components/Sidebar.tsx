@@ -38,8 +38,8 @@ export default function Sidebar({
     <nav className="flex flex-col h-full py-6 px-4 w-64 bg-[var(--bg)] border-r border-white/5 z-50 transition-colors duration-300">
       {/* Brand / Header */}
       <div className="flex items-center gap-3 mb-10 pl-2">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center neo-button shrink-0">
-           <span className="text-white font-bold text-sm">LF</span>
+        <div className="w-10 h-10 rounded-xl overflow-hidden neo-button shrink-0 shadow-lg">
+           <img src="/logo.png" alt="Liftoff Logo" className="w-full h-full object-cover" />
         </div>
         <div>
           <h1 className="font-display text-2xl font-bold text-[var(--accent)] tracking-tight">Liftoff</h1>
