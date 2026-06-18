@@ -30,6 +30,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // Adds web-push handlers (push / notificationclick) to the generated SW.
+        importScripts: ['push-sw.js'],
         // Serve the SPA shell for offline deep-link navigations so any route
         // works without the network.
         navigateFallback: 'index.html',
