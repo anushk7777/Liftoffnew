@@ -11,7 +11,7 @@ import {
   Clock,
   Calendar,
 } from 'lucide-react';
-import { format, isToday, isPast, startOfDay, addMinutes } from 'date-fns';
+import { format, isToday, isPast, startOfDay } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { buildICS, downloadICS, googleCalendarUrl } from '../lib/ics';
 import type { TodoTask, Priority, Status } from '../store/data';
@@ -472,21 +472,4 @@ function TaskForm({
   );
 }
 
-function Field({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={cn('block', className)}>
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle mb-1.5 block">
-        {label}
-      </span>
-      {children}
-    </label>
-  );
-}
+

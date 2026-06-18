@@ -1,9 +1,8 @@
-import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { useEffect, useState, lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import {
   Menu,
-  Moon,
   Search,
   Plus,
   LayoutDashboard,
@@ -11,6 +10,7 @@ import {
   CheckSquare,
   Timer,
   Map,
+  CalendarDays,
 } from 'lucide-react';
 import { useStore } from './store/useStore';
 import { cn } from './lib/utils';
@@ -33,7 +33,10 @@ import BrainDump from './pages/BrainDump';
 import Roadmap from './pages/Roadmap';
 const Stats = lazy(() => import('./pages/Stats'));
 import SettingsPage from './pages/Settings';
+import Schedule from './pages/Schedule';
+import Login from './pages/Login';
 import { EmptyState } from './components/ui';
+import { supabase } from './lib/supabase';
 
 function NotFound() {
   return (
@@ -49,45 +52,44 @@ function NotFound() {
 
 const MOBILE_NAV = [
   { to: '/', label: 'Today', icon: LayoutDashboard, end: true },
-  { to: '/coach', label: 'Coach', icon: Sparkles },
+  { to: '/schedule', label: 'Schedule', icon: CalendarDays },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/focus', label: 'Focus', icon: Timer },
   { to: '/roadmap', label: 'Roadmap', icon: Map },
 ];
 
-// Pages where sidebar should auto-collapse for maximum workspace
-const WIDE_PAGES = new Set(['/tasks', '/focus', '/roadmap', '/coach', '/brain-dump']);
 
 function Shell() {
   const location = useLocation();
+  const navigate = useNavigate();
   const rm = useReducedMotion();
   useReminders();
 
-  const [userCollapsed, setUserCollapsed] = useState(
-    () => localStorage.getItem('liftoff_sidebar_collapsed') === '1',
-  );
+  const [authChecking, setAuthChecking] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthChecking(false);
+      if (!session && location.pathname !== '/login') {
+        navigate('/login');
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session && location.pathname !== '/login') {
+        navigate('/login');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate, location.pathname]);
+
   const [focusMode, setFocusMode] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-
-  // Auto-collapse logic fix: Only auto-collapse on route change if it's a wide page and not already collapsed.
-  // We do NOT force `collapsed = autoCollapse || userCollapsed` anymore, so the user can manually open it.
-  useEffect(() => {
-    if (WIDE_PAGES.has(location.pathname)) {
-      setUserCollapsed(true);
-    }
-  }, [location.pathname]);
-
-  const collapsed = focusMode || userCollapsed;
-
-  const toggleCollapsed = () => {
-    setUserCollapsed((c) => {
-      const next = !c;
-      localStorage.setItem('liftoff_sidebar_collapsed', next ? '1' : '0');
-      return next;
-    });
-  };
 
   // Global shortcuts + the command-palette "Add a task" bridge.
   useEffect(() => {
@@ -115,6 +117,7 @@ function Shell() {
 
   const routesEl = (
     <Routes location={location}>
+      <Route path="/login" element={<Login />} />
       <Route path="/" element={<Dashboard />} />
       <Route path="/coach" element={<Coach />} />
       <Route path="/tasks" element={<Tasks />} />
@@ -122,11 +125,21 @@ function Shell() {
       <Route path="/focus" element={<Focus />} />
       <Route path="/brain-dump" element={<BrainDump />} />
       <Route path="/roadmap" element={<Roadmap />} />
+      <Route path="/schedule" element={<Schedule />} />
       <Route path="/stats" element={<Suspense fallback={<div className="flex h-full items-center justify-center text-ink-subtle animate-pulse">Loading stats...</div>}><Stats /></Suspense>} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
+
+  if (authChecking) {
+    return <div className="min-h-screen bg-background flex items-center justify-center">Loading...</div>;
+  }
+
+  // If on login page, just render the simple layout
+  if (location.pathname === '/login') {
+    return routesEl;
+  }
 
   return (
     <div className="bg-background text-on-surface font-body-lg min-h-screen overflow-hidden selection:bg-primary/30 flex relative">
@@ -135,7 +148,7 @@ function Shell() {
       {/* Desktop sidebar */}
       {!focusMode && (
         <div className="hidden md:block shrink-0 z-40 relative">
-          <Sidebar collapsed={collapsed} onToggle={toggleCollapsed} onOpenSearch={() => setPaletteOpen(true)} />
+          <Sidebar onOpenSearch={() => setPaletteOpen(true)} />
         </div>
       )}
 
@@ -145,8 +158,6 @@ function Shell() {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
           <div className="absolute left-0 top-0 h-full shadow-lg animate-rise">
             <Sidebar
-              collapsed={false}
-              onToggle={() => setMobileOpen(false)}
               onNavigate={() => setMobileOpen(false)}
               onOpenSearch={() => {
                 setMobileOpen(false);
@@ -158,6 +169,10 @@ function Shell() {
       )}
 
       <div className={cn("flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative z-10", !focusMode && "md:ml-0")}>
+        {/* Decorative Background */}
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] z-0 pointer-events-none overflow-visible flex items-center justify-center bg-transparent">
+          <img alt="Glowing moon" className="w-[380px] h-[380px] object-contain mix-blend-screen opacity-50 transform translate-x-10 -translate-y-10" src="https://lh3.googleusercontent.com/aida/AP1WRLsozTQcci_eKwFiNlWjSiaryhyrkTTRaDy-r2t1v_2VRRgtuo-cN2RlK6n0qgGvuXT5R_tGjPGZLoOOp0YiOEKj3xAp2i0iPGBrpOVKMiM8bnKeHZo1Ag7M85Dms_eVV0vOVrPm36wiVqUiTCI9oCjPqArExJkfy9TB4o5iv8t8EknV918RBLuLbqlDAJKCwHN8WPQp-XL7IHp9t-XB0QL7EqH1Ne_g6ZAeqx2kSE_Ju-6ASU8Rm9c4GXB2" style={{ filter: 'drop-shadow(rgba(255, 248, 231, 0.1) 0px 0px 40px)' }} />
+        </div>
         {/* Mobile top bar */}
         <header className="md:hidden flex items-center justify-between h-14 px-4 border-b border-white/10 bg-surface-container/60 backdrop-blur-md shrink-0">
           <button
@@ -183,10 +198,7 @@ function Shell() {
         </header>
 
         <main className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className={cn(
-            'mx-auto w-full px-5 py-7 pb-24 sm:px-8 sm:py-10 md:pb-12 transition-all duration-300',
-            collapsed ? 'max-w-7xl' : 'max-w-6xl',
-          )}>
+          <div className="mx-auto w-full px-5 py-7 pb-24 sm:px-8 sm:py-10 md:pb-12 transition-all duration-300 max-w-7xl">
             <ErrorBoundary>
               {rm ? (
                 routesEl

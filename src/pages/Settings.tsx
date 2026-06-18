@@ -13,7 +13,7 @@ import {
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { requestNotificationPermission, notificationPermission } from '../lib/reminders';
+import { requestNotificationPermission, notificationPermission, notificationsSupported } from '../lib/reminders';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
 

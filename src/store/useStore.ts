@@ -18,7 +18,6 @@ import { startOfDay } from 'date-fns';
 import { dayKey, streakFromDays } from '../lib/streak';
 import {
   getDeviceId,
-  getStorageId,
   getSyncCode,
   setSyncCodeStorage,
   getLocalUpdatedAt,
@@ -71,7 +70,7 @@ interface AppState {
   deleteTask: (id: string) => void;
   cycleTaskStatus: (id: string) => void;
   setTaskStatus: (id: string, status: Status) => void;
-  addTaskFromRoadmap: (phaseId: string, weekId: string, taskId: string) => void;
+  addTaskFromRoadmap: (phaseId: string, weekId: string, taskId: string, title?: string, type?: string) => void;
 
   // Brain dump (quick capture)
   ideas: Idea[];
@@ -169,7 +168,14 @@ export const useStore = create<AppState>()(
           return;
         }
         try {
-          const id = getStorageId();
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            set({ _initialized: true });
+            get().recalculateStreak();
+            return;
+          }
+          const id = session.user.id;
+          
           const { data } = await supabase
             .from('user_data')
             .select('data, updated_at')
@@ -290,7 +296,7 @@ export const useStore = create<AppState>()(
     const next = order[(order.indexOf(t.status) + 1) % order.length];
     get().setTaskStatus(id, next);
   },
-  addTaskFromRoadmap: (phaseId, weekId, taskId) => {
+  addTaskFromRoadmap: (phaseId, weekId, taskId, title, type) => {
     const state = get();
     // Avoid duplicates: if a task already links to this roadmap item, do nothing.
     const exists = state.tasks.some(
@@ -301,13 +307,15 @@ export const useStore = create<AppState>()(
         t.sourceRoadmap.taskId === taskId,
     );
     if (exists) return;
-    let found: { title: string; type: string } | null = null;
-    for (const p of state.phases) {
-      if (p.id !== phaseId) continue;
-      for (const w of p.weeks) {
-        if (w.id !== weekId) continue;
-        const rt = w.tasks.find((t) => t.id === taskId);
-        if (rt) found = { title: rt.title, type: rt.type };
+    let found: { title: string; type: string } | null = title && type ? { title, type } : null;
+    if (!found) {
+      for (const p of state.phases) {
+        if (p.id !== phaseId) continue;
+        for (const w of p.weeks) {
+          if (w.id !== weekId) continue;
+          const rt = w.tasks.find((t) => t.id === taskId);
+          if (rt) found = { title: rt.title, type: rt.type };
+        }
       }
     }
     if (!found) return;
@@ -563,9 +571,12 @@ useStore.subscribe((state) => {
   clearTimeout(syncTimeout);
   syncTimeout = setTimeout(async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      
       const ts = nowISO();
       await supabase.from('user_data').upsert(
-        { id: getStorageId(), data: extractData(state), updated_at: ts },
+        { id: session.user.id, data: extractData(state), updated_at: ts },
         { onConflict: 'id' },
       );
       setLocalUpdatedAt(ts); // mirror for the recency-guarded merge on next load

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Map,
@@ -15,10 +15,18 @@ import {
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import type { Phase, TaskType } from '../store/data';
+import type { Phase, TaskType, Task } from '../store/data';
 import { parseRoadmap, countRoadmap } from '../lib/roadmap';
 import { PageHeader, ProgressBar, Modal } from '../components/ui';
-import RoadmapJourney, { type NodeRef } from '../components/RoadmapJourney';
+import RoadmapGraph from '../components/RoadmapGraph';
+
+export interface NodeRef {
+  phaseId: string;
+  weekId: string;
+  task: Task;
+  phaseTitle: string;
+  weekTitle: string;
+}
 
 const TYPE_COLOR: Record<TaskType, string> = {
   dsa: 'text-accent',
@@ -47,10 +55,17 @@ export default function Roadmap() {
     useStore();
   const navigate = useNavigate();
   const [importOpen, setImportOpen] = useState(false);
-  const [view, setView] = useState<'journey' | 'list'>(
-    () => (localStorage.getItem('liftoff_roadmap_view') as 'journey' | 'list') || 'journey',
+  const [view, setView] = useState<'graph' | 'list'>(
+    () => (localStorage.getItem('liftoff_roadmap_view') as 'graph' | 'list') || 'graph',
   );
   const [selected, setSelected] = useState<NodeRef | null>(null);
+
+  // Auto-reset if the local storage data is using the old phase format (phase-a) or is incomplete
+  useEffect(() => {
+    if (phases.length === 0 || phases[0].id === 'phase-a' || phases.length < 3) {
+      useStore.getState().resetRoadmap();
+    }
+  }, [phases]);
 
   const overall = useMemo(() => countRoadmap(phases), [phases]);
 
@@ -63,7 +78,7 @@ export default function Roadmap() {
     return s;
   }, [tasks]);
 
-  const setViewPersist = (v: 'journey' | 'list') => {
+  const setViewPersist = (v: 'graph' | 'list') => {
     localStorage.setItem('liftoff_roadmap_view', v);
     setView(v);
   };
@@ -80,8 +95,8 @@ export default function Roadmap() {
         actions={
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 p-1 rounded-lg bg-elevated border border-border">
-              <ViewBtn active={view === 'journey'} onClick={() => setViewPersist('journey')} icon={<Workflow className="w-4 h-4" />}>
-                Journey
+              <ViewBtn active={view === 'graph'} onClick={() => setViewPersist('graph')} icon={<Workflow className="w-4 h-4" />}>
+                Graph
               </ViewBtn>
               <ViewBtn active={view === 'list'} onClick={() => setViewPersist('list')} icon={<List className="w-4 h-4" />}>
                 List
@@ -107,8 +122,8 @@ export default function Roadmap() {
         <ProgressBar value={overall.percent} />
       </div>
 
-      {view === 'journey' ? (
-        <RoadmapJourney phases={phases} onNodeClick={setSelected} addedKeys={addedKeys} />
+      {view === 'graph' ? (
+        <RoadmapGraph phases={phases} onNodeClick={setSelected} addedKeys={addedKeys} />
       ) : (
         <div className="space-y-3">
           {phases.map((phase, i) => (
@@ -157,7 +172,13 @@ export default function Roadmap() {
                 return (
                   <button
                     onClick={() => {
-                      addTaskFromRoadmap(liveSelected.phaseId, liveSelected.weekId, liveSelected.task.id);
+                      addTaskFromRoadmap(
+                        liveSelected.phaseId, 
+                        liveSelected.weekId, 
+                        liveSelected.task.id,
+                        liveSelected.task.title,
+                        liveSelected.task.type
+                      );
                       setSelected(null);
                       navigate('/tasks');
                     }}
@@ -221,11 +242,11 @@ const cleanPhaseTitle = (s: string) => s.replace(/^phase\s+[a-z]\s*[—-]\s*/i, 
 
 // Resolve a selected node against the current phases so the action sheet always
 // reflects live completion state.
-function findLiveNode(phases: Phase[], selected: NodeRef): NodeRef | null {
+function findLiveNode(phases: Phase[], selected: NodeRef): NodeRef {
   const p = phases.find((x) => x.id === selected.phaseId);
   const w = p?.weeks.find((x) => x.id === selected.weekId);
   const t = w?.tasks.find((x) => x.id === selected.task.id);
-  return t ? { ...selected, task: t } : null;
+  return t ? { ...selected, task: t } : selected;
 }
 
 function ViewBtn({

@@ -1,0 +1,38 @@
+name: Scheduled Maintenance
+
+on:
+  schedule:
+    # Runs at 00:00 every Sunday (0)
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and build
+        run: npm run build
+
+      - name: Update dependencies automatically
+        run: |
+          npm update
+          if [[ `git status --porcelain` ]]; then
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git commit -am "chore: automated weekly dependency maintenance"
+            git push
+          else
+            echo "No updates needed."
+          fi

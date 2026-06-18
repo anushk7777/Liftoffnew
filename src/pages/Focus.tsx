@@ -196,30 +196,32 @@ export default function Focus() {
 
       {/* Timer ring */}
       <div className="flex flex-col items-center">
-        <div className="relative w-[300px] h-[300px]">
-          <svg className="w-full h-full -rotate-90" viewBox="0 0 300 300">
-            <circle cx="150" cy="150" r={R} fill="none" stroke="var(--border)" strokeWidth="10" />
-            <circle
-              cx="150"
-              cy="150"
-              r={R}
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth="10"
-              strokeLinecap="round"
-              strokeDasharray={C}
-              strokeDashoffset={C * (1 - progress)}
-              style={{ transition: 'stroke-dashoffset 0.5s linear' }}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <p className="font-display text-6xl font-bold tabular-nums text-ink tracking-tight">
-              {mm}:{ss}
-            </p>
-            <p className="text-sm text-ink-muted mt-2 flex items-center gap-1.5">
-              {MODE_META[mode].icon}
-              {MODE_META[mode].label} · Round {round}
-            </p>
+        <div className="relative w-80 h-80 flex items-center justify-center mb-10 neo-dial mx-auto">
+          <div className="absolute inset-4 neo-dial-inner flex items-center justify-center">
+            <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 300 300">
+              <circle cx="150" cy="150" r={R} fill="none" stroke="var(--border)" strokeWidth="8" />
+              <circle
+                cx="150"
+                cy="150"
+                r={R}
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={C}
+                strokeDashoffset={C * (1 - progress)}
+                style={{ transition: 'stroke-dashoffset 0.5s linear', filter: 'drop-shadow(0 0 8px var(--glow-color))' }}
+              />
+            </svg>
+            <div className="flex flex-col items-center z-10">
+              <p className="font-display text-7xl font-extrabold tabular-nums tracking-tight">
+                {mm}<span className="opacity-50">:</span>{ss}
+              </p>
+              <p className="text-sm text-[var(--accent)] font-bold mt-2 flex items-center gap-1.5 uppercase tracking-widest">
+                {MODE_META[mode].icon}
+                {MODE_META[mode].label} · R{round}
+              </p>
+            </div>
           </div>
         </div>
 

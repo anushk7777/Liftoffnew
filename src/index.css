@@ -38,38 +38,38 @@
     --shadow-md: 0 4px 16px rgba(40, 30, 80, 0.08);
     --shadow-lg: 0 14px 44px rgba(40, 30, 80, 0.12);
 
-    --radius: 10px;
+    --radius: 6px;
     --font-body: 'Inter', system-ui, sans-serif;
-    --font-display: 'Space Grotesk', 'Inter', sans-serif;
+    --font-display: 'Inter', system-ui, sans-serif;
 
     color-scheme: light;
   }
 
-  /* Dark theme — Atmospheric Precision (Deep Night Sky + Neon Accents) */
+  /* Dark theme — Strava x Notion (Deep Charcoal + Neon Orange) */
   .dark {
-    --bg: #070d1f;
-    --surface: #0c1324;
-    --elevated: #151b2d;
-    --sidebar: #0c1324;
-    --border: #2e3447;
-    --border-strong: #464554;
+    --bg: #111111;
+    --surface: #1a1a1a;
+    --elevated: #242424;
+    --sidebar: #111111;
+    --border: #2e2e2e;
+    --border-strong: #3d3d3d;
     --hover: rgba(255, 255, 255, 0.05);
     --hover-strong: rgba(255, 255, 255, 0.08);
 
-    --text: #dce1fb;
-    --text-muted: #c7c4d7;
-    --text-subtle: #908fa0;
+    --text: #f3f4f6;
+    --text-muted: #9ca3af;
+    --text-subtle: #6b7280;
 
-    --accent: #6366f1; /* Electric Indigo */
-    --accent-hover: #8083ff;
-    --accent-soft: rgba(99, 102, 241, 0.15);
+    --accent: #fc4c02; /* Strava Orange */
+    --accent-hover: #ff6b2b;
+    --accent-soft: rgba(252, 76, 2, 0.15);
     --accent-text: #ffffff;
 
-    --danger: #ffb4ab;
-    --success: #5de6ff; /* Neon Cyan */
-    --warning: #00cbe6;
+    --danger: #ef4444;
+    --success: #10b981;
+    --warning: #f59e0b;
 
-    --glow: rgba(99, 102, 241, 0.2);
+    --glow: rgba(252, 76, 2, 0.2);
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
     --shadow-md: 0 6px 22px rgba(0, 0, 0, 0.5);
@@ -302,3 +302,95 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-subtle);
 }
+
+@layer components {
+  .neo-card {
+      background: var(--bg);
+      border-radius: 24px;
+      box-shadow: 12px 12px 24px var(--shadow-dark, #0a0a0e), -12px -12px 24px var(--shadow-light, #1c1c28), 0 0 20px var(--glow-color, rgba(255, 248, 231, 0.05));
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .neo-card-inset {
+      background: var(--bg);
+      border-radius: 24px;
+      box-shadow: inset 8px 8px 16px var(--shadow-dark, #0a0a0e), inset -8px -8px 16px var(--shadow-light, #1c1c28);
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .neo-button {
+      background: var(--bg);
+      box-shadow: 6px 6px 12px var(--shadow-dark, #0a0a0e), -6px -6px 12px var(--shadow-light, #1c1c28);
+      transition: all 0.2s ease;
+      border: 1px solid rgba(255, 255, 255, 0.02);
+  }
+  .neo-button:hover {
+      box-shadow: 4px 4px 8px var(--shadow-dark, #0a0a0e), -4px -4px 8px var(--shadow-light, #1c1c28), 0 0 10px var(--glow-color, rgba(255, 248, 231, 0.05));
+      transform: translateY(1px);
+  }
+  .neo-button:active, .neo-pressed {
+      box-shadow: inset 4px 4px 8px var(--shadow-dark, #0a0a0e), inset -4px -4px 8px var(--shadow-light, #1c1c28);
+  }
+  .heatmap-cell { transition: all 0.2s ease; }
+  .heatmap-cell:hover { transform: scale(1.1); }
+  .progress-track { box-shadow: inset 4px 4px 8px var(--shadow-dark, #0a0a0e), inset -4px -4px 8px var(--shadow-light, #1c1c28); }
+  .progress-fill { box-shadow: 2px 2px 8px rgba(192, 193, 255, 0.4); }
+  .dial-ring { box-shadow: 8px 8px 16px var(--shadow-dark, #0a0a0e), -8px -8px 16px var(--shadow-light, #1c1c28), 0 0 15px var(--glow-color, rgba(255, 248, 231, 0.05)); }
+  .dial-inner { box-shadow: inset 8px 8px 16px var(--shadow-dark, #0a0a0e), inset -8px -8px 16px var(--shadow-light, #1c1c28); }
+}
+
+
+@layer components {
+  /* Automatically map old Liftoff classes to Stitch neo-morphism for un-overwritten pages */
+  .glass-panel {
+      background: var(--bg);
+      border-radius: 24px;
+      box-shadow: inset 8px 8px 16px var(--shadow-dark, #0a0a0e), inset -8px -8px 16px var(--shadow-light, #1c1c28);
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      backdrop-filter: none;
+  }
+  .btn, .btn-secondary {
+      background: var(--bg) !important;
+      box-shadow: 6px 6px 12px var(--shadow-dark, #0a0a0e), -6px -6px 12px var(--shadow-light, #1c1c28) !important;
+      border: 1px solid rgba(255, 255, 255, 0.02) !important;
+      border-radius: 12px;
+  }
+  .btn:hover, .btn-secondary:hover {
+      box-shadow: 4px 4px 8px var(--shadow-dark, #0a0a0e), -4px -4px 8px var(--shadow-light, #1c1c28), 0 0 10px var(--glow-color, rgba(255, 248, 231, 0.05)) !important;
+      transform: translateY(1px);
+  }
+  .btn:active, .btn-secondary:active {
+      box-shadow: inset 4px 4px 8px var(--shadow-dark, #0a0a0e), inset -4px -4px 8px var(--shadow-light, #1c1c28) !important;
+  }
+  .btn-primary {
+      background: var(--accent) !important;
+      color: #000 !important;
+      box-shadow: 0 0 10px var(--glow-color, rgba(255, 248, 231, 0.05)) !important;
+  }
+  .input {
+      background: var(--bg);
+      box-shadow: inset 4px 4px 8px var(--shadow-dark, #0a0a0e), inset -4px -4px 8px var(--shadow-light, #1c1c28);
+      border: 1px solid rgba(0,0,0,0.2) !important;
+      border-radius: 12px;
+  }
+}
+
+
+@layer components {
+  .neo-dial {
+      background: var(--bg);
+      box-shadow: -20px 20px 40px var(--shadow-dark, #08080c), 20px -20px 40px var(--glow-color, rgba(255, 245, 225, 0.04));
+      border-radius: 50%;
+  }
+  .neo-dial-inner {
+      background: var(--bg);
+      box-shadow: inset -10px 10px 20px var(--shadow-dark, #08080c), inset 10px -10px 20px var(--glow-color, rgba(255, 245, 225, 0.04));
+      border-radius: 50%;
+  }
+  .neo-card-sm {
+      background: var(--bg);
+      box-shadow: 6px 6px 12px var(--shadow-dark, #0c0c11), -6px -6px 12px var(--shadow-light, #1a1a25);
+      border-radius: 12px;
+  }
+}
+

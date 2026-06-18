@@ -68,7 +68,7 @@ export default function AlarmOverlay() {
           >
             <button
               onClick={dismiss}
-              className="absolute top-3 right-3 p-1.5 rounded-md text-ink-subtle hover:text-ink hover:bg-hover"
+              className="absolute top-3 right-3 p-1.5 rounded-md text-text-subtle hover:text-text hover:bg-hover"
             >
               <X className="w-4 h-4" />
             </button>
@@ -79,8 +79,8 @@ export default function AlarmOverlay() {
             >
               <AlarmClock className="w-7 h-7 text-accent" />
             </motion.div>
-            <p className="text-[11px] uppercase tracking-wider text-ink-subtle">Reminder</p>
-            <h2 className="font-display text-xl font-bold text-ink mt-1 leading-snug">{alarm.title}</h2>
+            <p className="text-[11px] uppercase tracking-wider text-text-subtle">Reminder</p>
+            <h2 className="font-display text-xl font-bold text-text mt-1 leading-snug">{alarm.title}</h2>
 
             <div className="grid grid-cols-2 gap-2 mt-5">
               <button onClick={() => snooze(5)} className="btn btn-secondary">
