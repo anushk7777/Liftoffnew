@@ -8,16 +8,20 @@ export default function Login() {
   const navigate = useNavigate();
   const { loadFromDB } = useStore();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     // Check if user is already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        // Trigger load from DB to hydrate zustand store with user's data
-        loadFromDB();
-        navigate('/');
-      }
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (session) {
+          // Trigger load from DB to hydrate zustand store with user's data
+          loadFromDB();
+          navigate('/');
+        }
+      })
+      .catch((err) => console.error('Failed to check existing session:', err));
 
     const {
       data: { subscription },
@@ -34,6 +38,7 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
+      setError('');
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -41,8 +46,9 @@ export default function Login() {
         },
       });
       if (error) throw error;
-    } catch (error: any) {
-      alert('Error logging in: ' + error.message);
+    } catch (err) {
+      console.error('Google sign-in failed:', err);
+      setError("Couldn't sign in with Google. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -71,6 +77,12 @@ export default function Login() {
         >
           {loading ? 'Connecting...' : 'Sign in with Google'}
         </button>
+
+        {error && (
+          <p role="alert" className="text-sm text-red-400">
+            {error}
+          </p>
+        )}
 
         <p className="text-xs text-ink-muted pt-4 border-t border-border/50 w-full">
           By signing in, your local roadmap data will automatically migrate to your new account.

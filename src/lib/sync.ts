@@ -7,6 +7,8 @@
 // never written to the cloud blob.
 // =========================================================================
 
+import { safeSetItem } from './utils';
+
 const SYNC_CODE_KEY = 'liftoff_sync_code';
 const SYNC_ID_KEY = 'liftoff_sync_id';
 const DEVICE_ID_KEY = 'liftoff_device_id';
@@ -17,11 +19,20 @@ const uid = () =>
   crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
 
 // Stable random per-device id (the default workspace when no sync code is set).
+// If localStorage is unavailable (Safari private mode, etc.) we fall back to a
+// process-lifetime id so the app keeps working instead of throwing.
+let memoryDeviceId = '';
 export function getDeviceId(): string {
-  let id = localStorage.getItem(DEVICE_ID_KEY);
+  let id: string | null = null;
+  try {
+    id = localStorage.getItem(DEVICE_ID_KEY);
+  } catch {
+    /* storage unavailable */
+  }
   if (!id) {
-    id = uid();
-    localStorage.setItem(DEVICE_ID_KEY, id);
+    id = memoryDeviceId || uid();
+    memoryDeviceId = id;
+    safeSetItem(DEVICE_ID_KEY, id);
   }
   return id;
 }
@@ -60,8 +71,8 @@ export async function setSyncCodeStorage(code: string): Promise<void> {
     return;
   }
   const id = await hashSyncCode(trimmed);
-  localStorage.setItem(SYNC_CODE_KEY, trimmed);
-  localStorage.setItem(SYNC_ID_KEY, id);
+  safeSetItem(SYNC_CODE_KEY, trimmed);
+  safeSetItem(SYNC_ID_KEY, id);
 }
 
 // The cloud row key: the shared sync workspace if enabled, else this device.
@@ -71,7 +82,7 @@ export function getStorageId(): string {
 }
 
 export const getLocalUpdatedAt = (): string => localStorage.getItem(UPDATED_AT_KEY) || EPOCH;
-export const setLocalUpdatedAt = (ts: string) => localStorage.setItem(UPDATED_AT_KEY, ts);
+export const setLocalUpdatedAt = (ts: string) => safeSetItem(UPDATED_AT_KEY, ts);
 
 type AnyState = Record<string, unknown>;
 

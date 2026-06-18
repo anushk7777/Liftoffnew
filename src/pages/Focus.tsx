@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw, SkipForward, Timer, Coffee, Brain } from 'lucide-react';
 import { isToday } from 'date-fns';
 import { useStore } from '../store/useStore';
-import { cn } from '../lib/utils';
+import { cn, safeSetItem } from '../lib/utils';
 import { beep } from '../lib/sound';
 import { PageHeader, StatCard } from '../components/ui';
 
@@ -113,7 +113,7 @@ export default function Focus() {
   // Persist a running timer so a page reload resumes it.
   useEffect(() => {
     if (running && endsAt) {
-      localStorage.setItem(FOCUS_KEY, JSON.stringify({ endsAt, mode, round, taskLabel }));
+      safeSetItem(FOCUS_KEY, JSON.stringify({ endsAt, mode, round, taskLabel }));
     } else {
       localStorage.removeItem(FOCUS_KEY);
     }

@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Local environment files (values are supplied via the host at build time)
+.env
+.env.*
+!.env.local.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

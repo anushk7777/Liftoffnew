@@ -15,7 +15,7 @@ import { initialNodes, initialEdges } from '../lib/roadmap-graph';
 import type { NodeData } from '../lib/roadmap-graph';
 import { Check } from 'lucide-react';
 import { cn } from '../lib/utils';
-import type { Phase, Task } from '../store/data';
+import type { Phase, Task, TaskType } from '../store/data';
 
 // --- Dagre Layout ---
 const dagreGraph = new dagre.graphlib.Graph();
@@ -201,7 +201,7 @@ export default function RoadmapGraph({
           const taskObj: Task = {
             id: node.data.taskId as string,
             title: node.data.label as string,
-            type: node.data.type as any,
+            type: node.data.type as TaskType,
             completed: !!node.data.completed
           };
           onNodeClick({

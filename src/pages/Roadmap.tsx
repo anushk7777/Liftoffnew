@@ -14,7 +14,7 @@ import {
   Timer,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { cn } from '../lib/utils';
+import { cn, safeSetItem } from '../lib/utils';
 import type { Phase, TaskType, Task } from '../store/data';
 import { parseRoadmap, countRoadmap } from '../lib/roadmap';
 import { PageHeader, ProgressBar, Modal } from '../components/ui';
@@ -79,7 +79,7 @@ export default function Roadmap() {
   }, [tasks]);
 
   const setViewPersist = (v: 'graph' | 'list') => {
-    localStorage.setItem('liftoff_roadmap_view', v);
+    safeSetItem('liftoff_roadmap_view', v);
     setView(v);
   };
 

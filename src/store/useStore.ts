@@ -176,11 +176,16 @@ export const useStore = create<AppState>()(
           }
           const id = session.user.id;
           
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('user_data')
             .select('data, updated_at')
             .eq('id', id)
             .single();
+
+          // PGRST116 = "no rows" — expected for a brand-new user, not an error.
+          if (error && error.code !== 'PGRST116') {
+            console.error('Failed to load from Supabase:', error);
+          }
 
           if (data && data.data) {
             const cloud = migrate(data.data);
@@ -575,10 +580,17 @@ useStore.subscribe((state) => {
       if (!session) return;
       
       const ts = nowISO();
-      await supabase.from('user_data').upsert(
+      const { error } = await supabase.from('user_data').upsert(
         { id: session.user.id, data: extractData(state), updated_at: ts },
         { onConflict: 'id' },
       );
+      // Supabase resolves with { error } instead of throwing; if the write
+      // failed, don't advance the local marker so the next load still treats
+      // local as fresh and retries.
+      if (error) {
+        console.error('Background sync failed', error);
+        return;
+      }
       setLocalUpdatedAt(ts); // mirror for the recency-guarded merge on next load
     } catch (e) {
       console.error('Background sync failed', e);
