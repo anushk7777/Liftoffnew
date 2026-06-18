@@ -15,6 +15,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import QuickAdd from './components/QuickAdd';
 import AlarmOverlay from './components/AlarmOverlay';
 import InstallPrompt from './components/InstallPrompt';
+import OfflineBanner from './components/OfflineBanner';
 
 import Dashboard from './pages/Dashboard';
 import Coach from './pages/Coach';
@@ -101,6 +102,7 @@ function Shell() {
   // Overlays shared by both the desktop and mobile layouts.
   const overlays = (
     <>
+      <OfflineBanner />
       <PanicButton />
       <PWAPrompt />
       <InstallPrompt />
