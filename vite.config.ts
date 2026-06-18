@@ -8,27 +8,24 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.svg', 'icon.svg'],
+      includeAssets: ['favicon.svg', 'icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Liftoff',
         short_name: 'Liftoff',
         description: '6-month full-stack developer roadmap tracker',
+        id: '/',
+        start_url: '/',
+        scope: '/',
         theme_color: '#0b0a16',
         background_color: '#0b0a16',
         display: 'standalone',
         orientation: 'portrait',
+        categories: ['productivity', 'education'],
         icons: [
-          {
-            src: 'icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml'
-          },
-          {
-            src: 'icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'maskable'
-          }
+          { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'pwa-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' }
         ]
       },
       workbox: {
