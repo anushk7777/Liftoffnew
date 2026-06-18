@@ -210,7 +210,7 @@ export default function Settings() {
                 new CustomEvent('liftoff:alarm', { detail: { id: 'test', title: 'This is a test reminder!' } })
               );
               if (notificationsSupported() && Notification.permission === 'granted') {
-                try { new Notification('Liftoff reminder', { body: 'This is a test reminder!' }); } catch {}
+                try { new Notification('Liftoff reminder', { body: 'This is a test reminder!' }); } catch { /* notification unsupported */ }
               }
             }}
             className="btn btn-secondary w-full mt-3"
