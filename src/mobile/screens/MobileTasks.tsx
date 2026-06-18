@@ -5,6 +5,7 @@ import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 import { haptics } from '../../lib/haptics';
 import { PriorityDot } from '../../components/ui';
+import { SwipeRow } from '../components/SwipeRow';
 import type { Status } from '../../store/data';
 
 type Filter = 'all' | 'todo' | 'doing' | 'done';
@@ -22,7 +23,7 @@ function StatusIcon({ status }: { status: Status }) {
 }
 
 export default function MobileTasks() {
-  const { tasks, cycleTaskStatus, deleteTask } = useStore();
+  const { tasks, cycleTaskStatus, setTaskStatus, deleteTask } = useStore();
   const [filter, setFilter] = useState<Filter>('all');
 
   const filtered = useMemo(() => {
@@ -60,37 +61,44 @@ export default function MobileTasks() {
             const overdue =
               task.dueDate && task.status !== 'done' && isPast(new Date(task.dueDate)) && !isToday(new Date(task.dueDate));
             return (
-              <li key={task.id} className="card flex items-center gap-3 p-3">
-                <button
-                  onClick={() => { cycleTaskStatus(task.id); haptics.tap(); }}
-                  aria-label="Cycle status"
-                  className={cn(
-                    'w-11 h-11 -m-1 rounded-full flex items-center justify-center shrink-0',
-                    task.status === 'done' ? 'text-accent' : task.status === 'doing' ? 'text-secondary' : 'text-on-surface-variant',
-                  )}
+              <li key={task.id}>
+                <SwipeRow
+                  onComplete={() => setTaskStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
+                  onDelete={() => deleteTask(task.id)}
                 >
-                  <StatusIcon status={task.status} />
-                </button>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <PriorityDot priority={task.priority} />
-                    <p className={cn('truncate text-base', task.status === 'done' && 'line-through text-ink-muted')}>{task.title}</p>
+                  <div className="card flex items-center gap-3 p-3">
+                    <button
+                      onClick={() => { cycleTaskStatus(task.id); haptics.tap(); }}
+                      aria-label="Cycle status"
+                      className={cn(
+                        'w-11 h-11 -m-1 rounded-full flex items-center justify-center shrink-0',
+                        task.status === 'done' ? 'text-accent' : task.status === 'doing' ? 'text-secondary' : 'text-on-surface-variant',
+                      )}
+                    >
+                      <StatusIcon status={task.status} />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <PriorityDot priority={task.priority} />
+                        <p className={cn('truncate text-base', task.status === 'done' && 'line-through text-ink-muted')}>{task.title}</p>
+                      </div>
+                      {(task.dueDate || task.scheduledAt) && (
+                        <p className={cn('text-[11px] font-mono-data text-on-surface-variant mt-0.5', overdue && 'text-danger')}>
+                          {task.scheduledAt
+                            ? format(new Date(task.scheduledAt), 'MMM d, h:mm a')
+                            : `${overdue ? 'Overdue · ' : 'Due '}${format(new Date(task.dueDate!), 'MMM d')}`}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => { deleteTask(task.id); haptics.warn(); }}
+                      aria-label="Delete task"
+                      className="w-11 h-11 -m-1 rounded-full flex items-center justify-center text-on-surface-variant active:text-danger shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  {(task.dueDate || task.scheduledAt) && (
-                    <p className={cn('text-[11px] font-mono-data text-on-surface-variant mt-0.5', overdue && 'text-danger')}>
-                      {task.scheduledAt
-                        ? format(new Date(task.scheduledAt), 'MMM d, h:mm a')
-                        : `${overdue ? 'Overdue · ' : 'Due '}${format(new Date(task.dueDate!), 'MMM d')}`}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={() => { deleteTask(task.id); haptics.warn(); }}
-                  aria-label="Delete task"
-                  className="w-11 h-11 -m-1 rounded-full flex items-center justify-center text-on-surface-variant active:text-danger shrink-0"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                </SwipeRow>
               </li>
             );
           })}

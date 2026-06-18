@@ -8,12 +8,13 @@ import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { haptics } from '../lib/haptics';
 import { BottomSheet } from './components/BottomSheet';
+import { PullToRefresh } from './components/PullToRefresh';
 
 import MobileToday from './screens/MobileToday';
 import MobileTasks from './screens/MobileTasks';
+import MobileRoadmap from './screens/MobileRoadmap';
 import Focus from '../pages/Focus';
 import Schedule from '../pages/Schedule';
-import Roadmap from '../pages/Roadmap';
 import Coach from '../pages/Coach';
 import Habits from '../pages/Habits';
 import BrainDump from '../pages/BrainDump';
@@ -86,8 +87,8 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
         </button>
       </header>
 
-      {/* Scrollable content */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar">
+      {/* Scrollable content with pull-to-refresh sync */}
+      <PullToRefresh onRefresh={() => useStore.getState().syncNow()} className="flex-1 min-h-0">
         <div className="px-4 py-5 pb-28">
           <Suspense fallback={<div className="py-16 text-center text-ink-subtle animate-pulse">Loading…</div>}>
             <Routes location={location}>
@@ -95,7 +96,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
               <Route path="/tasks" element={<MobileTasks />} />
               <Route path="/focus" element={<Focus />} />
               <Route path="/schedule" element={<Schedule />} />
-              <Route path="/roadmap" element={<Roadmap />} />
+              <Route path="/roadmap" element={<MobileRoadmap />} />
               <Route path="/coach" element={<Coach />} />
               <Route path="/habits" element={<Habits />} />
               <Route path="/brain-dump" element={<BrainDump />} />
@@ -105,7 +106,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
             </Routes>
           </Suspense>
         </div>
-      </main>
+      </PullToRefresh>
 
       {/* Quick-add FAB */}
       <button
