@@ -1,0 +1,129 @@
+import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { Timer, Flame, Check } from 'lucide-react';
+import { startOfDay, isToday } from 'date-fns';
+import { useStore } from '../../store/useStore';
+import { cn } from '../../lib/utils';
+import { haptics } from '../../lib/haptics';
+import { buildProfile, getSuggestions } from '../../lib/coach';
+import type { CoachState } from '../../lib/coach';
+import { Heatmap } from '../../components/Heatmap';
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5) return 'Burning the midnight oil';
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  if (h < 22) return 'Good evening';
+  return 'Winding down';
+}
+
+export default function MobileToday() {
+  const {
+    tasks, cycleTaskStatus, streak, activityHistory, targetDate,
+    phases, focusSessions, ideas, pomodoro, habits, habitLog,
+  } = useStore();
+
+  const todayMs = startOfDay(new Date()).getTime();
+
+  const todaysTasks = useMemo(
+    () =>
+      tasks
+        .filter((t) => {
+          if (t.status === 'done') return t.completedAt && isToday(new Date(t.completedAt));
+          if (t.dueDate) return new Date(t.dueDate).getTime() <= todayMs;
+          return true;
+        })
+        .sort((a, b) => {
+          const order = { doing: 0, todo: 1, done: 2 };
+          return order[a.status] - order[b.status];
+        }),
+    [tasks, todayMs],
+  );
+
+  const suggestions = useMemo(() => {
+    const state: CoachState = { phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate };
+    return getSuggestions(state, buildProfile(state));
+  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate]);
+
+  const done = todaysTasks.filter((t) => t.status === 'done').length;
+  const total = todaysTasks.length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-3">
+        <h1 className="font-display text-2xl font-bold text-ink">{greeting()}</h1>
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-2.5 rounded-full bg-elevated overflow-hidden">
+            <div className="h-full rounded-full bg-accent transition-all duration-700" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="font-mono-data text-sm font-semibold text-accent">{pct}%</span>
+        </div>
+      </header>
+
+      {/* Coach insight */}
+      {suggestions[0]?.title && (
+        <div className="card p-4">
+          <p className="text-sm text-ink leading-relaxed">{suggestions[0].title}</p>
+        </div>
+      )}
+
+      {/* Today's tasks */}
+      <section className="flex flex-col gap-3">
+        <h2 className="font-display text-lg font-semibold text-ink">Today</h2>
+        {total === 0 ? (
+          <p className="card p-6 text-center text-sm text-ink-muted">No objectives for today. Tap + to add one.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {todaysTasks.map((t) => {
+              const isDone = t.status === 'done';
+              return (
+                <li key={t.id}>
+                  <button
+                    onClick={() => { cycleTaskStatus(t.id); haptics.tap(); }}
+                    className={cn(
+                      'w-full card flex items-center gap-3 p-4 text-left active:scale-[0.99] transition-transform',
+                      isDone && 'opacity-60',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'w-6 h-6 rounded-full border flex items-center justify-center shrink-0',
+                        isDone ? 'bg-accent border-accent text-[var(--accent-text)]' : 'border-on-surface-variant/50 text-transparent',
+                      )}
+                    >
+                      <Check className="w-4 h-4" />
+                    </span>
+                    <span className={cn('flex-1 text-base', isDone && 'line-through text-ink-muted')}>{t.title}</span>
+                    {t.priority === 'high' && !isDone && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-danger">High</span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* Focus CTA */}
+      <Link to="/focus" className="card p-5 flex items-center justify-between active:scale-[0.99] transition-transform">
+        <span className="flex items-center gap-3 text-ink font-medium">
+          <Timer className="w-5 h-5 text-accent" /> Start a focus session
+        </span>
+        <span className="text-ink-subtle">→</span>
+      </Link>
+
+      {/* Streak */}
+      <section className="card p-5">
+        <h2 className="font-display text-base font-semibold text-ink mb-3 flex items-center gap-2">
+          <Flame className="w-4 h-4 text-warning" /> {streak}-day streak
+        </h2>
+        <div className="overflow-x-auto custom-scrollbar -mx-1 px-1">
+          <Heatmap history={activityHistory} />
+        </div>
+      </section>
+    </div>
+  );
+}
