@@ -33,6 +33,7 @@ export interface WorkoutProgram {
 
 /** One logged set. Inputs kept as strings for friction-free typing. */
 export interface LoggedSet {
+  id: string;
   weight: string;
   reps: string;
   rpe: string; // RPE achieved

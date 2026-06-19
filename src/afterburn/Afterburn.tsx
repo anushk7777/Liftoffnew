@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Flame, Rocket, Plus, Check, Star, Trash2, ChevronDown, ChevronRight, Pencil, X } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -44,7 +44,7 @@ function exerciseTarget(ex: ProgramExercise): string {
 function Header() {
   const setMode = useAppMode((s) => s.setMode);
   return (
-    <header className="sticky top-0 z-30 bg-background/90 backdrop-blur border-b border-border">
+    <header className="sticky top-0 z-30 bg-background/90 backdrop-blur border-b border-border pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-2xl px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Flame className="w-5 h-5 text-orange-400" />
@@ -257,14 +257,14 @@ function Logger({ onFinish }: { onFinish: () => void }) {
   const setExerciseNotes = useAfterburn((s) => s.setExerciseNotes);
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="space-y-4 pb-32">
       <div>
         <h1 className="font-display text-xl font-bold">{draft.dayName}</h1>
         <p className="text-xs text-ink-subtle">{format(new Date(draft.date), 'EEEE, MMM d · h:mm a')}</p>
       </div>
 
       {draft.entries.map((ex, exIdx) => (
-        <div key={ex.exerciseId + exIdx} className="card p-4">
+        <div key={ex.exerciseId} className="card p-4">
           <p className="font-semibold text-ink">{ex.name}</p>
           <p className="text-xs text-ink-subtle mt-0.5">
             target: {ex.target.reps}
@@ -275,7 +275,7 @@ function Logger({ onFinish }: { onFinish: () => void }) {
 
           <div className="mt-3 space-y-2">
             {ex.sets.map((set, setIdx) => (
-              <SetRow key={setIdx} exIdx={exIdx} setIdx={setIdx} set={set} unit={unit} />
+              <SetRow key={set.id} exIdx={exIdx} setIdx={setIdx} set={set} unit={unit} />
             ))}
           </div>
 
@@ -299,7 +299,10 @@ function Logger({ onFinish }: { onFinish: () => void }) {
         </div>
       ))}
 
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur border-t border-border p-3">
+      <div
+        className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur border-t border-border px-3 pt-3"
+        style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+      >
         <div className="mx-auto max-w-2xl flex gap-2">
           <button onClick={cancelDraft} className="btn btn-secondary flex-1">Cancel</button>
           <button onClick={() => { finishDraft(); onFinish(); }} className="btn btn-primary flex-1">
@@ -334,12 +337,12 @@ function SessionCard({ session }: { session: WorkoutSession }) {
 
       {open && (
         <div className="mt-3 space-y-2 border-t border-border pt-3">
-          {session.entries.map((e, i) => (
-            <div key={i} className="text-sm">
+          {session.entries.map((e) => (
+            <div key={e.exerciseId} className="text-sm">
               <p className="text-ink font-medium">{e.name}</p>
               <div className="text-xs text-ink-muted mt-0.5 space-y-0.5">
                 {e.sets.map((s, j) => (
-                  <div key={j}>
+                  <div key={s.id || j}>
                     #{j + 1}: {s.weight || '–'}{unit} × {s.reps || '–'}
                     {s.rpe ? ` @ RPE ${s.rpe}` : ''}
                     {s.rating ? ` · ${'★'.repeat(s.rating)}` : ''}
@@ -372,7 +375,13 @@ function HistoryView() {
 // ---------- root ----------
 export default function Afterburn() {
   const draft = useAfterburn((s) => s.draft);
+  const loadWorkouts = useAfterburn((s) => s.loadWorkouts);
   const [tab, setTab] = useState<'program' | 'history'>('program');
+
+  // Pull cloud workout data when entering the app (recency-guarded in the store).
+  useEffect(() => {
+    loadWorkouts();
+  }, [loadWorkouts]);
 
   return (
     <div className="min-h-screen bg-background text-ink relative">

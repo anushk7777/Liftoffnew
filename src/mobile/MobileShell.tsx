@@ -2,9 +2,10 @@ import { useState, lazy, Suspense } from 'react';
 import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CheckSquare, Timer, CalendarDays, MoreHorizontal, Plus, Search,
-  Map, Sparkles, Repeat, Inbox, BarChart3, Settings as SettingsIcon, Moon, Sun,
+  Map, Sparkles, Repeat, Inbox, BarChart3, Settings as SettingsIcon, Moon, Sun, Flame,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { useAppMode } from '../afterburn/store';
 import { cn } from '../lib/utils';
 import { haptics } from '../lib/haptics';
 import { BottomSheet } from './components/BottomSheet';
@@ -54,6 +55,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useStore();
+  const setAppMode = useAppMode((s) => s.setMode);
   const [moreOpen, setMoreOpen] = useState(false);
 
   const title = TITLES[location.pathname] ?? 'Liftoff';
@@ -152,6 +154,13 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
               <span className="text-xs font-medium">{label}</span>
             </button>
           ))}
+          <button
+            onClick={() => { setMoreOpen(false); haptics.tap(); setAppMode('afterburn'); }}
+            className="card flex flex-col items-center justify-center gap-2 py-5 active:scale-95 transition-transform text-orange-400 border-orange-400/30"
+          >
+            <Flame className="w-6 h-6" />
+            <span className="text-xs font-medium">Afterburn</span>
+          </button>
           <button
             onClick={() => { toggleTheme(); haptics.tap(); }}
             className="card flex flex-col items-center justify-center gap-2 py-5 active:scale-95 transition-transform"
