@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
-import { Sparkles, Brain, Clock, TrendingUp, ShieldCheck, Moon, TriangleAlert } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Sparkles, Brain, Clock, TrendingUp, ShieldCheck, Moon, TriangleAlert, Wand2, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { buildProfile, getSuggestions, getBriefing, formatHour } from '../lib/coach';
 import type { CoachState } from '../lib/coach';
+import { hasApiKey, generateCoaching, modelShortLabel } from '../lib/aicoach';
 import { PageHeader, ProgressBar } from '../components/ui';
 import { SuggestionRow } from '../components/Coach';
 import { useCoachActions } from '../components/useCoachActions';
@@ -22,7 +24,7 @@ export default function Coach() {
 
   const onAct = useCoachActions();
 
-  const { profile, suggestions, briefing } = useMemo(() => {
+  const { state: coachState, profile, suggestions, briefing } = useMemo(() => {
     const state: CoachState = {
       phases,
       tasks,
@@ -36,7 +38,7 @@ export default function Coach() {
       targetDate,
     };
     const profile = buildProfile(state);
-    return { profile, suggestions: getSuggestions(state, profile), briefing: getBriefing(state) };
+    return { state, profile, suggestions: getSuggestions(state, profile), briefing: getBriefing(state) };
   }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate]);
 
   const learning = profile.dataPoints < 8;
@@ -94,6 +96,9 @@ export default function Coach() {
             : ' The more you do, the sharper it gets.'}
         </p>
       </div>
+
+      {/* AI coach (optional, bring-your-own Anthropic key) */}
+      <AICoachPanel state={coachState} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Suggestions */}
@@ -167,6 +172,80 @@ export default function Coach() {
           </div>
         </aside>
       </div>
+    </div>
+  );
+}
+
+function AICoachPanel({ state }: { state: CoachState }) {
+  const [enabled] = useState(() => hasApiKey());
+  const [question, setQuestion] = useState('');
+  const [output, setOutput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const run = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    setOutput('');
+    try {
+      await generateCoaching({ state, question, onText: (t) => setOutput((p) => p + t) });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong calling the AI.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card p-5 mb-6 border border-accent/30">
+      <div className="flex items-center gap-2 mb-2">
+        <Wand2 className="w-5 h-5 text-accent" />
+        <h2 className="font-display text-lg font-bold text-ink">AI Coach</h2>
+        {enabled && (
+          <span className="chip text-accent border-accent/30 bg-accent-soft/40 ml-auto">
+            {modelShortLabel()}
+          </span>
+        )}
+      </div>
+
+      {!enabled ? (
+        <p className="text-sm text-ink-muted">
+          Add your free Google Gemini API key in{' '}
+          <Link to="/settings" className="text-accent underline underline-offset-2">
+            Settings → AI Coach
+          </Link>{' '}
+          to get a personalized, conversational briefing powered by Gemini — grounded in your real
+          tasks, habits, and goal. It's free, and your key stays on this device.
+        </p>
+      ) : (
+        <>
+          <p className="text-sm text-ink-muted mb-3">
+            Generate a briefing from your current data, or ask the coach a question.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 mb-3">
+            <input
+              className="input flex-1"
+              placeholder="Optional: ask a question (e.g. what should I focus on this week?)"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') run();
+              }}
+            />
+            <button onClick={run} disabled={busy} className="btn btn-primary disabled:opacity-50">
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+              {busy ? 'Thinking…' : question.trim() ? 'Ask coach' : 'Generate briefing'}
+            </button>
+          </div>
+          {error && <p className="text-xs text-danger mb-2">{error}</p>}
+          {output && (
+            <div className="text-sm text-ink whitespace-pre-wrap leading-relaxed bg-elevated rounded-md p-3 border border-border">
+              {output}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

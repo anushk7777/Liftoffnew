@@ -1,67 +1,91 @@
 # Push reminder setup
 
-Liftoff's client is ready for web-push: the **Settings → Reminders → Push
-reminders** toggle subscribes the browser and stores the subscription in
-Supabase, and the service worker already shows incoming notifications
-(`public/push-sw.js`). What's left is the part only you can provision: VAPID
-keys, a table, and a sender. ~15 minutes.
+Liftoff's client is ready for web-push out of the box: the **Settings →
+Reminders → Push reminders** toggle subscribes the browser and stores the
+subscription in Supabase (`src/lib/push.ts`), and the service worker shows
+incoming notifications (`public/push-sw.js`). The steps below provision the
+backend that actually *sends* the pushes. **This was deployed entirely from
+the Supabase + Vercel dashboards** (no local CLI needed). ~15 minutes.
 
-## 1. Generate VAPID keys
+The sender, table, schedule, and config are all version-controlled:
+- `supabase/functions/send-reminders/index.ts` — the sender (self-diagnosing, `?test=1` support)
+- `supabase/migrations/20260618_push_subscriptions.sql` — the subscriptions table
+- `supabase/migrations/20260619_schedule_send_reminders.sql` — the every-minute cron
+- `supabase/config.toml` — sets `verify_jwt = false` for the function
+
+## 0. Generate VAPID keys
 
 ```bash
 npx web-push generate-vapid-keys
 ```
 
-- Put the **public** key in the client env as `VITE_VAPID_PUBLIC_KEY`
-  (e.g. in Vercel project env, then redeploy). Until this is set, the toggle
-  stays disabled and shows a "not configured" note.
-- Keep the **private** key for the Edge Function secret (step 3).
+Keep both:
+- **Public key** → goes in the client env (`VITE_VAPID_PUBLIC_KEY`) **and** as a function secret.
+- **Private key** → function secret only. Never ship it to the client.
 
-## 2. Create the subscriptions table (Supabase SQL editor)
+## 1. Create the subscriptions table (Supabase → SQL Editor)
 
-```sql
-create table if not exists public.push_subscriptions (
-  endpoint    text primary key,
-  user_id     uuid not null references auth.users(id) on delete cascade,
-  subscription jsonb not null,
-  created_at  timestamptz not null default now()
-);
-
-alter table public.push_subscriptions enable row level security;
-
--- Each user manages only their own subscriptions.
-create policy "own subscriptions" on public.push_subscriptions
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-```
-
-This matches the client upsert in `src/lib/push.ts`
+Run the contents of `supabase/migrations/20260618_push_subscriptions.sql`.
+Re-running is harmless — a "policy already exists" error just means it's
+already there. This matches the client upsert in `src/lib/push.ts`
 (`{ user_id, endpoint, subscription }`, `onConflict: 'endpoint'`).
 
-## 3. Sender — Supabase Edge Function
+## 2. Client public key (Vercel)
 
-Create `supabase/functions/send-reminders/index.ts` that, for each due task,
-looks up the user's subscriptions and sends a push with payload
-`{ title, body, url }` (the shape `public/push-sw.js` expects). Use the
-`web-push` library with your VAPID keys.
+Project → **Settings → Environment Variables** → add `VITE_VAPID_PUBLIC_KEY`
+= *(public key)* for Production → **Redeploy** (Vite inlines env vars at build
+time, so a redeploy is required). Until this is set the toggle stays disabled
+with a "not configured" note.
 
-```bash
-supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:you@example.com
-supabase functions deploy send-reminders
-```
+## 3. Function secrets (Supabase → Edge Functions → Secrets)
 
-Then schedule it (pick one):
+Add three secrets in the dashboard (no CLI):
 
-- **pg_cron** in Supabase calling the function over HTTP every minute/5 min, or
-- the app's existing Scheduler / an external cron hitting the function URL.
+| Name | Value |
+|------|-------|
+| `VAPID_PUBLIC_KEY`  | *(public key)* |
+| `VAPID_PRIVATE_KEY` | *(private key)* |
+| `VAPID_SUBJECT`     | `mailto:you@example.com` |
 
-The function should select tasks whose `scheduledAt` falls in the current
-window, find `push_subscriptions` for each `user_id`, and send. Prune any
-subscription that returns HTTP 410/404 (expired).
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically — do
+not add them.
+
+## 4. Deploy the function (Supabase → Edge Functions)
+
+"Deploy a new function" → **Via Editor** → name it **`send-reminders`** →
+paste `supabase/functions/send-reminders/index.ts` → **Deploy**. Then open the
+function's settings and turn **Verify JWT OFF** (the cron calls it without a
+user token). *(CLI alternative: `npx supabase link --project-ref <ref>` then
+`npx supabase functions deploy send-reminders`; `config.toml` sets verify_jwt.)*
+
+## 5. Schedule it every minute (Supabase → SQL Editor)
+
+Enable the `pg_cron` and `pg_net` extensions (Database → Extensions), then run
+`supabase/migrations/20260619_schedule_send_reminders.sql`. Confirm with
+`select jobid, jobname, schedule, active from cron.job;` — `active` should be
+`true`. The function's due-window is 60s to match the 60s cron exactly, so each
+task fires once.
+
+## 6. Test
+
+1. On the device, open the app → sign in → **Settings → Reminders → Push
+   reminders ON** → allow the permission prompt (writes one `push_subscriptions` row).
+2. Open `https://<project-ref>.supabase.co/functions/v1/send-reminders?test=1`.
+   Expect `{ ok: true, sent: ≥1, subscriptions: ≥1 }` and a notification.
+3. Schedule a task ~2 minutes out and confirm it fires on its own.
+
+### Troubleshooting (the function self-reports as JSON)
+- `subscriptions: 0` → no device subscribed; enable the toggle (and confirm the
+  Vercel redeploy picked up `VITE_VAPID_PUBLIC_KEY` — hard-refresh to drop a
+  stale service worker).
+- `ok: false, step: "secrets"` → the VAPID secrets aren't set (step 3).
+- `401` on the test URL → Verify JWT wasn't turned off (step 4).
+- Still nothing → check the function's **Logs** in the dashboard.
 
 ## Notes
 
 - **iOS**: web push only works for PWAs **installed to the Home Screen**
-  (iOS 16.4+). The toggle will no-op in the normal Safari tab — install first
-  (the InstallPrompt sheet explains how).
+  (iOS 16.4+); it no-ops in a normal Safari tab. Android Chrome and desktop work
+  in-browser directly.
 - Nothing here changes the existing reminder paths: in-app alarms and calendar
   (.ics) export keep working regardless (`src/lib/reminders.ts`, `src/lib/ics.ts`).
