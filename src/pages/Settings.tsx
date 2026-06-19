@@ -271,16 +271,16 @@ export default function Settings() {
         {/* AI Coach (bring-your-own key) */}
         <Section title="AI Coach" icon={<Sparkles className="w-4 h-4" />}>
           <p className="text-xs text-ink-subtle mb-3">
-            Optional: power the Coach page with Claude using your own Anthropic API key. The key is
-            stored <strong>only on this device</strong> (never synced or sent anywhere except
-            Anthropic). Get a key at{' '}
+            Optional and free: power the Coach page with Google Gemini using your own API key. The
+            key is stored <strong>only on this device</strong> (never synced or sent anywhere except
+            Google). Get a <strong>free</strong> key (no credit card) at{' '}
             <a
-              href="https://console.anthropic.com/settings/keys"
+              href="https://aistudio.google.com/apikey"
               target="_blank"
               rel="noreferrer"
               className="text-accent underline underline-offset-2"
             >
-              console.anthropic.com
+              aistudio.google.com/apikey
             </a>
             .
           </p>
@@ -288,7 +288,7 @@ export default function Settings() {
             type="password"
             value={aiKey}
             onChange={(e) => setAiKey(e.target.value)}
-            placeholder="sk-ant-..."
+            placeholder="AIza..."
             autoComplete="off"
             className="input mb-3"
           />

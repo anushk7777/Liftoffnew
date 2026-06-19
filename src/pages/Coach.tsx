@@ -211,12 +211,12 @@ function AICoachPanel({ state }: { state: CoachState }) {
 
       {!enabled ? (
         <p className="text-sm text-ink-muted">
-          Add your Anthropic API key in{' '}
+          Add your free Google Gemini API key in{' '}
           <Link to="/settings" className="text-accent underline underline-offset-2">
             Settings → AI Coach
           </Link>{' '}
-          to get a personalized, conversational briefing powered by Claude — grounded in your real
-          tasks, habits, and goal. Your key stays on this device.
+          to get a personalized, conversational briefing powered by Gemini — grounded in your real
+          tasks, habits, and goal. It's free, and your key stays on this device.
         </p>
       ) : (
         <>

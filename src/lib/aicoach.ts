@@ -1,24 +1,22 @@
-// Optional LLM-powered coach. Brings the user's OWN Anthropic API key (stored
-// only in this browser, never synced) and asks Claude for a personalized
-// briefing grounded in the same data the on-device heuristic coach uses.
-// The Anthropic SDK is imported dynamically so it stays out of the main bundle
-// and only loads when the user actually asks the AI coach.
-import type AnthropicSDK from '@anthropic-ai/sdk';
+// Optional LLM-powered coach using Google Gemini's FREE tier. Brings the user's
+// OWN Gemini API key (free from Google AI Studio — no payment), stored only in
+// this browser and never synced. It reuses the on-device heuristic coach to
+// build a grounded context, then streams a personalized briefing from Gemini.
 import { safeSetItem } from './utils';
 import { buildProfile, getSuggestions, getBriefing, buildDailyPlan, formatHour } from './coach';
 import type { CoachState } from './coach';
 
-const KEY_STORAGE = 'liftoff_anthropic_key';
+const KEY_STORAGE = 'liftoff_gemini_key';
 const MODEL_STORAGE = 'liftoff_ai_model';
 
 export const AI_MODELS = [
-  { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 — most capable (priciest)' },
-  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 — balanced' },
-  { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — fastest & cheapest' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash — capable & free', short: 'Gemini 2.5 Flash' },
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite — fastest & free', short: 'Gemini 2.5 Flash-Lite' },
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash — free', short: 'Gemini 2.0 Flash' },
 ] as const;
 
 export type AiModelId = (typeof AI_MODELS)[number]['id'];
-const DEFAULT_MODEL: AiModelId = 'claude-opus-4-8';
+const DEFAULT_MODEL: AiModelId = 'gemini-2.5-flash';
 
 function read(key: string): string {
   try {
@@ -42,9 +40,9 @@ export const setModel = (id: AiModelId): void => {
   safeSetItem(MODEL_STORAGE, id);
 };
 
-/** Short, human label for the active model (e.g. "Opus 4.8"). */
+/** Short, human label for the active model (e.g. "Gemini 2.5 Flash"). */
 export const modelShortLabel = (): string =>
-  getModel().replace('claude-', '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  AI_MODELS.find((m) => m.id === getModel())?.short ?? 'Gemini';
 
 const SYSTEM_PROMPT = `You are the coach inside "Liftoff", an app that helps the user reach a career goal by a target date. You are given the user's real data as JSON.
 
@@ -100,8 +98,12 @@ function buildContext(state: CoachState): string {
   return JSON.stringify(ctx, null, 2);
 }
 
+interface GeminiChunk {
+  candidates?: { content?: { parts?: { text?: string }[] } }[];
+}
+
 /**
- * Stream a coaching response from Claude. Calls `onText` with each chunk.
+ * Stream a coaching response from Google Gemini. Calls `onText` with each chunk.
  * Throws on missing key or API error (caller surfaces the message).
  */
 export async function generateCoaching(opts: {
@@ -110,10 +112,7 @@ export async function generateCoaching(opts: {
   onText: (chunk: string) => void;
 }): Promise<void> {
   const apiKey = getApiKey();
-  if (!apiKey) throw new Error('Add your Anthropic API key in Settings → AI Coach first.');
-
-  const { default: Anthropic } = await import('@anthropic-ai/sdk');
-  const client: AnthropicSDK = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  if (!apiKey) throw new Error('Add your free Google Gemini API key in Settings → AI Coach first.');
 
   const context = buildContext(opts.state);
   const q = opts.question?.trim();
@@ -121,12 +120,55 @@ export async function generateCoaching(opts: {
     ? `My current data:\n\n${context}\n\nMy question: ${q}`
     : `My current data:\n\n${context}\n\nGive me a short, personalized briefing: where I stand against my goal, then my top 3 priorities right now — each tied to a specific task or habit above.`;
 
-  const stream = client.messages.stream({
-    model: getModel(),
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userText }],
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${getModel()}` +
+    `:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: 'user', parts: [{ text: userText }] }],
+      generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
+    }),
   });
-  stream.on('text', (delta) => opts.onText(delta));
-  await stream.finalMessage();
+
+  if (!res.ok || !res.body) {
+    let msg = `Request failed (${res.status}).`;
+    try {
+      const j = (await res.json()) as { error?: { message?: string } };
+      if (j.error?.message) msg = j.error.message;
+    } catch {
+      /* non-JSON error body */
+    }
+    if (res.status === 400 || res.status === 403) msg = `${msg} — check your Gemini API key.`;
+    throw new Error(msg);
+  }
+
+  // Gemini streams Server-Sent Events: one `data: {json}` line per chunk.
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? ''; // keep the trailing partial line
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const data = trimmed.slice(5).trim();
+      if (!data || data === '[DONE]') continue;
+      try {
+        const json = JSON.parse(data) as GeminiChunk;
+        const text =
+          json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+        if (text) opts.onText(text);
+      } catch {
+        /* incomplete/non-JSON event — skip */
+      }
+    }
+  }
 }
