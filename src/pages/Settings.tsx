@@ -9,12 +9,15 @@ import {
   Target,
   Bell,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { requestNotificationPermission, notificationPermission, notificationsSupported } from '../lib/reminders';
 import { enablePush, disablePush, isPushSupported, isPushConfigured, pushPermission } from '../lib/push';
+import { getApiKey, setApiKey, getModel, setModel, AI_MODELS } from '../lib/aicoach';
+import type { AiModelId } from '../lib/aicoach';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
 
@@ -44,6 +47,21 @@ export default function Settings() {
   const [syncInput, setSyncInput] = useState(syncCode);
   const [syncStatus, setSyncStatus] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [aiKey, setAiKey] = useState(() => getApiKey());
+  const [aiModel, setAiModelState] = useState<AiModelId>(() => getModel());
+  const [aiStatus, setAiStatus] = useState('');
+
+  const saveAiKey = () => {
+    setApiKey(aiKey);
+    setAiStatus(aiKey.trim() ? 'Saved on this device.' : 'Key removed.');
+    setTimeout(() => setAiStatus(''), 4000);
+  };
+  const clearAiKey = () => {
+    setApiKey('');
+    setAiKey('');
+    setAiStatus('Key removed.');
+    setTimeout(() => setAiStatus(''), 4000);
+  };
 
   const enableSync = async () => {
     if (!syncInput.trim()) return;
@@ -248,6 +266,63 @@ export default function Settings() {
           >
             Test reminder
           </button>
+        </Section>
+
+        {/* AI Coach (bring-your-own key) */}
+        <Section title="AI Coach" icon={<Sparkles className="w-4 h-4" />}>
+          <p className="text-xs text-ink-subtle mb-3">
+            Optional: power the Coach page with Claude using your own Anthropic API key. The key is
+            stored <strong>only on this device</strong> (never synced or sent anywhere except
+            Anthropic). Get a key at{' '}
+            <a
+              href="https://console.anthropic.com/settings/keys"
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent underline underline-offset-2"
+            >
+              console.anthropic.com
+            </a>
+            .
+          </p>
+          <input
+            type="password"
+            value={aiKey}
+            onChange={(e) => setAiKey(e.target.value)}
+            placeholder="sk-ant-..."
+            autoComplete="off"
+            className="input mb-3"
+          />
+          <label className="block mb-3">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle mb-1.5 block">
+              Model
+            </span>
+            <select
+              value={aiModel}
+              onChange={(e) => {
+                const id = e.target.value as AiModelId;
+                setAiModelState(id);
+                setModel(id);
+              }}
+              className="input"
+            >
+              {AI_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button onClick={saveAiKey} className="btn btn-primary flex-1">
+              Save key
+            </button>
+            {getApiKey() && (
+              <button onClick={clearAiKey} className="btn btn-danger flex-1">
+                Remove key
+              </button>
+            )}
+          </div>
+          {aiStatus && <p className="text-xs text-success font-medium mt-2">{aiStatus}</p>}
         </Section>
 
         {/* Sync across devices */}
