@@ -1,0 +1,6 @@
+project_id = "kqsudgkpzawyloccjtpa"
+
+# The reminder sender is called by a scheduled job (pg_cron), not a logged-in
+# user, so it must not require a user JWT.
+[functions.send-reminders]
+verify_jwt = false
