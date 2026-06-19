@@ -10,6 +10,7 @@ import {
   Bell,
   RefreshCw,
   Sparkles,
+  Flame,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
@@ -18,6 +19,7 @@ import { requestNotificationPermission, notificationPermission, notificationsSup
 import { enablePush, disablePush, isPushSupported, isPushConfigured, pushPermission } from '../lib/push';
 import { getApiKey, setApiKey, getModel, setModel, AI_MODELS } from '../lib/aicoach';
 import type { AiModelId } from '../lib/aicoach';
+import { useAppMode } from '../afterburn/store';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
 
@@ -40,6 +42,7 @@ export default function Settings() {
     syncNow,
   } = useStore();
 
+  const setAppMode = useAppMode((s) => s.setMode);
   const [importStatus, setImportStatus] = useState('');
   const [reminders, setReminders] = useState(() => notificationPermission() === 'granted');
   const [push, setPush] = useState(() => isPushConfigured() && pushPermission() === 'granted');
@@ -117,6 +120,20 @@ export default function Settings() {
       />
 
       <div className="space-y-8">
+        {/* Workspace */}
+        <Section title="Workspace" icon={<Flame className="w-4 h-4" />}>
+          <Row label="Switch app" desc="Jump to Liftoff Afterburn (workout logger) or the profile picker.">
+            <div className="flex gap-2">
+              <button onClick={() => setAppMode('afterburn')} className="btn btn-secondary !py-1.5 !px-3 text-xs">
+                Afterburn
+              </button>
+              <button onClick={() => setAppMode(null)} className="btn btn-secondary !py-1.5 !px-3 text-xs">
+                Picker
+              </button>
+            </div>
+          </Row>
+        </Section>
+
         {/* Appearance */}
         <Section title="Appearance">
           <Row label="Theme" desc="Dark-first, switch any time.">

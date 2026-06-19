@@ -30,6 +30,9 @@ import Schedule from './pages/Schedule';
 import Login from './pages/Login';
 import { EmptyState } from './components/ui';
 import { supabase } from './lib/supabase';
+import { useAppMode } from './afterburn/store';
+import ProfilePicker from './afterburn/ProfilePicker';
+import Afterburn from './afterburn/Afterburn';
 
 function NotFound() {
   return (
@@ -48,6 +51,7 @@ function Shell() {
   const navigate = useNavigate();
   const rm = useReducedMotion();
   const isMobile = useIsMobile();
+  const appMode = useAppMode((s) => s.mode);
   useReminders();
 
   const [authChecking, setAuthChecking] = useState(true);
@@ -126,6 +130,10 @@ function Shell() {
       </Routes>
     );
   }
+
+  // ---- Workspace gate (after login): choose Focus vs Afterburn. ----
+  if (appMode === null) return <ProfilePicker />;
+  if (appMode === 'afterburn') return <Afterburn />;
 
   // ---- Mobile: dedicated app shell (the single source of truth for mobile UX). ----
   if (isMobile) {
