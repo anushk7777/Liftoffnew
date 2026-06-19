@@ -28,7 +28,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const testMode = new URL(req.url).searchParams.get("test") === "1";
     const now = Date.now();
-    const windowStart = now - 90_000;
+    // Look back exactly one cron interval (60s) so each clean-minute task is
+    // caught by exactly one run — a wider window double-sends.
+    const windowStart = now - 60_000;
 
     const { data: rows, error } = await supabase.from("user_data").select("id, data");
     if (error) return json(500, { ok: false, step: "select user_data", error: error.message });
