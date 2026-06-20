@@ -7,7 +7,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      // Auto-update so users always get the latest build (new screens, weeks,
+      // switcher) without a manual "reload" prompt or a stale cached shell.
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Liftoff',

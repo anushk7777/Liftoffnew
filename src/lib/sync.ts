@@ -1,16 +1,15 @@
 // =========================================================================
 // Cross-device sync helpers.
 //
-// A user opts in by choosing a private "sync code" (passphrase). The cloud row
-// id is derived from it (sync_<sha256>), so every device that enters the same
-// code shares one workspace. The raw code is kept only in localStorage and is
-// never written to the cloud blob.
+// Sync is keyed by the signed-in account (Supabase user.id) — each account has
+// one private `user_data` cloud row. There is no passphrase; signing into the
+// same Google account on another device shares the workspace automatically.
+// These helpers cover the per-device id, the local recency marker, and the
+// recency-guarded, non-destructive merge.
 // =========================================================================
 
 import { safeSetItem } from './utils';
 
-const SYNC_CODE_KEY = 'liftoff_sync_code';
-const SYNC_ID_KEY = 'liftoff_sync_id';
 const DEVICE_ID_KEY = 'liftoff_device_id';
 const UPDATED_AT_KEY = 'liftoff_updated_at';
 const EPOCH = '1970-01-01T00:00:00.000Z';
@@ -45,50 +44,6 @@ const readItem = (key: string): string | null => {
     return null;
   }
 };
-
-export const getSyncCode = (): string => readItem(SYNC_CODE_KEY) || '';
-export const isSyncEnabled = (): boolean => getSyncCode().trim().length > 0;
-
-// Derive a deterministic, non-reversible workspace id from the passphrase.
-export async function hashSyncCode(code: string): Promise<string> {
-  const trimmed = code.trim();
-  try {
-    if (crypto?.subtle) {
-      const buf = await crypto.subtle.digest(
-        'SHA-256',
-        new TextEncoder().encode('liftoff:' + trimmed),
-      );
-      const hex = Array.from(new Uint8Array(buf))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-      return 'sync_' + hex.slice(0, 40);
-    }
-  } catch {
-    /* fall through to non-crypto fallback */
-  }
-  let h = 0;
-  for (let i = 0; i < trimmed.length; i++) h = (h * 31 + trimmed.charCodeAt(i)) | 0;
-  return 'sync_' + (h >>> 0).toString(16);
-}
-
-// Persist (or clear) the sync code and its derived workspace id.
-export async function setSyncCodeStorage(code: string): Promise<void> {
-  const trimmed = code.trim();
-  if (!trimmed) {
-    localStorage.removeItem(SYNC_CODE_KEY);
-    localStorage.removeItem(SYNC_ID_KEY);
-    return;
-  }
-  const id = await hashSyncCode(trimmed);
-  safeSetItem(SYNC_CODE_KEY, trimmed);
-  safeSetItem(SYNC_ID_KEY, id);
-}
-
-// The cloud row key: the shared sync workspace if enabled, else this device.
-export function getStorageId(): string {
-  if (isSyncEnabled()) return readItem(SYNC_ID_KEY) || getDeviceId();
-  return getDeviceId();
-}
 
 export const getLocalUpdatedAt = (): string => readItem(UPDATED_AT_KEY) || EPOCH;
 export const setLocalUpdatedAt = (ts: string) => safeSetItem(UPDATED_AT_KEY, ts);

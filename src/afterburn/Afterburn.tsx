@@ -65,6 +65,7 @@ function ProgramView({ onStart }: { onStart: () => void }) {
   const setCurrentWeek = useAfterburn((s) => s.setCurrentWeek);
   const startDay = useAfterburn((s) => s.startDay);
   const addCustomDay = useAfterburn((s) => s.addCustomDay);
+  const resetProgram = useAfterburn((s) => s.resetProgram);
   const [editDay, setEditDay] = useState<string | null>(null);
   const [newDayName, setNewDayName] = useState('');
   const [adding, setAdding] = useState(false);
@@ -92,38 +93,43 @@ function ProgramView({ onStart }: { onStart: () => void }) {
         <p className="text-xs text-ink-subtle mt-0.5">Logging in {program.unit} · RPE 1–10</p>
       </div>
 
-      {/* Week selector */}
-      <div className="flex items-center gap-2 card p-2">
-        <button
-          disabled={weekIdx <= 0}
-          onClick={() => setCurrentWeek(program.weeks[weekIdx - 1].id)}
-          className="btn btn-secondary !px-2 !py-1.5 disabled:opacity-40"
-          aria-label="Previous week"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        <select
-          value={week?.id}
-          onChange={(e) => setCurrentWeek(e.target.value)}
-          className="input !py-1.5 flex-1 text-center font-medium"
-        >
-          {program.weeks.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name}
-            </option>
-          ))}
-        </select>
-        <button
-          disabled={weekIdx >= program.weeks.length - 1}
-          onClick={() => setCurrentWeek(program.weeks[weekIdx + 1].id)}
-          className="btn btn-secondary !px-2 !py-1.5 disabled:opacity-40"
-          aria-label="Next week"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
+      {/* Week selector — only when the program ships scheduled weeks. A fresh
+          install has none, so users go straight to "My workouts" below. */}
+      {program.weeks.length > 0 && (
+        <>
+          <div className="flex items-center gap-2 card p-2">
+            <button
+              disabled={weekIdx <= 0}
+              onClick={() => setCurrentWeek(program.weeks[weekIdx - 1].id)}
+              className="btn btn-secondary !px-2 !py-1.5 disabled:opacity-40"
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <select
+              value={week?.id}
+              onChange={(e) => setCurrentWeek(e.target.value)}
+              className="input !py-1.5 flex-1 text-center font-medium"
+            >
+              {program.weeks.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+            <button
+              disabled={weekIdx >= program.weeks.length - 1}
+              onClick={() => setCurrentWeek(program.weeks[weekIdx + 1].id)}
+              className="btn btn-secondary !px-2 !py-1.5 disabled:opacity-40"
+              aria-label="Next week"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
 
-      {week?.days.map(renderDay)}
+          {week?.days.map(renderDay)}
+        </>
+      )}
 
       {/* User-added workouts */}
       <h2 className="section-label mt-5">My workouts</h2>
@@ -162,6 +168,22 @@ function ProgramView({ onStart }: { onStart: () => void }) {
       ) : (
         <button onClick={() => setAdding(true)} className="btn btn-secondary w-full">
           <Plus className="w-4 h-4" /> Add your own workout
+        </button>
+      )}
+
+      {(program.weeks.length > 0 || program.custom.length > 0) && (
+        <button
+          onClick={() => {
+            if (
+              window.confirm(
+                'Clear this program (weeks + custom workouts) and start blank? Your logged workout history is kept.',
+              )
+            )
+              resetProgram();
+          }}
+          className="btn btn-danger w-full !py-1.5 text-sm mt-2"
+        >
+          <Trash2 className="w-4 h-4" /> Reset / clear program
         </button>
       )}
     </div>

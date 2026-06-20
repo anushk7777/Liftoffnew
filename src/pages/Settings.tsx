@@ -8,7 +8,6 @@ import {
   Timer,
   Target,
   Bell,
-  RefreshCw,
   Sparkles,
   Flame,
 } from 'lucide-react';
@@ -36,10 +35,8 @@ export default function Settings() {
     exportData,
     importData,
     resetRoadmap,
-    syncCode,
-    setSyncCode,
-    clearSyncCode,
-    syncNow,
+    loadExampleRoadmap,
+    phases,
   } = useStore();
 
   const setAppMode = useAppMode((s) => s.setMode);
@@ -47,9 +44,6 @@ export default function Settings() {
   const [reminders, setReminders] = useState(() => notificationPermission() === 'granted');
   const [push, setPush] = useState(() => isPushConfigured() && pushPermission() === 'granted');
   const [pushBusy, setPushBusy] = useState(false);
-  const [syncInput, setSyncInput] = useState(syncCode);
-  const [syncStatus, setSyncStatus] = useState('');
-  const [syncing, setSyncing] = useState(false);
   const [aiKey, setAiKey] = useState(() => getApiKey());
   const [aiModel, setAiModelState] = useState<AiModelId>(() => getModel());
   const [aiStatus, setAiStatus] = useState('');
@@ -65,29 +59,6 @@ export default function Settings() {
     setAiStatus('Key removed.');
     setTimeout(() => setAiStatus(''), 4000);
   };
-
-  const enableSync = async () => {
-    if (!syncInput.trim()) return;
-    setSyncing(true);
-    await setSyncCode(syncInput.trim());
-    setSyncing(false);
-    setSyncStatus('Synced. Enter the same code on your other devices.');
-    setTimeout(() => setSyncStatus(''), 5000);
-  };
-  const disconnectSync = () => {
-    clearSyncCode();
-    setSyncInput('');
-    setSyncStatus('Disconnected. Your data stays on this device.');
-    setTimeout(() => setSyncStatus(''), 5000);
-  };
-  const manualSync = async () => {
-    setSyncing(true);
-    await syncNow();
-    setSyncing(false);
-    setSyncStatus('Synced.');
-    setTimeout(() => setSyncStatus(''), 3000);
-  };
-
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -342,51 +313,6 @@ export default function Settings() {
           {aiStatus && <p className="text-xs text-success font-medium mt-2">{aiStatus}</p>}
         </Section>
 
-        {/* Sync across devices */}
-        <Section title="Sync across devices" icon={<RefreshCw className="w-4 h-4" />}>
-          {!isSupabaseConfigured ? (
-            <p className="text-xs text-ink-subtle">
-              Cross-device sync needs cloud credentials. Add your Supabase keys (see the README),
-              then a sync option appears here. Until then, your data is saved on this device.
-            </p>
-          ) : syncCode.trim() ? (
-            <div className="space-y-3">
-              <Row label="Synced" desc="This device shares a workspace with anything using the same code.">
-                <span className="chip text-success border-success/30 bg-success/10">Connected</span>
-              </Row>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button onClick={manualSync} disabled={syncing} className="btn btn-secondary flex-1 disabled:opacity-50">
-                  <RefreshCw className={cn('w-4 h-4', syncing && 'animate-spin')} /> Sync now
-                </button>
-                <button onClick={disconnectSync} className="btn btn-danger flex-1">
-                  Disconnect
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-xs text-ink-subtle">
-                Choose a private sync code, then enter the <strong>same code</strong> on your other
-                devices to share one workspace. Anyone with the code can access this data — pick a
-                strong, unique passphrase.
-              </p>
-              <input
-                type="password"
-                value={syncInput}
-                onChange={(e) => setSyncInput(e.target.value)}
-                placeholder="Your sync code / passphrase"
-                autoComplete="off"
-                className="input"
-              />
-              <button onClick={enableSync} disabled={syncing || !syncInput.trim()} className="btn btn-primary disabled:opacity-50">
-                {syncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Enable sync
-              </button>
-            </div>
-          )}
-          {syncStatus && <p className="text-xs text-success font-medium mt-2">{syncStatus}</p>}
-        </Section>
-
         {/* Data */}
         <Section title="Data">
           <p className="text-xs text-ink-subtle mb-3">
@@ -404,14 +330,24 @@ export default function Settings() {
             </label>
           </div>
           {importStatus && <p className="text-xs text-success font-medium mt-2">{importStatus}</p>}
+          {phases.length === 0 && (
+            <button
+              onClick={() => {
+                if (window.confirm('Load the example developer roadmap? You can edit or clear it any time.'))
+                  loadExampleRoadmap();
+              }}
+              className="btn btn-secondary w-full mt-3"
+            >
+              <Target className="w-4 h-4" /> Load example roadmap
+            </button>
+          )}
           <button
             onClick={() => {
-              if (window.confirm('Reset the roadmap to default? Progress will be lost.'))
-                resetRoadmap();
+              if (window.confirm('Clear your roadmap? Progress will be lost.')) resetRoadmap();
             }}
             className="btn btn-danger w-full mt-3"
           >
-            Reset roadmap progress
+            Clear roadmap
           </button>
         </Section>
       </div>

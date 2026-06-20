@@ -25,6 +25,15 @@ export default function MobileRoadmap() {
         <p className="text-xs text-ink-muted mt-2">{overall.done} of {overall.total} milestones complete</p>
       </section>
 
+      {phases.length === 0 && (
+        <section className="card p-5 text-center">
+          <p className="text-sm font-medium text-ink">No roadmap yet</p>
+          <p className="text-xs text-ink-muted mt-1">
+            Import your own plan or load an example from Settings → Data to get started.
+          </p>
+        </section>
+      )}
+
       {phases.map((phase) => {
         const pc = countRoadmap([phase]);
         const isOpen = open === phase.id;
