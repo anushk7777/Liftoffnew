@@ -196,7 +196,18 @@ function TaskRow({
         <StatusIcon status={task.status} />
       </button>
 
-      <div className="flex-1 min-w-0 cursor-pointer" onClick={onEdit} role="button">
+      <div
+        className="flex-1 min-w-0 cursor-pointer"
+        onClick={onEdit}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onEdit();
+          }
+        }}
+      >
         <div className="flex items-center gap-3">
           <PriorityDot priority={task.priority} />
           <p

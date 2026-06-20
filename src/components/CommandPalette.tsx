@@ -100,8 +100,6 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
     }
   };
 
-  let lastGroup = '';
-
   return (
     <div className="fixed inset-0 z-[70] flex items-start justify-center p-4 pt-[12vh]">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
@@ -126,8 +124,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
             <p className="text-sm text-ink-subtle text-center py-8">No matches.</p>
           )}
           {filtered.map((c, i) => {
-            const showGroup = c.group !== lastGroup;
-            lastGroup = c.group;
+            const showGroup = i === 0 || c.group !== filtered[i - 1].group;
             const Icon = c.icon;
             return (
               <div key={c.id}>

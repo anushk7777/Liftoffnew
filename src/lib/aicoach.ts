@@ -163,8 +163,8 @@ export async function generateCoaching(opts: {
       if (!data || data === '[DONE]') continue;
       try {
         const json = JSON.parse(data) as GeminiChunk;
-        const text =
-          json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+        const parts = json.candidates?.[0]?.content?.parts;
+        const text = Array.isArray(parts) ? parts.map((p) => p.text ?? '').join('') : '';
         if (text) opts.onText(text);
       } catch {
         /* incomplete/non-JSON event — skip */
