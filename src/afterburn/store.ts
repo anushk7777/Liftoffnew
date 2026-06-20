@@ -39,7 +39,7 @@ function draftFromDay(day: ProgramDay): WorkoutSession {
       exerciseId: ex.id,
       name: ex.name,
       target: { reps: ex.reps, rpe: ex.rpe, percent1RM: ex.percent1RM, tempo: ex.tempo },
-      sets: Array.from({ length: Math.max(1, ex.workingSets) }, blankSet),
+      sets: Array.from({ length: Math.max(1, Number(ex.workingSets) || 1) }, blankSet),
       notes: '',
     })),
   };

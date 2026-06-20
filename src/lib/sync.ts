@@ -99,23 +99,33 @@ function asArray(s: AnyState, key: string): unknown[] {
   return Array.isArray(s[key]) ? (s[key] as unknown[]) : [];
 }
 
-// Union two lists by a natural key; the first list wins on conflict.
+// Union two lists by a natural key; the first list wins on key conflict.
+// Items whose key is empty/undefined/null are always kept (never falsely
+// deduped together under an "undefined" key).
 function unionBy(base: unknown[], other: unknown[], key: (x: unknown) => string): unknown[] {
   const seen = new Set<string>();
   const out: unknown[] = [];
   for (const item of [...base, ...other]) {
     const k = key(item);
-    if (seen.has(k)) continue;
-    seen.add(k);
+    if (k && k !== 'undefined' && k !== 'null') {
+      if (seen.has(k)) continue;
+      seen.add(k);
+    }
     out.push(item);
   }
   return out;
 }
 
-// Recency-guarded merge:
-//  - editable collections + settings: last-write-wins by timestamp (so edits
-//    AND deletions propagate cleanly).
-//  - append-only logs: unioned by natural key so nothing logged is ever lost.
+// Recency-guarded, non-destructive merge:
+//  - id-keyed collections (tasks / ideas / notes / habits) and the append-only
+//    logs are UNIONED by their natural key, so concurrent additions on either
+//    device are never lost. The recency winner ("base") wins on same-key
+//    conflicts, so the most recent edit of an item takes precedence.
+//  - scalar settings + the roadmap (theme, targetDate, pomodoro, streak,
+//    phases, …) take the recency winner via the `...base` spread.
+// Trade-off: without tombstones, deleting an item on one device can be undone by
+// an add still present on the other. For a personal app, preserving the user's
+// data is worth more than propagating every deletion instantly.
 export function mergeState(
   local: AnyState,
   cloud: AnyState,
@@ -126,22 +136,17 @@ export function mergeState(
   const base = cloudNewer ? cloud : local;
   const other = cloudNewer ? local : cloud;
   const k = (x: unknown) => (x ?? {}) as Record<string, unknown>;
+  const byId = (field: string) => (x: unknown) => String(k(x)[field] ?? '');
+  const union = (field: string, keyFn: (x: unknown) => string) =>
+    unionBy(asArray(base, field), asArray(other, field), keyFn);
   return {
     ...base,
-    focusSessions: unionBy(
-      asArray(base, 'focusSessions'),
-      asArray(other, 'focusSessions'),
-      (s) => String(k(s).id),
-    ),
-    activityHistory: unionBy(
-      asArray(base, 'activityHistory'),
-      asArray(other, 'activityHistory'),
-      (a) => String(k(a).date),
-    ),
-    habitLog: unionBy(
-      asArray(base, 'habitLog'),
-      asArray(other, 'habitLog'),
-      (l) => `${k(l).habitId}:${k(l).date}`,
-    ),
+    tasks: union('tasks', byId('id')),
+    ideas: union('ideas', byId('id')),
+    notes: union('notes', byId('id')),
+    habits: union('habits', byId('id')),
+    focusSessions: union('focusSessions', byId('id')),
+    activityHistory: union('activityHistory', (a) => String(k(a).date)),
+    habitLog: union('habitLog', (l) => `${k(l).habitId}:${k(l).date}`),
   };
 }
