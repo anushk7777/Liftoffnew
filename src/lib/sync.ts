@@ -37,7 +37,16 @@ export function getDeviceId(): string {
   return id;
 }
 
-export const getSyncCode = (): string => localStorage.getItem(SYNC_CODE_KEY) || '';
+// Guarded read — localStorage can throw in private mode / when storage is off.
+const readItem = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+export const getSyncCode = (): string => readItem(SYNC_CODE_KEY) || '';
 export const isSyncEnabled = (): boolean => getSyncCode().trim().length > 0;
 
 // Derive a deterministic, non-reversible workspace id from the passphrase.
@@ -77,11 +86,11 @@ export async function setSyncCodeStorage(code: string): Promise<void> {
 
 // The cloud row key: the shared sync workspace if enabled, else this device.
 export function getStorageId(): string {
-  if (isSyncEnabled()) return localStorage.getItem(SYNC_ID_KEY) || getDeviceId();
+  if (isSyncEnabled()) return readItem(SYNC_ID_KEY) || getDeviceId();
   return getDeviceId();
 }
 
-export const getLocalUpdatedAt = (): string => localStorage.getItem(UPDATED_AT_KEY) || EPOCH;
+export const getLocalUpdatedAt = (): string => readItem(UPDATED_AT_KEY) || EPOCH;
 export const setLocalUpdatedAt = (ts: string) => safeSetItem(UPDATED_AT_KEY, ts);
 
 type AnyState = Record<string, unknown>;
