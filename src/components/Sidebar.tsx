@@ -10,9 +10,11 @@ import {
   Sun,
   Sparkles,
   HelpCircle,
-  CalendarDays
+  CalendarDays,
+  Flame,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { useAppMode } from '../afterburn/store';
 import { cn } from '../lib/utils';
 
 const NAV = [
@@ -33,6 +35,7 @@ export default function Sidebar({
   onOpenSearch?: () => void;
 }) {
   const { theme, toggleTheme } = useStore();
+  const setAppMode = useAppMode((s) => s.setMode);
 
   return (
     <nav className="flex flex-col h-full py-6 px-4 w-64 bg-[var(--bg)] border-r border-white/5 z-50 transition-colors duration-300">
@@ -73,7 +76,14 @@ export default function Sidebar({
 
       {/* Footer Tabs */}
       <div className="mt-auto pt-4 space-y-3 border-t border-white/5">
-        <button 
+        <button
+          onClick={() => setAppMode('afterburn')}
+          className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-orange-400 font-medium hover:neo-button transition-all duration-200 active:scale-95"
+        >
+          <Flame className="w-5 h-5 shrink-0" />
+          <span className="font-body text-sm">Afterburn (workouts)</span>
+        </button>
+        <button
           onClick={toggleTheme}
           className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[var(--text-muted)] font-medium hover:text-[var(--accent)] hover:neo-button transition-all duration-200 active:scale-95"
         >

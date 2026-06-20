@@ -25,10 +25,18 @@ export interface ProgramDay {
   exercises: ProgramExercise[];
 }
 
+export interface WeekPlan {
+  id: string;
+  name: string;
+  days: ProgramDay[];
+}
+
 export interface WorkoutProgram {
   name: string;
   unit: WeightUnit;
-  days: ProgramDay[];
+  weeks: WeekPlan[];
+  /** User-added workouts, available regardless of selected week. */
+  custom: ProgramDay[];
 }
 
 /** One logged set. Inputs kept as strings for friction-free typing. */

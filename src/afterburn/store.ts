@@ -45,10 +45,24 @@ function draftFromDay(day: ProgramDay): WorkoutSession {
   };
 }
 
+/** Every schedulable day across all weeks plus the custom bucket. */
+const allDays = (p: WorkoutProgram): ProgramDay[] => [...p.weeks.flatMap((w) => w.days), ...p.custom];
+
+/** Apply `fn` to the day with `dayId`, wherever it lives (a week or custom). */
+function mapDay(p: WorkoutProgram, dayId: string, fn: (d: ProgramDay) => ProgramDay): WorkoutProgram {
+  return {
+    ...p,
+    weeks: p.weeks.map((w) => ({ ...w, days: w.days.map((d) => (d.id === dayId ? fn(d) : d)) })),
+    custom: p.custom.map((d) => (d.id === dayId ? fn(d) : d)),
+  };
+}
+
 interface AfterburnState {
   program: WorkoutProgram;
   sessions: WorkoutSession[];
   draft: WorkoutSession | null;
+  currentWeekId: string;
+  setCurrentWeek: (id: string) => void;
   _cloudLoaded: boolean;
   loadWorkouts: () => Promise<void>;
   startDay: (dayId: string) => void;
@@ -72,6 +86,8 @@ export const useAfterburn = create<AfterburnState>()(
       program: DEFAULT_PROGRAM,
       sessions: [],
       draft: null,
+      currentWeekId: 'w3',
+      setCurrentWeek: (id) => set({ currentWeekId: id }),
       _cloudLoaded: false,
 
       // Pull from the cloud (recency-guarded) when entering the workout app.
@@ -97,7 +113,9 @@ export const useAfterburn = create<AfterburnState>()(
           const cloudTs = data?.updated_at ?? '';
           if (data?.data && cloudTs > getMarker()) {
             const d = data.data as { program?: WorkoutProgram; sessions?: WorkoutSession[] };
-            set({ program: d.program ?? get().program, sessions: d.sessions ?? get().sessions });
+            // Ignore an old-shape cloud program (pre-weeks) so it can't break the UI.
+            const validProgram = d.program && Array.isArray(d.program.weeks) ? d.program : undefined;
+            set({ program: validProgram ?? get().program, sessions: d.sessions ?? get().sessions });
             setMarker(cloudTs || new Date().toISOString());
           }
         } catch (e) {
@@ -107,7 +125,7 @@ export const useAfterburn = create<AfterburnState>()(
       },
 
       startDay: (dayId) => {
-        const day = get().program.days.find((d) => d.id === dayId);
+        const day = allDays(get().program).find((d) => d.id === dayId);
         if (day) set({ draft: draftFromDay(day) });
       },
       cancelDraft: () => set({ draft: null }),
@@ -148,30 +166,31 @@ export const useAfterburn = create<AfterburnState>()(
 
       addCustomDay: (name) => {
         const id = uid();
-        set((s) => ({ program: { ...s.program, days: [...s.program.days, { id, name, source: 'custom', exercises: [] }] } }));
+        set((s) => ({ program: { ...s.program, custom: [...s.program.custom, { id, name, source: 'custom', exercises: [] }] } }));
         return id;
       },
       addExercise: (dayId, ex) =>
-        set((s) => ({
-          program: {
-            ...s.program,
-            days: s.program.days.map((d) => (d.id !== dayId ? d : { ...d, exercises: [...d.exercises, { ...ex, id: uid() }] })),
-          },
-        })),
+        set((s) => ({ program: mapDay(s.program, dayId, (d) => ({ ...d, exercises: [...d.exercises, { ...ex, id: uid() }] })) })),
       removeExercise: (dayId, exId) =>
-        set((s) => ({
-          program: {
-            ...s.program,
-            days: s.program.days.map((d) => (d.id !== dayId ? d : { ...d, exercises: d.exercises.filter((e) => e.id !== exId) })),
-          },
-        })),
-      removeDay: (dayId) => set((s) => ({ program: { ...s.program, days: s.program.days.filter((d) => d.id !== dayId) } })),
+        set((s) => ({ program: mapDay(s.program, dayId, (d) => ({ ...d, exercises: d.exercises.filter((e) => e.id !== exId) })) })),
+      removeDay: (dayId) => set((s) => ({ program: { ...s.program, custom: s.program.custom.filter((d) => d.id !== dayId) } })),
       deleteSession: (id) => set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) })),
       resetProgram: () => set({ program: DEFAULT_PROGRAM }),
     }),
     {
       name: 'liftoff-afterburn',
-      partialize: (s) => ({ program: s.program, sessions: s.sessions, draft: s.draft }),
+      version: 2,
+      // v1 stored a single-week `program.days`. Reset the program to the new
+      // multi-week default if the persisted shape predates `weeks` (keep sessions).
+      migrate: (persisted: unknown) => {
+        const p = (persisted ?? {}) as Record<string, unknown>;
+        const prog = p.program as { weeks?: unknown } | undefined;
+        if (!prog || !Array.isArray(prog.weeks)) {
+          return { ...p, program: DEFAULT_PROGRAM, currentWeekId: 'w3' };
+        }
+        return p;
+      },
+      partialize: (s) => ({ program: s.program, sessions: s.sessions, draft: s.draft, currentWeekId: s.currentWeekId }),
     },
   ),
 );

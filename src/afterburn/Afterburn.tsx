@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Flame, Rocket, Plus, Check, Star, Trash2, ChevronDown, ChevronRight, Pencil, X } from 'lucide-react';
+import { Flame, Rocket, Plus, Check, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAfterburn, useAppMode } from './store';
 import type { LoggedSet, ProgramDay, ProgramExercise, WeightUnit, WorkoutSession } from './types';
@@ -61,33 +61,76 @@ function Header() {
 // ---------- program view ----------
 function ProgramView({ onStart }: { onStart: () => void }) {
   const program = useAfterburn((s) => s.program);
+  const currentWeekId = useAfterburn((s) => s.currentWeekId);
+  const setCurrentWeek = useAfterburn((s) => s.setCurrentWeek);
   const startDay = useAfterburn((s) => s.startDay);
   const addCustomDay = useAfterburn((s) => s.addCustomDay);
   const [editDay, setEditDay] = useState<string | null>(null);
   const [newDayName, setNewDayName] = useState('');
   const [adding, setAdding] = useState(false);
 
+  const weekIdx = Math.max(0, program.weeks.findIndex((w) => w.id === currentWeekId));
+  const week = program.weeks[weekIdx] ?? program.weeks[0];
+
+  const renderDay = (day: ProgramDay) => (
+    <DayCard
+      key={day.id}
+      day={day}
+      editing={editDay === day.id}
+      onToggleEdit={() => setEditDay(editDay === day.id ? null : day.id)}
+      onStart={() => {
+        startDay(day.id);
+        onStart();
+      }}
+    />
+  );
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold">{program.name}</h1>
-          <p className="text-xs text-ink-subtle mt-0.5">Logging in {program.unit} · RPE 1–10</p>
-        </div>
+      <div>
+        <h1 className="font-display text-2xl font-bold">{program.name}</h1>
+        <p className="text-xs text-ink-subtle mt-0.5">Logging in {program.unit} · RPE 1–10</p>
       </div>
 
-      {program.days.map((day) => (
-        <DayCard
-          key={day.id}
-          day={day}
-          editing={editDay === day.id}
-          onToggleEdit={() => setEditDay(editDay === day.id ? null : day.id)}
-          onStart={() => {
-            startDay(day.id);
-            onStart();
-          }}
-        />
-      ))}
+      {/* Week selector */}
+      <div className="flex items-center gap-2 card p-2">
+        <button
+          disabled={weekIdx <= 0}
+          onClick={() => setCurrentWeek(program.weeks[weekIdx - 1].id)}
+          className="btn btn-secondary !px-2 !py-1.5 disabled:opacity-40"
+          aria-label="Previous week"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <select
+          value={week?.id}
+          onChange={(e) => setCurrentWeek(e.target.value)}
+          className="input !py-1.5 flex-1 text-center font-medium"
+        >
+          {program.weeks.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.name}
+            </option>
+          ))}
+        </select>
+        <button
+          disabled={weekIdx >= program.weeks.length - 1}
+          onClick={() => setCurrentWeek(program.weeks[weekIdx + 1].id)}
+          className="btn btn-secondary !px-2 !py-1.5 disabled:opacity-40"
+          aria-label="Next week"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {week?.days.map(renderDay)}
+
+      {/* User-added workouts */}
+      <h2 className="section-label mt-5">My workouts</h2>
+      {program.custom.length === 0 && !adding && (
+        <p className="text-xs text-ink-subtle">Add your own workout in the same format below.</p>
+      )}
+      {program.custom.map(renderDay)}
 
       {adding ? (
         <div className="card p-4 space-y-3">
