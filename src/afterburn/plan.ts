@@ -1,12 +1,11 @@
-// AUTO-GENERATED from the Jeff Nippard Powerbuilding (Weeks 1-9, full program)
-// + Arm Hypertrophy Program (Block 2 / Week 5, page 12) for the two arm days.
-// 6-day cycle per week: PB / PB / Arm Day / PB / PB / Supplemental A. kg, RPE 1-10.
-// Edit/extend in-app; resetProgram() restores this. Weeks 10 (max test) and 11
-// (deload) use different formats and can be added later.
+// AUTO-GENERATED from Jeff Nippard Powerbuilding (Weeks 1-11) + Arm Hypertrophy
+// (Block 2 / Week 5, page 12) for the two arm days on Weeks 1-9. 6-day cycle per
+// training week: PB / PB / Arm Day / PB / PB / Supplemental A. Week 10 = max test
+// (Option A), Week 11 = deload (both PB-only). kg, RPE 1-10. Edit in-app.
 import type { WorkoutProgram } from './types';
 
 export const DEFAULT_PROGRAM: WorkoutProgram = {
-  name: 'Powerbuilding + Arms (6-day, Weeks 1-9)',
+  name: 'Powerbuilding + Arms (Weeks 1-11)',
   unit: 'kg',
   weeks: [
   {
@@ -48,9 +47,9 @@ export const DEFAULT_PROGRAM: WorkoutProgram = {
       exercises: [
         { id: "w1d3e1", name: "Close Grip Bench Press", workingSets: 4, reps: "6-8", tempo: "2.1.1.1", rpe: "8", rest: "2.0", notes: "Shoulder width grip. Touch bar to chest with a silent pause." },
         { id: "w1d3e2", name: "Bayesian Cable Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "7", rest: "1.0", notes: "Pre-activation. Smooth, controlled reps — slight pump with light weight." },
-        { id: "w1d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 sets closer. Last set to failure, 1-2 cheat reps at end." },
+        { id: "w1d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 closer. Last set to failure, 1-2 cheat reps at end." },
         { id: "w1d3e4", name: "Dumbbell Preacher Hammer Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "8", rest: "1.0", notes: "Both arms at once, hammer grip in the middle of the dumbbell." },
-        { id: "w1d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked, minimize swinging." },
+        { id: "w1d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked." },
         { id: "w1d3e6", name: "Overhead Rope Extension", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Both arms at once, press the rope apart at the top end ROM." },
         { id: "w1d3e7", name: "Forearm Wrist Curl (optional)", workingSets: 3, reps: "15-20", tempo: "2.0.1.0", rpe: "9", rest: "1.0", notes: "Optional. Forearm braced on a horizontal bench." },
       ],
@@ -135,9 +134,9 @@ export const DEFAULT_PROGRAM: WorkoutProgram = {
       exercises: [
         { id: "w2d3e1", name: "Close Grip Bench Press", workingSets: 4, reps: "6-8", tempo: "2.1.1.1", rpe: "8", rest: "2.0", notes: "Shoulder width grip. Touch bar to chest with a silent pause." },
         { id: "w2d3e2", name: "Bayesian Cable Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "7", rest: "1.0", notes: "Pre-activation. Smooth, controlled reps — slight pump with light weight." },
-        { id: "w2d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 sets closer. Last set to failure, 1-2 cheat reps at end." },
+        { id: "w2d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 closer. Last set to failure, 1-2 cheat reps at end." },
         { id: "w2d3e4", name: "Dumbbell Preacher Hammer Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "8", rest: "1.0", notes: "Both arms at once, hammer grip in the middle of the dumbbell." },
-        { id: "w2d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked, minimize swinging." },
+        { id: "w2d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked." },
         { id: "w2d3e6", name: "Overhead Rope Extension", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Both arms at once, press the rope apart at the top end ROM." },
         { id: "w2d3e7", name: "Forearm Wrist Curl (optional)", workingSets: 3, reps: "15-20", tempo: "2.0.1.0", rpe: "9", rest: "1.0", notes: "Optional. Forearm braced on a horizontal bench." },
       ],
@@ -225,9 +224,9 @@ export const DEFAULT_PROGRAM: WorkoutProgram = {
       exercises: [
         { id: "w3d3e1", name: "Close Grip Bench Press", workingSets: 4, reps: "6-8", tempo: "2.1.1.1", rpe: "8", rest: "2.0", notes: "Shoulder width grip. Touch bar to chest with a silent pause." },
         { id: "w3d3e2", name: "Bayesian Cable Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "7", rest: "1.0", notes: "Pre-activation. Smooth, controlled reps — slight pump with light weight." },
-        { id: "w3d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 sets closer. Last set to failure, 1-2 cheat reps at end." },
+        { id: "w3d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 closer. Last set to failure, 1-2 cheat reps at end." },
         { id: "w3d3e4", name: "Dumbbell Preacher Hammer Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "8", rest: "1.0", notes: "Both arms at once, hammer grip in the middle of the dumbbell." },
-        { id: "w3d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked, minimize swinging." },
+        { id: "w3d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked." },
         { id: "w3d3e6", name: "Overhead Rope Extension", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Both arms at once, press the rope apart at the top end ROM." },
         { id: "w3d3e7", name: "Forearm Wrist Curl (optional)", workingSets: 3, reps: "15-20", tempo: "2.0.1.0", rpe: "9", rest: "1.0", notes: "Optional. Forearm braced on a horizontal bench." },
       ],
@@ -312,9 +311,9 @@ export const DEFAULT_PROGRAM: WorkoutProgram = {
       exercises: [
         { id: "w4d3e1", name: "Close Grip Bench Press", workingSets: 4, reps: "6-8", tempo: "2.1.1.1", rpe: "8", rest: "2.0", notes: "Shoulder width grip. Touch bar to chest with a silent pause." },
         { id: "w4d3e2", name: "Bayesian Cable Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "7", rest: "1.0", notes: "Pre-activation. Smooth, controlled reps — slight pump with light weight." },
-        { id: "w4d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 sets closer. Last set to failure, 1-2 cheat reps at end." },
+        { id: "w4d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 closer. Last set to failure, 1-2 cheat reps at end." },
         { id: "w4d3e4", name: "Dumbbell Preacher Hammer Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "8", rest: "1.0", notes: "Both arms at once, hammer grip in the middle of the dumbbell." },
-        { id: "w4d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked, minimize swinging." },
+        { id: "w4d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked." },
         { id: "w4d3e6", name: "Overhead Rope Extension", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Both arms at once, press the rope apart at the top end ROM." },
         { id: "w4d3e7", name: "Forearm Wrist Curl (optional)", workingSets: 3, reps: "15-20", tempo: "2.0.1.0", rpe: "9", rest: "1.0", notes: "Optional. Forearm braced on a horizontal bench." },
       ],
@@ -402,9 +401,9 @@ export const DEFAULT_PROGRAM: WorkoutProgram = {
       exercises: [
         { id: "w5d3e1", name: "Close Grip Bench Press", workingSets: 4, reps: "6-8", tempo: "2.1.1.1", rpe: "8", rest: "2.0", notes: "Shoulder width grip. Touch bar to chest with a silent pause." },
         { id: "w5d3e2", name: "Bayesian Cable Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "7", rest: "1.0", notes: "Pre-activation. Smooth, controlled reps — slight pump with light weight." },
-        { id: "w5d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 sets closer. Last set to failure, 1-2 cheat reps at end." },
+        { id: "w5d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 closer. Last set to failure, 1-2 cheat reps at end." },
         { id: "w5d3e4", name: "Dumbbell Preacher Hammer Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "8", rest: "1.0", notes: "Both arms at once, hammer grip in the middle of the dumbbell." },
-        { id: "w5d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked, minimize swinging." },
+        { id: "w5d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked." },
         { id: "w5d3e6", name: "Overhead Rope Extension", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Both arms at once, press the rope apart at the top end ROM." },
         { id: "w5d3e7", name: "Forearm Wrist Curl (optional)", workingSets: 3, reps: "15-20", tempo: "2.0.1.0", rpe: "9", rest: "1.0", notes: "Optional. Forearm braced on a horizontal bench." },
       ],
@@ -488,9 +487,9 @@ export const DEFAULT_PROGRAM: WorkoutProgram = {
       exercises: [
         { id: "w6d3e1", name: "Close Grip Bench Press", workingSets: 4, reps: "6-8", tempo: "2.1.1.1", rpe: "8", rest: "2.0", notes: "Shoulder width grip. Touch bar to chest with a silent pause." },
         { id: "w6d3e2", name: "Bayesian Cable Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "7", rest: "1.0", notes: "Pre-activation. Smooth, controlled reps — slight pump with light weight." },
-        { id: "w6d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 sets closer. Last set to failure, 1-2 cheat reps at end." },
+        { id: "w6d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 closer. Last set to failure, 1-2 cheat reps at end." },
         { id: "w6d3e4", name: "Dumbbell Preacher Hammer Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "8", rest: "1.0", notes: "Both arms at once, hammer grip in the middle of the dumbbell." },
-        { id: "w6d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked, minimize swinging." },
+        { id: "w6d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked." },
         { id: "w6d3e6", name: "Overhead Rope Extension", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Both arms at once, press the rope apart at the top end ROM." },
         { id: "w6d3e7", name: "Forearm Wrist Curl (optional)", workingSets: 3, reps: "15-20", tempo: "2.0.1.0", rpe: "9", rest: "1.0", notes: "Optional. Forearm braced on a horizontal bench." },
       ],
@@ -579,9 +578,9 @@ export const DEFAULT_PROGRAM: WorkoutProgram = {
       exercises: [
         { id: "w7d3e1", name: "Close Grip Bench Press", workingSets: 4, reps: "6-8", tempo: "2.1.1.1", rpe: "8", rest: "2.0", notes: "Shoulder width grip. Touch bar to chest with a silent pause." },
         { id: "w7d3e2", name: "Bayesian Cable Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "7", rest: "1.0", notes: "Pre-activation. Smooth, controlled reps — slight pump with light weight." },
-        { id: "w7d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 sets closer. Last set to failure, 1-2 cheat reps at end." },
+        { id: "w7d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 closer. Last set to failure, 1-2 cheat reps at end." },
         { id: "w7d3e4", name: "Dumbbell Preacher Hammer Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "8", rest: "1.0", notes: "Both arms at once, hammer grip in the middle of the dumbbell." },
-        { id: "w7d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked, minimize swinging." },
+        { id: "w7d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked." },
         { id: "w7d3e6", name: "Overhead Rope Extension", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Both arms at once, press the rope apart at the top end ROM." },
         { id: "w7d3e7", name: "Forearm Wrist Curl (optional)", workingSets: 3, reps: "15-20", tempo: "2.0.1.0", rpe: "9", rest: "1.0", notes: "Optional. Forearm braced on a horizontal bench." },
       ],
@@ -665,9 +664,9 @@ export const DEFAULT_PROGRAM: WorkoutProgram = {
       exercises: [
         { id: "w8d3e1", name: "Close Grip Bench Press", workingSets: 4, reps: "6-8", tempo: "2.1.1.1", rpe: "8", rest: "2.0", notes: "Shoulder width grip. Touch bar to chest with a silent pause." },
         { id: "w8d3e2", name: "Bayesian Cable Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "7", rest: "1.0", notes: "Pre-activation. Smooth, controlled reps — slight pump with light weight." },
-        { id: "w8d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 sets closer. Last set to failure, 1-2 cheat reps at end." },
+        { id: "w8d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 closer. Last set to failure, 1-2 cheat reps at end." },
         { id: "w8d3e4", name: "Dumbbell Preacher Hammer Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "8", rest: "1.0", notes: "Both arms at once, hammer grip in the middle of the dumbbell." },
-        { id: "w8d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked, minimize swinging." },
+        { id: "w8d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked." },
         { id: "w8d3e6", name: "Overhead Rope Extension", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Both arms at once, press the rope apart at the top end ROM." },
         { id: "w8d3e7", name: "Forearm Wrist Curl (optional)", workingSets: 3, reps: "15-20", tempo: "2.0.1.0", rpe: "9", rest: "1.0", notes: "Optional. Forearm braced on a horizontal bench." },
       ],
@@ -755,9 +754,9 @@ export const DEFAULT_PROGRAM: WorkoutProgram = {
       exercises: [
         { id: "w9d3e1", name: "Close Grip Bench Press", workingSets: 4, reps: "6-8", tempo: "2.1.1.1", rpe: "8", rest: "2.0", notes: "Shoulder width grip. Touch bar to chest with a silent pause." },
         { id: "w9d3e2", name: "Bayesian Cable Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "7", rest: "1.0", notes: "Pre-activation. Smooth, controlled reps — slight pump with light weight." },
-        { id: "w9d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 sets closer. Last set to failure, 1-2 cheat reps at end." },
+        { id: "w9d3e3", name: "Standing EZ Bar Curl", workingSets: 4, reps: "4-6", tempo: "2.0.1.0", rpe: "9", rest: "3.0", notes: "2 sets wider grip, 2 closer. Last set to failure, 1-2 cheat reps at end." },
         { id: "w9d3e4", name: "Dumbbell Preacher Hammer Curl", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "8", rest: "1.0", notes: "Both arms at once, hammer grip in the middle of the dumbbell." },
-        { id: "w9d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked, minimize swinging." },
+        { id: "w9d3e5", name: "Tricep Pressdown", workingSets: 4, reps: "10-12", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Bar attachment. 2 sets wide, 2 narrow. Keep elbows locked." },
         { id: "w9d3e6", name: "Overhead Rope Extension", workingSets: 3, reps: "12-15", tempo: "2.0.0.0", rpe: "9", rest: "1.0", notes: "Both arms at once, press the rope apart at the top end ROM." },
         { id: "w9d3e7", name: "Forearm Wrist Curl (optional)", workingSets: 3, reps: "15-20", tempo: "2.0.1.0", rpe: "9", rest: "1.0", notes: "Optional. Forearm braced on a horizontal bench." },
       ],
@@ -785,30 +784,6 @@ export const DEFAULT_PROGRAM: WorkoutProgram = {
         { id: "w9d5e3", name: "CHEST-SUPPORTED T-BAR ROW OR PENDLAY ROW", warmupSets: 1, workingSets: 3, reps: "10", rpe: "7", rest: "1-2 MIN", notes: "BE MINDFUL OF LOWER BACK FATIGUE. STAY LIGHT, MINIMIZE CHEATING" },
         { id: "w9d5e4", name: "NORDIC HAM CURL", warmupSets: 0, workingSets: 3, reps: "6-8", rpe: "8", rest: "1-2 MIN", notes: "BEND FORWARD AT HIPS DURING THE CONCENTRIC AND MINIMIZE CONTRIBUTION FROM HANDS" },
         { id: "w9d5e5", name: "DUMBBELL SHRUG", warmupSets: 0, workingSets: 3, reps: "20-25", rpe: "9", rest: "1-2 MIN", notes: "FEEL A STRETCH ON THE TRAPS AT THE BOTTOM, SQUEEZE HARD AT THE TOP" },
-        { id: "w9d5e6", name: "BACK SQUAT", warmupSets: 4, workingSets: 1, reps: "AMRAP", percent1RM: "90%", rpe: "9.5", rest: "4-5 MIN", notes: "AS MANY REPS AS POSSIBLE. ALWAYS USE A SPOTTER AND GOOD FORM. AIM TO 3+ REPS" },
-        { id: "w9d5e7", name: "SINGLE-ARM LAT PULLDOWN", warmupSets: 1, workingSets: 2, reps: "12", rpe: "8", rest: "2-3 MIN", notes: "PERFORM WITH BANDS IF NO LAT PULLDOWN, DRIVE ELBOWS DOWN AND IN" },
-        { id: "w9d5e8", name: "INCLINE DUMBBELL CURL", warmupSets: 0, workingSets: 4, reps: "12", rpe: "8", rest: "1-2 MIN", notes: "FOCUS ON THE MIND-MUSCLE CONNECTION" },
-        { id: "w9d5e9", name: "STANDING CALF RAISE", warmupSets: 1, workingSets: 3, reps: "12", rpe: "8", rest: "1-2 MIN", notes: "1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP, FULL SQUEEZE AT THE TOP" },
-        { id: "w9d5e10", name: "BARBELL BENCH PRESS", warmupSets: 4, workingSets: 1, reps: "AMRAP", percent1RM: "90%", rpe: "9.5", rest: "4-5 MIN", notes: "AS MANY REPS AS POSSIBLE. ALWAYS USE A SPOTTER AND GOOD FORM. AIM TO 3+ REPS" },
-        { id: "w9d5e11", name: "LEG CURL", warmupSets: 1, workingSets: 3, reps: "8-10", rpe: "8", rest: "2-3 MIN", notes: "DO LYING LEG CURL MACHINE OR NORDIC HAM CURL IF NO MACHINE ACCESS" },
-        { id: "w9d5e12", name: "DUMBBELL LATERAL RAISE", warmupSets: 0, workingSets: 2, reps: "15-20", rpe: "8", rest: "1-2 MIN", notes: "ARC THE DUMBBELL OUT, MIND-MUSCLE CONNECTION WITH MIDDLE FIBERS" },
-        { id: "w9d5e13", name: "TRICEPS PRESSDOWN", warmupSets: 1, workingSets: 3, reps: "12", rpe: "8", rest: "1-2 MIN", notes: "CAN DO WITH CABLES OR BANDS, SQUEEZE TRICEPS TO MOVE THE WEIGHT" },
-        { id: "w9d5e14", name: "DEADLIFT", warmupSets: 4, workingSets: 1, reps: "AMRAP", percent1RM: "90%", rpe: "9.5", rest: "4-5 MIN", notes: "AS MANY REPS AS POSSIBLE. ALWAYS USE GOOD FORM. AIM TO 3+ REPS" },
-        { id: "w9d5e15", name: "OVERHEAD PRESS", warmupSets: 2, workingSets: 3, reps: "10", rpe: "6", rest: "2-3 MIN", notes: "RESET EACH REP (DON'T TOUCH-AND-PRESS)" },
-        { id: "w9d5e16", name: "LEG EXTENSION", warmupSets: 1, workingSets: 3, reps: "12", rpe: "7", rest: "1-2 MIN", notes: "USE BANDS IF NO MACHINE ACCESS, MIND-MUSCLE CONNECTION WITH QUADS" },
-        { id: "w9d5e17", name: "BICYCLE CRUNCH", warmupSets: 0, workingSets: 4, reps: "15", rpe: "8", rest: "1-2 MIN", notes: "FOCUS ON ROUNDING YOUR BACK AS YOU CRUNCH HARD!" },
-        { id: "w9d5e18", name: "BACK SQUAT", warmupSets: 5, workingSets: 1, reps: "1", percent1RM: "100-105%", rpe: "9.5", rest: "4-5 MIN", notes: "AIM FOR A NEW PR. START WITH 100% AND INCREASE BY ~2.5% EVERY ATTEMPT UNTIL YOU HIT A 9.5 RPE. USE A SPOTTER AND GOOD FORM!" },
-        { id: "w9d5e19", name: "SINGLE-ARM LAT PULLDOWN", warmupSets: 1, workingSets: 2, reps: "12", rpe: "8", rest: "2-3 MIN", notes: "PERFORM WITH BANDS IF NO LAT PULLDOWN, DRIVE ELBOWS DOWN AND IN" },
-        { id: "w9d5e20", name: "INCLINE DUMBBELL CURL", warmupSets: 0, workingSets: 4, reps: "12", rpe: "8", rest: "1-2 MIN", notes: "FOCUS ON THE MIND-MUSCLE CONNECTION" },
-        { id: "w9d5e21", name: "STANDING CALF RAISE", warmupSets: 1, workingSets: 3, reps: "12", rpe: "8", rest: "1-2 MIN", notes: "1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP, FULL SQUEEZE AT THE TOP" },
-        { id: "w9d5e22", name: "BARBELL BENCH PRESS", warmupSets: 5, workingSets: 1, reps: "1", percent1RM: "100-105%", rpe: "9.5", rest: "4-5 MIN", notes: "AIM FOR A NEW PR. START WITH 100% AND INCREASE BY ~2.5% EVERY ATTEMPT UNTIL YOU HIT A 9.5 RPE. USE A SPOTTER AND GOOD FORM!" },
-        { id: "w9d5e23", name: "LEG CURL", warmupSets: 1, workingSets: 3, reps: "8-10", rpe: "8", rest: "2-3 MIN", notes: "DO LYING LEG CURL MACHINE OR NORDIC HAM CURL IF NO MACHINE ACCESS" },
-        { id: "w9d5e24", name: "DUMBBELL LATERAL RAISE", warmupSets: 0, workingSets: 2, reps: "15-20", rpe: "8", rest: "1-2 MIN", notes: "ARC THE DUMBBELL OUT, MIND-MUSCLE CONNECTION WITH MIDDLE FIBERS" },
-        { id: "w9d5e25", name: "TRICEPS PRESSDOWN", warmupSets: 1, workingSets: 3, reps: "12", rpe: "8", rest: "1-2 MIN", notes: "CAN DO WITH CABLES OR BANDS, SQUEEZE TRICEPS TO MOVE THE WEIGHT" },
-        { id: "w9d5e26", name: "DEADLIFT", warmupSets: 5, workingSets: 1, reps: "1", percent1RM: "100-105%", rpe: "9.5", rest: "4-5 MIN", notes: "AIM FOR A NEW PR. START WITH 100% AND INCREASE BY ~2.5% EVERY ATTEMPT. 5-MIN REST BETWEEN ATTEMPTS. USE GOOD FORM!" },
-        { id: "w9d5e27", name: "OVERHEAD PRESS", warmupSets: 2, workingSets: 3, reps: "10", rpe: "6", rest: "2-3 MIN", notes: "RESET EACH REP (DON'T TOUCH-AND-PRESS)" },
-        { id: "w9d5e28", name: "LEG EXTENSION", warmupSets: 1, workingSets: 3, reps: "12", rpe: "7", rest: "1-2 MIN", notes: "USE BANDS IF NO MACHINE ACCESS, MIND-MUSCLE CONNECTION WITH QUADS" },
-        { id: "w9d5e29", name: "BICYCLE CRUNCH", warmupSets: 0, workingSets: 4, reps: "15", rpe: "8", rest: "1-2 MIN", notes: "FOCUS ON ROUNDING YOUR BACK AS YOU CRUNCH HARD!" },
       ],
     },
     {
@@ -822,6 +797,108 @@ export const DEFAULT_PROGRAM: WorkoutProgram = {
         { id: "w9d6e3", name: "Weighted Dip", workingSets: 3, reps: "12-15", tempo: "2.0.1.0", rpe: "8", rest: "2.0", notes: "More upright posture, mind-muscle connection with the triceps." },
         { id: "w9d6e4", name: "1-Arm Overhead Cable Extension", workingSets: 2, reps: "15-20", tempo: "2.0.1.0", rpe: "9", rest: "1.0", notes: "Keep your elbow locked into place and tucked in." },
         { id: "w9d6e5", name: "Reverse Grip Forearm Wrist Curl (optional)", workingSets: 2, reps: "15-20", tempo: "2.0.1.0", rpe: "9", rest: "1.0", notes: "Optional. Forearm braced on a horizontal bench." },
+      ],
+    },
+    ],
+  },
+  {
+    id: "w10",
+    name: "Week 10 (Max Test · Option A)",
+    days: [
+    {
+      id: "w10d1",
+      name: "Day 1 — Squat Test",
+      source: "powerbuilding",
+      exercises: [
+        { id: "w10d1e1", name: "BACK SQUAT", warmupSets: 4, workingSets: 1, reps: "AMRAP", percent1RM: "90%", rpe: "9.5", rest: "4-5 MIN", notes: "AS MANY REPS AS POSSIBLE. ALWAYS USE A SPOTTER AND GOOD FORM. AIM TO 3+ REPS" },
+        { id: "w10d1e2", name: "SINGLE-ARM LAT PULLDOWN", warmupSets: 1, workingSets: 2, reps: "12", rpe: "8", rest: "2-3 MIN", notes: "PERFORM WITH BANDS IF NO LAT PULLDOWN, DRIVE ELBOWS DOWN AND IN" },
+        { id: "w10d1e3", name: "INCLINE DUMBBELL CURL", warmupSets: 0, workingSets: 4, reps: "12", rpe: "8", rest: "1-2 MIN", notes: "FOCUS ON THE MIND-MUSCLE CONNECTION" },
+        { id: "w10d1e4", name: "STANDING CALF RAISE", warmupSets: 1, workingSets: 3, reps: "12", rpe: "8", rest: "1-2 MIN", notes: "1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP, FULL SQUEEZE AT THE TOP" },
+      ],
+    },
+    {
+      id: "w10d2",
+      name: "Day 2 — Bench Test",
+      source: "powerbuilding",
+      exercises: [
+        { id: "w10d2e1", name: "BARBELL BENCH PRESS", warmupSets: 4, workingSets: 1, reps: "AMRAP", percent1RM: "90%", rpe: "9.5", rest: "4-5 MIN", notes: "AS MANY REPS AS POSSIBLE. ALWAYS USE A SPOTTER AND GOOD FORM. AIM TO 3+ REPS" },
+        { id: "w10d2e2", name: "LEG CURL", warmupSets: 1, workingSets: 3, reps: "8-10", rpe: "8", rest: "2-3 MIN", notes: "DO LYING LEG CURL MACHINE OR NORDIC HAM CURL IF NO MACHINE ACCESS" },
+        { id: "w10d2e3", name: "DUMBBELL LATERAL RAISE", warmupSets: 0, workingSets: 2, reps: "15-20", rpe: "8", rest: "1-2 MIN", notes: "ARC THE DUMBBELL OUT, MIND-MUSCLE CONNECTION WITH MIDDLE FIBERS" },
+        { id: "w10d2e4", name: "TRICEPS PRESSDOWN", warmupSets: 1, workingSets: 3, reps: "12", rpe: "8", rest: "1-2 MIN", notes: "CAN DO WITH CABLES OR BANDS, SQUEEZE TRICEPS TO MOVE THE WEIGHT" },
+      ],
+    },
+    {
+      id: "w10d3",
+      name: "Day 3 — Deadlift Test",
+      source: "powerbuilding",
+      exercises: [
+        { id: "w10d3e1", name: "DEADLIFT", warmupSets: 4, workingSets: 1, reps: "AMRAP", percent1RM: "90%", rpe: "9.5", rest: "4-5 MIN", notes: "AS MANY REPS AS POSSIBLE. ALWAYS USE GOOD FORM. AIM TO 3+ REPS" },
+        { id: "w10d3e2", name: "OVERHEAD PRESS", warmupSets: 2, workingSets: 3, reps: "10", rpe: "6", rest: "2-3 MIN", notes: "RESET EACH REP (DON'T TOUCH-AND-PRESS)" },
+        { id: "w10d3e3", name: "LEG EXTENSION", warmupSets: 1, workingSets: 3, reps: "12", rpe: "7", rest: "1-2 MIN", notes: "USE BANDS IF NO MACHINE ACCESS, MIND-MUSCLE CONNECTION WITH QUADS" },
+        { id: "w10d3e4", name: "BICYCLE CRUNCH", warmupSets: 0, workingSets: 4, reps: "15", rpe: "8", rest: "1-2 MIN", notes: "FOCUS ON ROUNDING YOUR BACK AS YOU CRUNCH HARD!" },
+      ],
+    },
+    ],
+  },
+  {
+    id: "w11",
+    name: "Week 11 (Deload)",
+    days: [
+    {
+      id: "w11d1",
+      name: "Day 1 — Lower #1",
+      source: "powerbuilding",
+      exercises: [
+        { id: "w11d1e1", name: "DEADLIFT", warmupSets: 4, workingSets: 2, reps: "3", percent1RM: "75%", rest: "3-5 MIN", notes: "BRACE YOUR LATS, CHEST TALL, PULL THE SLACK OUT OF THE BAR BEFORE LIFTING" },
+        { id: "w11d1e2", name: "SUMO BOX SQUAT OR PAUSE HIGH-BAR SQUAT", warmupSets: 2, workingSets: 2, reps: "6", rpe: "5", rest: "2-3 MIN", notes: "IF YOU SQUAT HIGH-BAR, DO SUMO BOX SQUAT. IF YOU SQUAT LOW-BAR, DO PAUSE HIGH-BAR (2 SEC PAUSE)" },
+        { id: "w11d1e3", name: "LEG CURL", warmupSets: 1, workingSets: 2, reps: "6-8", rpe: "6", rest: "1-2 MIN", notes: "DO LYING LEG CURL MACHINE OR NORDIC HAM CURL IF NO MACHINE ACCESS" },
+        { id: "w11d1e4", name: "STANDING CALF RAISE", warmupSets: 1, workingSets: 2, reps: "8-10", rpe: "6", rest: "1-2 MIN", notes: "1-2 SECOND PAUSE AT THE BOTTOM OF EACH REP, FULL SQUEEZE AT THE TOP" },
+        { id: "w11d1e5", name: "HANGING LEG RAISE", warmupSets: 0, workingSets: 2, reps: "10-12", rpe: "6", rest: "1-2 MIN", notes: "KNEES TO CHEST, CONTROLLED REPS, STRAIGHTEN LEGS MORE TO INCREASE DIFFICULTY" },
+      ],
+    },
+    {
+      id: "w11d2",
+      name: "Day 2 — Upper #1",
+      source: "powerbuilding",
+      exercises: [
+        { id: "w11d2e1", name: "BARBELL BENCH PRESS", warmupSets: 3, workingSets: 2, reps: "6", percent1RM: "72.5%", rest: "3-4 MIN", notes: "SET UP A COMFORTABLE ARCH, SLIGHT PAUSE ON THE CHEST, EXPLODE UP" },
+        { id: "w11d2e2", name: "ASSISTED CHIN-UP", warmupSets: 1, workingSets: 2, reps: "8-10", rpe: "7", rest: "2-3 MIN", notes: "UNDERHAND GRIP, PULL YOUR CHEST TO THE BAR, ADD WEIGHT IF NEEDED TO HIT RPE" },
+        { id: "w11d2e3", name: "OVERHEAD PRESS", warmupSets: 2, workingSets: 2, reps: "4", percent1RM: "75%", rest: "2-3 MIN", notes: "SQUEEZE YOUR GLUTES TO KEEP YOUR TORSO UPRIGHT, PRESS UP AND SLIGHTLY BACK" },
+        { id: "w11d2e4", name: "CHEST-SUPPORTED DUMBBELL ROW", warmupSets: 1, workingSets: 2, reps: "12-15", rpe: "7", rest: "1-2 MIN", notes: "LIE ON AN INCLINE BENCH AND DO ROWS - PULL WITH LATS!" },
+        { id: "w11d2e5", name: "A1: FACE PULL", warmupSets: 0, workingSets: 2, reps: "15-20", rpe: "8", rest: "30SEC", notes: "CAN USE CABLE/ROPE OR BAND, RETRACT YOUR SHOULDER BLADES AS YOU PULL" },
+        { id: "w11d2e6", name: "A2: DUMBBELL LATERAL RAISE", warmupSets: 0, workingSets: 2, reps: "15-20", rpe: "8", rest: "30SEC", notes: "ARC THE DUMBBELL OUT, MIND-MUSCLE CONNECTION WITH MIDDLE FIBERS" },
+        { id: "w11d2e7", name: "B1: CONCENTRATION BICEP CURL", warmupSets: 0, workingSets: 2, reps: "12-15", rpe: "8", rest: "30SEC", notes: "PIN YOUR ELBOW AGAINST YOUR UPPER LEG OR THE BACK OF A BENCH" },
+        { id: "w11d2e8", name: "B2: TRICEPS PRESSDOWN", warmupSets: 0, workingSets: 2, reps: "12-15", rpe: "8", rest: "30SEC", notes: "CAN DO WITH CABLES OR BANDS, SQUEEZE TRICEPS TO MOVE THE WEIGHT" },
+      ],
+    },
+    {
+      id: "w11d3",
+      name: "Day 3 — Lower # 2",
+      source: "powerbuilding",
+      exercises: [
+        { id: "w11d3e1", name: "BACK SQUAT", warmupSets: 4, workingSets: 2, reps: "6", percent1RM: "70%", rest: "3-4 MIN", notes: "SIT BACK AND DOWN, KEEP YOUR UPPER BACK TIGHT TO THE BAR" },
+        { id: "w11d3e2", name: "SNATCH-GRIP ROMANIAN DEADLIFT", warmupSets: 2, workingSets: 2, reps: "8", rpe: "6", rest: "2-3 MIN", notes: "WIDE GRIP, MIND-MUSCLE CONNECTION WITH HAMSTRINGS" },
+        { id: "w11d3e3", name: "LEG EXTENSION", warmupSets: 1, workingSets: 2, reps: "12-15", rpe: "7", rest: "1-2 MIN", notes: "USE BANDS IF NO MACHINE ACCESS, MIND-MUSCLE CONNECTION WITH QUADS" },
+        { id: "w11d3e4", name: "STANDING CALF RAISE", warmupSets: 0, workingSets: 2, reps: "15-20", rpe: "8", rest: "1-2 MIN", notes: "EMPHASIZE THE MIND-MUSCLE CONNECTION" },
+        { id: "w11d3e5", name: "BANDED LATERAL WALK OR HIP ABDUCTION", warmupSets: 0, workingSets: 2, reps: "15-20", rpe: "8", rest: "1-2 MIN", notes: "POINT TOES SLIGHTLY OUTWARD, MIND-MUSCLE CONNECTION WITH GLUTES" },
+        { id: "w11d3e6", name: "V SIT-UP", warmupSets: 0, workingSets: 2, reps: "12-15", rpe: "8", rest: "1-2 MIN", notes: "THINK ABOUT SQUEEZING YOUR UPPER AND LOWER ABS TOGETHER" },
+        { id: "w11d3e7", name: "NECK FLEXION/EXTENSION (OPTIONAL)", warmupSets: 1, workingSets: 2, reps: "12/12", rpe: "8", rest: "1-2 MIN", notes: "12 REPS FLEXION (FRONT OF NECK), 12 REPS EXTENSION (BACK OF NECK)" },
+      ],
+    },
+    {
+      id: "w11d4",
+      name: "Day 4 — Upper #2",
+      source: "powerbuilding",
+      exercises: [
+        { id: "w11d4e1", name: "CLOSE-GRIP BENCH PRESS", warmupSets: 3, workingSets: 3, reps: "10", rpe: "6", rest: "2-3 MIN", notes: "SHOULDER WIDTH GRIP, TUCK YOUR ELBOWS IN CLOSER TO YOUR TORSO" },
+        { id: "w11d4e2", name: "CHEST-SUPPORTED DUMBBELL ROW", warmupSets: 1, workingSets: 2, reps: "10", rpe: "6", rest: "3-4 MIN", notes: "LIE ON AN INCLINE BENCH AND DO ROWS - PULL WITH LATS!" },
+        { id: "w11d4e3", name: "WEIGHTED DIP", warmupSets: 2, workingSets: 2, reps: "6", rpe: "7", rest: "2-3 MIN", notes: "DO DUMBBELL FLOOR PRESS IF NO ACCESS TO DIP HANDLES" },
+        { id: "w11d4e4", name: "SINGLE-ARM LAT PULLDOWN", warmupSets: 1, workingSets: 2, reps: "10", rpe: "8", rest: "2-3 MIN", notes: "PERFORM WITH BANDS IF NO LAT PULLDOWN, DRIVE ELBOWS DOWN AND IN" },
+        { id: "w11d4e5", name: "A1. INCLINE SHRUG", warmupSets: 0, workingSets: 2, reps: "15-20", rpe: "8", rest: "30SEC", notes: "LIE FACE DOWN AGAINST AN INCLINE BENCH AND DO SHRUGS - FULL ROM AND SQUEEZE!" },
+        { id: "w11d4e6", name: "A2. UPRIGHT ROW", warmupSets: 0, workingSets: 2, reps: "15-20", rpe: "8", rest: "30SEC", notes: "CAN USE CABLES/ROPE, BANDS OR DUMBBELLS. STOP ROM ONCE ELBOWS REACH SHOULDER HEIGHT." },
+        { id: "w11d4e7", name: "B1: BARBELL OR EZ BAR CURL", warmupSets: 0, workingSets: 2, reps: "12-15", rpe: "8", rest: "30SEC", notes: "FOCUS ON THE MIND-MUSCLE CONNECTION" },
+        { id: "w11d4e8", name: "B2. SKULL CRUSHER", warmupSets: 0, workingSets: 2, reps: "8-10", rpe: "8", rest: "30SEC", notes: "BARBELL OR EZ BAR, DO THESE ON A BENCH, CONSTANT TENSION ON TRICEPS" },
+        { id: "w11d4e9", name: "A2. FLOOR SKULL CRUSHER", warmupSets: 1, workingSets: 3, reps: "12", rpe: "8", rest: "30SEC", notes: "ARC THE BAR BACK BEHIND YOUR HEAD, SOFT TOUCH ON THE FLOOR BEHIND YOU" },
       ],
     },
     ],
