@@ -5,6 +5,13 @@
 import { safeSetItem } from './utils';
 import { buildProfile, getSuggestions, getBriefing, buildDailyPlan, formatHour } from './coach';
 import type { CoachState } from './coach';
+import { format } from 'date-fns';
+
+/** Local calendar day (yyyy-MM-dd) for an ISO string, or null if unparseable. */
+const localDay = (s: string): string | null => {
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : format(d, 'yyyy-MM-dd');
+};
 
 const KEY_STORAGE = 'liftoff_gemini_key';
 const MODEL_STORAGE = 'liftoff_ai_model';
@@ -58,9 +65,12 @@ function buildContext(state: CoachState): string {
   const profile = buildProfile(state);
   const briefing = getBriefing(state);
   const plan = buildDailyPlan(state, profile);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = format(new Date(), 'yyyy-MM-dd');
   const open = state.tasks.filter((t) => t.status !== 'done');
-  const overdueCount = open.filter((t) => t.dueDate && t.dueDate.slice(0, 10) < today).length;
+  const overdueCount = open.filter((t) => {
+    const d = t.dueDate ? localDay(t.dueDate) : null;
+    return d != null && d < today;
+  }).length;
 
   const ctx = {
     goal: {
@@ -90,7 +100,7 @@ function buildContext(state: CoachState): string {
       title: t.title,
       status: t.status,
       priority: t.priority,
-      due: t.dueDate ? t.dueDate.slice(0, 10) : null,
+      due: t.dueDate ? localDay(t.dueDate) : null,
     })),
     activeHabits: state.habits.filter((h) => !h.archived).map((h) => h.name),
     heuristicSuggestions: getSuggestions(state, profile).map((s) => s.title),

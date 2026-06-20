@@ -320,16 +320,18 @@ export function buildDailyPlan(state: CoachState, profile: CoachProfile, now = n
 
   // Lay tasks out from the next usable hour, jumping to peak hours when possible.
   const peaks = [...profile.peakHours].sort((a, b) => a - b);
-  let cursor = Math.min(Math.max(now.getHours() + 1, 8), 21);
+  let cursor = Math.min(Math.max(now.getHours() + 1, 8), 22);
   let scheduledMins = 0;
   const blocks: PlanBlock[] = [];
   for (const t of candidates) {
+    if (cursor > 23) break; // out of hours left in the day
     const mins = parseEstimateMins(t.estimate) || defaultMins;
     if (blocks.length >= 1 && scheduledMins + mins > capacityMins) break; // keep at least one
     const peak = peaks.find((p) => p >= cursor);
-    const hour = Math.min(peak ?? cursor, 22);
+    const hour = Math.min(peak ?? cursor, 23);
     blocks.push({ taskId: t.id, title: t.title, startHour: hour, mins });
-    cursor = Math.min(23, hour + Math.max(1, Math.ceil(mins / 60)));
+    // advance strictly past this block's hour so no two blocks share an hour
+    cursor = hour + Math.max(1, Math.ceil(mins / 60));
     scheduledMins += mins;
   }
 

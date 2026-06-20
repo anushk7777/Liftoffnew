@@ -332,7 +332,9 @@ function TaskForm({
   const [status, setStatus] = useState<Status>(editing?.status ?? 'todo');
   const [category, setCategory] = useState(editing?.category ?? '');
   const [estimate, setEstimate] = useState(editing?.estimate ?? '');
-  const [dueDate, setDueDate] = useState(editing?.dueDate ? editing.dueDate.slice(0, 10) : '');
+  const [dueDate, setDueDate] = useState(
+    editing?.dueDate ? format(new Date(editing.dueDate), 'yyyy-MM-dd') : '',
+  );
   const [scheduledAt, setScheduledAt] = useState(
     editing?.scheduledAt ? toLocalInput(new Date(editing.scheduledAt)) : '',
   );
@@ -352,7 +354,9 @@ function TaskForm({
       dueDate: sched
         ? startOfDay(sched).toISOString()
         : dueDate
-          ? startOfDay(new Date(dueDate)).toISOString()
+          ? // parse the yyyy-MM-dd input as LOCAL midnight (not UTC) so the day
+            // doesn't shift by one for users east/west of UTC
+            startOfDay(new Date(`${dueDate}T00:00:00`)).toISOString()
           : undefined,
     });
   };
