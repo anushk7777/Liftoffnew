@@ -51,7 +51,7 @@ Week 5
 - [dsa] Recursion`;
 
 export default function Roadmap() {
-  const { phases, toggleRoadmapTask, replaceRoadmap, appendRoadmap, resetRoadmap, tasks, addTaskFromRoadmap } =
+  const { phases, toggleRoadmapTask, replaceRoadmap, appendRoadmap, resetRoadmap, loadExampleRoadmap, tasks, addTaskFromRoadmap } =
     useStore();
   const navigate = useNavigate();
   const [importOpen, setImportOpen] = useState(false);
@@ -60,10 +60,12 @@ export default function Roadmap() {
   );
   const [selected, setSelected] = useState<NodeRef | null>(null);
 
-  // Auto-reset if the local storage data is using the old phase format (phase-a) or is incomplete
+  // One-time migration only for the OLD example format (phase-a ids) → the
+  // current example. We do NOT touch an empty roadmap (a fresh/blank slate the
+  // user is meant to build themselves) or a small custom one (would wipe it).
   useEffect(() => {
-    if (phases.length === 0 || phases[0].id === 'phase-a' || phases.length < 3) {
-      useStore.getState().resetRoadmap();
+    if (phases.length > 0 && phases[0].id === 'phase-a') {
+      useStore.getState().loadExampleRoadmap();
     }
   }, [phases]);
 
@@ -122,7 +124,23 @@ export default function Roadmap() {
         <ProgressBar value={overall.percent} />
       </div>
 
-      {view === 'graph' ? (
+      {phases.length === 0 ? (
+        <div className="card p-8 text-center">
+          <Map className="w-8 h-8 text-accent mx-auto mb-3" />
+          <h3 className="font-display text-lg font-bold text-ink">Build your roadmap</h3>
+          <p className="text-sm text-ink-subtle mt-1 max-w-md mx-auto">
+            You don't have a roadmap yet. Import your own plan, or start from an example you can edit.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center mt-4">
+            <button onClick={() => setImportOpen(true)} className="btn btn-primary">
+              <Upload className="w-4 h-4" /> Import a roadmap
+            </button>
+            <button onClick={() => loadExampleRoadmap()} className="btn btn-secondary">
+              <Sparkles className="w-4 h-4" /> Load example
+            </button>
+          </div>
+        </div>
+      ) : view === 'graph' ? (
         <RoadmapGraph phases={phases} onNodeClick={setSelected} addedKeys={addedKeys} />
       ) : (
         <div className="space-y-3">

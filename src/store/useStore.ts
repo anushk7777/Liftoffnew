@@ -14,12 +14,10 @@ import type {
   HabitLog,
 } from './data';
 import { initialRoadmap, defaultPomodoro } from './data';
-import { startOfDay } from 'date-fns';
+import { startOfDay, addMonths, format } from 'date-fns';
 import { dayKey, streakFromDays } from '../lib/streak';
 import {
   getDeviceId,
-  getSyncCode,
-  setSyncCodeStorage,
   getLocalUpdatedAt,
   setLocalUpdatedAt,
   mergeState,
@@ -41,10 +39,7 @@ interface AppState {
   setInitialized: (val: boolean) => void;
   loadFromDB: () => Promise<void>;
 
-  // Cross-device sync
-  syncCode: string;
-  setSyncCode: (code: string) => Promise<void>;
-  clearSyncCode: () => void;
+  // Cross-device sync (keyed by the signed-in account; no passphrase needed)
   syncNow: () => Promise<void>;
 
   // Settings
@@ -62,6 +57,7 @@ interface AppState {
   replaceRoadmap: (phases: Phase[]) => void;
   appendRoadmap: (phases: Phase[]) => void;
   resetRoadmap: () => void;
+  loadExampleRoadmap: () => void;
 
   // Full task manager
   tasks: TodoTask[];
@@ -119,10 +115,10 @@ interface AppState {
   importData: (jsonStr: string) => void;
 }
 
-const NON_PERSISTED = new Set(['_initialized', 'deviceId', 'syncCode']);
+const NON_PERSISTED = new Set(['_initialized', 'deviceId']);
 
 // The persisted/synced slice of state: everything except functions and the
-// runtime-only / device-local fields above (syncCode never leaves the device).
+// runtime-only / device-local fields above.
 function extractData(state: AppState): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(state)) {
@@ -140,19 +136,8 @@ export const useStore = create<AppState>()(
       setInitialized: (val) => set({ _initialized: val }),
 
       // ---- Cross-device sync ----
-      syncCode: getSyncCode(),
-      setSyncCode: async (code) => {
-        await setSyncCodeStorage(code);
-        set({ syncCode: code.trim() });
-        // Reset the recency clock so the shared workspace's data is pulled in,
-        // then merge + converge.
-        setLocalUpdatedAt('1970-01-01T00:00:00.000Z');
-        await get().loadFromDB();
-      },
-      clearSyncCode: () => {
-        void setSyncCodeStorage('');
-        set({ syncCode: '' });
-      },
+      // Data syncs automatically per signed-in account (keyed by user.id); no
+      // passphrase. Pull-to-refresh / tab-focus call syncNow to merge.
       syncNow: async () => {
         await get().loadFromDB();
       },
@@ -208,7 +193,9 @@ export const useStore = create<AppState>()(
       },
 
   // ---- Settings ----
-  targetDate: '2026-12-01',
+  // Default ~6 months out from first run (never a shared/stale hardcoded date).
+  // Existing users keep their persisted targetDate.
+  targetDate: format(addMonths(new Date(), 6), 'yyyy-MM-dd'),
   theme: 'dark',
   reduceMotion: false,
   setTargetDate: (date) => set({ targetDate: date }),
@@ -217,7 +204,11 @@ export const useStore = create<AppState>()(
   setReduceMotion: (reduceMotion) => set({ reduceMotion }),
 
   // ---- Roadmap ----
-  phases: initialRoadmap,
+  // Fresh installs start with NO roadmap so each user sets up their own (the
+  // coach shows a "Set up your roadmap" empty state). `initialRoadmap` is kept
+  // as an opt-in example via loadExampleRoadmap(). Existing users keep their
+  // persisted phases.
+  phases: [],
   toggleRoadmapTask: (phaseId, weekId, taskId) =>
     set((state) => {
       const newPhases = JSON.parse(JSON.stringify(state.phases)) as Phase[];
@@ -250,7 +241,8 @@ export const useStore = create<AppState>()(
     }),
   replaceRoadmap: (phases) => set({ phases }),
   appendRoadmap: (phases) => set((s) => ({ phases: [...s.phases, ...phases] })),
-  resetRoadmap: () => set({ phases: initialRoadmap }),
+  resetRoadmap: () => set({ phases: [] }),
+  loadExampleRoadmap: () => set({ phases: initialRoadmap }),
 
   // ---- Tasks ----
   tasks: [],
@@ -604,7 +596,7 @@ if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     const s = useStore.getState();
-    if (isSupabaseConfigured && s.syncCode.trim() && s._initialized) {
+    if (isSupabaseConfigured && s._initialized) {
       void s.syncNow();
     }
   });

@@ -7,9 +7,10 @@ incoming notifications (`public/push-sw.js`). The steps below provision the
 backend that actually *sends* the pushes. **This was deployed entirely from
 the Supabase + Vercel dashboards** (no local CLI needed). ~15 minutes.
 
-The sender, table, schedule, and config are all version-controlled:
-- `supabase/functions/send-reminders/index.ts` — the sender (self-diagnosing, `?test=1` support)
+The sender, tables, schedule, and config are all version-controlled:
+- `supabase/functions/send-reminders/index.ts` — the sender (self-diagnosing, `?test=1` support, de-dup via `reminder_log`)
 - `supabase/migrations/20260618_push_subscriptions.sql` — the subscriptions table
+- `supabase/migrations/20260620_reminder_log.sql` — the de-dup ledger (run this once too)
 - `supabase/migrations/20260619_schedule_send_reminders.sql` — the every-minute cron
 - `supabase/config.toml` — sets `verify_jwt = false` for the function
 
@@ -29,6 +30,12 @@ Run the contents of `supabase/migrations/20260618_push_subscriptions.sql`.
 Re-running is harmless — a "policy already exists" error just means it's
 already there. This matches the client upsert in `src/lib/push.ts`
 (`{ user_id, endpoint, subscription }`, `onConflict: 'endpoint'`).
+
+**Also run `supabase/migrations/20260620_reminder_log.sql`** in the same SQL
+editor. This creates the `reminder_log` de-dup ledger the sender uses so it can
+re-scan the last 30 minutes of due tasks (catching reminders missed when a cron
+tick lags) **without ever double-sending** — each `(user, task, time)` is
+pushed exactly once.
 
 ## 2. Client public key (Vercel)
 
@@ -63,8 +70,14 @@ user token). *(CLI alternative: `npx supabase link --project-ref <ref>` then
 Enable the `pg_cron` and `pg_net` extensions (Database → Extensions), then run
 `supabase/migrations/20260619_schedule_send_reminders.sql`. Confirm with
 `select jobid, jobname, schedule, active from cron.job;` — `active` should be
-`true`. The function's due-window is 60s to match the 60s cron exactly, so each
-task fires once.
+`true`. The function now scans a 30-minute catch-up window and de-dups via
+`reminder_log`, so a single late/skipped cron tick no longer drops a reminder
+and tasks still fire exactly once.
+
+> **Phone reminders:** each device needs its own subscription. Enabling the
+> toggle on desktop does **not** subscribe your phone — open the deployed app on
+> the phone (Android Chrome works in-browser; iOS needs the PWA installed to the
+> Home Screen) and turn **Push reminders ON** there too.
 
 ## 6. Test
 
