@@ -6,7 +6,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { DEFAULT_PROGRAM } from './plan';
-import type { AppMode, LoggedSet, ProgramDay, ProgramExercise, WeekPlan, WorkoutProgram, WorkoutSession } from './types';
+import type { AppMode, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, WeekPlan, WorkoutProgram, WorkoutSession } from './types';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const blankSet = (): LoggedSet => ({ id: uid(), weight: '', reps: '', rpe: '', rating: 0, done: false });
@@ -70,6 +70,22 @@ export function completionMap(sessions: WorkoutSession[]): Map<string, string> {
     if (!prev || s.completedAt > prev) m.set(key, s.completedAt);
   }
   return m;
+}
+
+/** Most recent prior logged performance for an exercise (by name) — the basis
+ *  for progressive overload. Skips the in-progress draft (not yet in sessions). */
+export function lastPerformance(
+  sessions: WorkoutSession[],
+  exerciseName: string,
+): { date: string; sets: LoggedSet[] } | null {
+  const sorted = [...sessions].sort((a, b) => (b.completedAt ?? b.date).localeCompare(a.completedAt ?? a.date));
+  for (const s of sorted) {
+    const entry: LoggedExercise | undefined = s.entries.find(
+      (e) => e.name === exerciseName && e.sets.some((st) => st.weight || st.reps),
+    );
+    if (entry) return { date: s.completedAt ?? s.date, sets: entry.sets.filter((st) => st.weight || st.reps) };
+  }
+  return null;
 }
 
 interface AfterburnState {
