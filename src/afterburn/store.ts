@@ -6,7 +6,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { DEFAULT_PROGRAM } from './plan';
-import type { AppMode, LoggedSet, ProgramDay, ProgramExercise, WorkoutProgram, WorkoutSession } from './types';
+import type { AppMode, LoggedSet, ProgramDay, ProgramExercise, WeekPlan, WorkoutProgram, WorkoutSession } from './types';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const blankSet = (): LoggedSet => ({ id: uid(), weight: '', reps: '', rpe: '', rating: 0, done: false });
@@ -29,11 +29,13 @@ const setMarker = (ts: string): void => {
   }
 };
 
-function draftFromDay(day: ProgramDay): WorkoutSession {
+function draftFromDay(day: ProgramDay, week?: WeekPlan): WorkoutSession {
   return {
     id: uid(),
     dayId: day.id,
     dayName: day.name,
+    weekId: week?.id,
+    weekName: week?.name,
     date: new Date().toISOString(),
     entries: day.exercises.map((ex) => ({
       exerciseId: ex.id,
@@ -45,9 +47,6 @@ function draftFromDay(day: ProgramDay): WorkoutSession {
   };
 }
 
-/** Every schedulable day across all weeks plus the custom bucket. */
-const allDays = (p: WorkoutProgram): ProgramDay[] => [...p.weeks.flatMap((w) => w.days), ...p.custom];
-
 /** Apply `fn` to the day with `dayId`, wherever it lives (a week or custom). */
 function mapDay(p: WorkoutProgram, dayId: string, fn: (d: ProgramDay) => ProgramDay): WorkoutProgram {
   return {
@@ -55,6 +54,22 @@ function mapDay(p: WorkoutProgram, dayId: string, fn: (d: ProgramDay) => Program
     weeks: p.weeks.map((w) => ({ ...w, days: w.days.map((d) => (d.id === dayId ? fn(d) : d)) })),
     custom: p.custom.map((d) => (d.id === dayId ? fn(d) : d)),
   };
+}
+
+/** Stable key linking a logged session back to a program day (scoped per week). */
+export const dayCompletionKey = (weekId: string | undefined, dayId: string): string =>
+  weekId ? `${weekId}|${dayId}` : dayId;
+
+/** Derive { dayCompletionKey -> most-recent completedAt ISO } from logged sessions. */
+export function completionMap(sessions: WorkoutSession[]): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const s of sessions) {
+    if (!s.completedAt) continue;
+    const key = dayCompletionKey(s.weekId, s.dayId);
+    const prev = m.get(key);
+    if (!prev || s.completedAt > prev) m.set(key, s.completedAt);
+  }
+  return m;
 }
 
 interface AfterburnState {
@@ -65,6 +80,7 @@ interface AfterburnState {
   setCurrentWeek: (id: string) => void;
   _cloudLoaded: boolean;
   loadWorkouts: () => Promise<void>;
+  loadProgram: (program: WorkoutProgram) => void;
   startDay: (dayId: string) => void;
   cancelDraft: () => void;
   finishDraft: () => void;
@@ -86,7 +102,7 @@ export const useAfterburn = create<AfterburnState>()(
       program: DEFAULT_PROGRAM,
       sessions: [],
       draft: null,
-      currentWeekId: 'w3',
+      currentWeekId: '',
       setCurrentWeek: (id) => set({ currentWeekId: id }),
       _cloudLoaded: false,
 
@@ -124,9 +140,25 @@ export const useAfterburn = create<AfterburnState>()(
         set({ _cloudLoaded: true });
       },
 
+      // Load a whole program (from the library or a fresh custom one). Replaces
+      // only the prescribed plan + jumps to its first week — NEVER touches the
+      // logged `sessions`, so history is always preserved.
+      loadProgram: (program) => set({ program, currentWeekId: program.weeks[0]?.id ?? '' }),
+
       startDay: (dayId) => {
-        const day = allDays(get().program).find((d) => d.id === dayId);
-        if (day) set({ draft: draftFromDay(day) });
+        const p = get().program;
+        let week: WeekPlan | undefined;
+        let day: ProgramDay | undefined;
+        for (const w of p.weeks) {
+          const d = w.days.find((x) => x.id === dayId);
+          if (d) {
+            week = w;
+            day = d;
+            break;
+          }
+        }
+        if (!day) day = p.custom.find((x) => x.id === dayId); // custom day → no week
+        if (day) set({ draft: draftFromDay(day, week) });
       },
       cancelDraft: () => set({ draft: null }),
       finishDraft: () => {
@@ -186,7 +218,7 @@ export const useAfterburn = create<AfterburnState>()(
         const p = (persisted ?? {}) as Record<string, unknown>;
         const prog = p.program as { weeks?: unknown } | undefined;
         if (!prog || !Array.isArray(prog.weeks)) {
-          return { ...p, program: DEFAULT_PROGRAM, currentWeekId: 'w3' };
+          return { ...p, program: DEFAULT_PROGRAM, currentWeekId: '' };
         }
         return p;
       },

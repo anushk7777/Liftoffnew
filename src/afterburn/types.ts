@@ -61,6 +61,8 @@ export interface WorkoutSession {
   id: string;
   dayId: string;
   dayName: string;
+  weekId?: string; // which program week this day belonged to (optional: old sessions/custom days have none)
+  weekName?: string; // denormalized label, e.g. "Week 3" — survives a program swap
   date: string; // ISO — when started
   completedAt?: string; // ISO — when finished
   entries: LoggedExercise[];
