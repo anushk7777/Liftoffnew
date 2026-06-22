@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useAfterburn, useAppMode, completionMap, dayCompletionKey } from './store';
+import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance } from './store';
 import ProgramLibrary from './ProgramLibrary';
 import type { LoggedSet, ProgramDay, ProgramExercise, WeightUnit, WorkoutSession } from './types';
 
@@ -163,6 +163,7 @@ function ProgramView({ onStart }: { onStart: () => void }) {
   const done = useMemo(() => completionMap(sessions), [sessions]);
   const weekIdx = Math.max(0, program.weeks.findIndex((w) => w.id === currentWeekId));
   const week = program.weeks[weekIdx] ?? program.weeks[0];
+  const weekDone = week ? week.days.filter((d) => done.has(dayCompletionKey(week.id, d.id))).length : 0;
 
   const renderDay = (day: ProgramDay, weekId?: string) => (
     <DayCard
@@ -218,6 +219,18 @@ function ProgramView({ onStart }: { onStart: () => void }) {
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
+
+          {week && (
+            <p className="text-xs text-ink-subtle px-1">
+              {weekDone === week.days.length ? (
+                <span className="text-success font-medium">✓ All {week.days.length} days done this week</span>
+              ) : (
+                <>
+                  {weekDone}/{week.days.length} days done this week
+                </>
+              )}
+            </p>
+          )}
 
           {week?.days.map((d) => renderDay(d, week?.id))}
         </>
@@ -419,11 +432,13 @@ function SetRow({ exIdx, setIdx, set, unit }: { exIdx: number; setIdx: number; s
 function Logger({ onFinish }: { onFinish: () => void }) {
   const draft = useAfterburn((s) => s.draft)!;
   const unit = useAfterburn((s) => s.program.unit);
+  const sessions = useAfterburn((s) => s.sessions);
   const cancelDraft = useAfterburn((s) => s.cancelDraft);
   const finishDraft = useAfterburn((s) => s.finishDraft);
   const addSet = useAfterburn((s) => s.addSet);
   const removeSet = useAfterburn((s) => s.removeSet);
   const setExerciseNotes = useAfterburn((s) => s.setExerciseNotes);
+  const updateSet = useAfterburn((s) => s.updateSet);
 
   return (
     <div className="space-y-4 pb-32">
@@ -433,7 +448,16 @@ function Logger({ onFinish }: { onFinish: () => void }) {
         <p className="text-xs text-ink-subtle">{format(new Date(draft.date), 'EEEE, MMM d · h:mm a')}</p>
       </div>
 
-      {draft.entries.map((ex, exIdx) => (
+      {draft.entries.map((ex, exIdx) => {
+        const last = lastPerformance(sessions, ex.name);
+        const prefill = () => {
+          if (!last) return;
+          ex.sets.forEach((_, setIdx) => {
+            const src = last.sets[setIdx];
+            if (src) updateSet(exIdx, setIdx, { weight: src.weight, reps: src.reps });
+          });
+        };
+        return (
         <div key={ex.exerciseId} className="card p-4">
           <p className="font-semibold text-ink">{ex.name}</p>
           {/* TARGET (prescribed) */}
@@ -444,6 +468,23 @@ function Logger({ onFinish }: { onFinish: () => void }) {
             {ex.target.rpe && <span className="chip !py-0.5">RPE {ex.target.rpe}</span>}
             {ex.target.tempo && <span className="chip !py-0.5">tempo {ex.target.tempo}</span>}
           </div>
+
+          {/* LAST TIME (progressive-overload reference) */}
+          {last && (
+            <div className="mt-2 flex items-start gap-2 text-xs rounded-md bg-elevated border border-border p-2">
+              <div className="flex-1 min-w-0">
+                <span className="text-ink-subtle">Last ({format(new Date(last.date), 'MMM d')}): </span>
+                <span className="text-ink">
+                  {last.sets
+                    .map((st) => `${st.weight || '–'}×${st.reps || '–'}${st.rpe ? `@${st.rpe}` : ''}`)
+                    .join(', ')}
+                </span>
+              </div>
+              <button onClick={prefill} className="btn btn-secondary !py-1 !px-2 text-[11px] shrink-0">
+                Use last
+              </button>
+            </div>
+          )}
 
           {/* ACHIEVED (what you logged) */}
           <div className="mt-3">
@@ -479,7 +520,8 @@ function Logger({ onFinish }: { onFinish: () => void }) {
             className="input !py-1.5 text-sm mt-2"
           />
         </div>
-      ))}
+        );
+      })}
 
       <div
         className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur border-t border-border px-3 pt-3"
