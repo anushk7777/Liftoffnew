@@ -93,6 +93,7 @@ interface AfterburnState {
   removeExercise: (dayId: string, exId: string) => void;
   removeDay: (dayId: string) => void;
   deleteSession: (id: string) => void;
+  setSessionWeek: (sessionId: string, weekId: string) => void;
   resetProgram: () => void;
 }
 
@@ -207,6 +208,21 @@ export const useAfterburn = create<AfterburnState>()(
         set((s) => ({ program: mapDay(s.program, dayId, (d) => ({ ...d, exercises: d.exercises.filter((e) => e.id !== exId) })) })),
       removeDay: (dayId) => set((s) => ({ program: { ...s.program, custom: s.program.custom.filter((d) => d.id !== dayId) } })),
       deleteSession: (id) => set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) })),
+      // Attribute a logged session to a program week (e.g. older logs that
+      // predate week tracking). Re-points dayId to that week's matching day (by
+      // name) so the Workout tab marks the right week's day as Done.
+      setSessionWeek: (sessionId, weekId) =>
+        set((s) => {
+          const week = s.program.weeks.find((w) => w.id === weekId);
+          return {
+            sessions: s.sessions.map((ses) => {
+              if (ses.id !== sessionId) return ses;
+              if (!week) return { ...ses, weekId: undefined, weekName: undefined };
+              const match = week.days.find((d) => d.name === ses.dayName);
+              return { ...ses, weekId: week.id, weekName: week.name, dayId: match?.id ?? ses.dayId };
+            }),
+          };
+        }),
       resetProgram: () => set({ program: DEFAULT_PROGRAM }),
     }),
     {
