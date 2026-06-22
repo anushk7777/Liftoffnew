@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Flame, Rocket, Plus, Check, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X } from 'lucide-react';
+import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useAfterburn, useAppMode } from './store';
+import { useAfterburn, useAppMode, completionMap, dayCompletionKey } from './store';
+import ProgramLibrary from './ProgramLibrary';
 import type { LoggedSet, ProgramDay, ProgramExercise, WeightUnit, WorkoutSession } from './types';
 
 // ---------- small inputs ----------
@@ -31,13 +32,101 @@ function Stars({ value, onChange }: { value: number; onChange: (v: number) => vo
   );
 }
 
-function exerciseTarget(ex: ProgramExercise): string {
-  const parts = [`${ex.workingSets} ${ex.workingSets === 1 ? 'set' : 'sets'} × ${ex.reps}`];
+// Combined intensity target column (mirrors the source program's "%1RM / RPE").
+function intensity(ex: ProgramExercise): string {
+  const parts = [];
   if (ex.percent1RM) parts.push(ex.percent1RM);
   if (ex.rpe) parts.push(`RPE ${ex.rpe}`);
-  if (ex.tempo) parts.push(`tempo ${ex.tempo}`);
-  if (ex.rest) parts.push(`rest ${ex.rest}`);
-  return parts.join(' · ');
+  return parts.join(' · ') || '—';
+}
+const setsReps = (ex: ProgramExercise) => `${ex.workingSets} × ${ex.reps}`;
+const dash = (v?: string | number) => (v === undefined || v === '' || v === 0 ? '—' : String(v));
+
+// The day's exercises laid out like the written program: a true table on wider
+// screens, stacked labelled rows on phones (this is a mobile PWA).
+function ExerciseTable({
+  exercises,
+  editing,
+  onRemove,
+}: {
+  exercises: ProgramExercise[];
+  editing: boolean;
+  onRemove: (exId: string) => void;
+}) {
+  return (
+    <div className="mt-3">
+      {/* Wide screens: real table */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-ink-subtle text-left border-b border-border">
+              <th className="py-1.5 pr-2 font-semibold">Exercise</th>
+              <th className="py-1.5 px-2 font-semibold text-center">Warm-up</th>
+              <th className="py-1.5 px-2 font-semibold text-center">Sets × Reps</th>
+              <th className="py-1.5 px-2 font-semibold text-center">%1RM / RPE</th>
+              <th className="py-1.5 px-2 font-semibold text-center">Tempo</th>
+              <th className="py-1.5 px-2 font-semibold text-center">Rest</th>
+              <th className="py-1.5 pl-2 font-semibold">Notes</th>
+              {editing && <th className="py-1.5 pl-2" />}
+            </tr>
+          </thead>
+          <tbody>
+            {exercises.map((ex) => (
+              <tr key={ex.id} className="border-b border-border/60 align-top">
+                <td className="py-2 pr-2 font-medium text-ink">{ex.name}</td>
+                <td className="py-2 px-2 text-center text-ink-muted">{dash(ex.warmupSets)}</td>
+                <td className="py-2 px-2 text-center text-ink whitespace-nowrap">{setsReps(ex)}</td>
+                <td className="py-2 px-2 text-center text-ink-muted whitespace-nowrap">{intensity(ex)}</td>
+                <td className="py-2 px-2 text-center text-ink-muted">{dash(ex.tempo)}</td>
+                <td className="py-2 px-2 text-center text-ink-muted whitespace-nowrap">{dash(ex.rest)}</td>
+                <td className="py-2 pl-2 text-ink-subtle italic">{ex.notes || ''}</td>
+                {editing && (
+                  <td className="py-2 pl-2">
+                    <button onClick={() => onRemove(ex.id)} className="p-1 text-ink-subtle hover:text-danger" aria-label="Remove exercise">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Phones: stacked rows */}
+      <div className="sm:hidden space-y-2">
+        {exercises.map((ex) => (
+          <div key={ex.id} className="border-t border-border pt-2">
+            <div className="flex items-start gap-2">
+              <p className="flex-1 font-medium text-ink text-sm">{ex.name}</p>
+              {editing && (
+                <button onClick={() => onRemove(ex.id)} className="p-1 text-ink-subtle hover:text-danger shrink-0" aria-label="Remove exercise">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1 text-xs">
+              <Field label="Sets × Reps" value={setsReps(ex)} />
+              <Field label="%1RM / RPE" value={intensity(ex)} />
+              <Field label="Warm-up" value={dash(ex.warmupSets)} />
+              <Field label="Tempo" value={dash(ex.tempo)} />
+              <Field label="Rest" value={dash(ex.rest)} />
+            </div>
+            {ex.notes && <p className="text-xs text-ink-subtle italic mt-1">{ex.notes}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-2">
+      <span className="text-ink-subtle">{label}</span>
+      <span className="text-ink font-medium text-right">{value}</span>
+    </div>
+  );
 }
 
 // ---------- header ----------
@@ -61,6 +150,7 @@ function Header() {
 // ---------- program view ----------
 function ProgramView({ onStart }: { onStart: () => void }) {
   const program = useAfterburn((s) => s.program);
+  const sessions = useAfterburn((s) => s.sessions);
   const currentWeekId = useAfterburn((s) => s.currentWeekId);
   const setCurrentWeek = useAfterburn((s) => s.setCurrentWeek);
   const startDay = useAfterburn((s) => s.startDay);
@@ -70,13 +160,15 @@ function ProgramView({ onStart }: { onStart: () => void }) {
   const [newDayName, setNewDayName] = useState('');
   const [adding, setAdding] = useState(false);
 
+  const done = useMemo(() => completionMap(sessions), [sessions]);
   const weekIdx = Math.max(0, program.weeks.findIndex((w) => w.id === currentWeekId));
   const week = program.weeks[weekIdx] ?? program.weeks[0];
 
-  const renderDay = (day: ProgramDay) => (
+  const renderDay = (day: ProgramDay, weekId?: string) => (
     <DayCard
       key={day.id}
       day={day}
+      lastDone={done.get(dayCompletionKey(weekId, day.id))}
       editing={editDay === day.id}
       onToggleEdit={() => setEditDay(editDay === day.id ? null : day.id)}
       onStart={() => {
@@ -127,7 +219,7 @@ function ProgramView({ onStart }: { onStart: () => void }) {
             </button>
           </div>
 
-          {week?.days.map(renderDay)}
+          {week?.days.map((d) => renderDay(d, week?.id))}
         </>
       )}
 
@@ -136,7 +228,7 @@ function ProgramView({ onStart }: { onStart: () => void }) {
       {program.custom.length === 0 && !adding && (
         <p className="text-xs text-ink-subtle">Add your own workout in the same format below.</p>
       )}
-      {program.custom.map(renderDay)}
+      {program.custom.map((d) => renderDay(d))}
 
       {adding ? (
         <div className="card p-4 space-y-3">
@@ -190,19 +282,40 @@ function ProgramView({ onStart }: { onStart: () => void }) {
   );
 }
 
-function DayCard({ day, editing, onToggleEdit, onStart }: { day: ProgramDay; editing: boolean; onToggleEdit: () => void; onStart: () => void }) {
+function DayCard({
+  day,
+  lastDone,
+  editing,
+  onToggleEdit,
+  onStart,
+}: {
+  day: ProgramDay;
+  lastDone?: string;
+  editing: boolean;
+  onToggleEdit: () => void;
+  onStart: () => void;
+}) {
   const removeExercise = useAfterburn((s) => s.removeExercise);
   const removeDay = useAfterburn((s) => s.removeDay);
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="card p-4">
+    <div className={cn('card p-4', lastDone && 'border-success/40')}>
       <div className="flex items-center gap-2">
         <button onClick={() => setOpen((o) => !o)} className="flex-1 flex items-center gap-2 text-left min-w-0">
           {open ? <ChevronDown className="w-4 h-4 text-ink-subtle shrink-0" /> : <ChevronRight className="w-4 h-4 text-ink-subtle shrink-0" />}
           <div className="min-w-0">
-            <p className="font-semibold text-ink truncate">{day.name}</p>
-            <p className="text-xs text-ink-subtle">{day.exercises.length} exercises</p>
+            <div className="flex items-center gap-2 min-w-0">
+              <p className="font-semibold text-ink truncate">{day.name}</p>
+              {lastDone && (
+                <span className="chip text-success border-success/30 bg-success/10 shrink-0 !py-0.5">
+                  <CheckCircle2 className="w-3 h-3" /> Done
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-ink-subtle">
+              {day.exercises.length} exercises{lastDone ? ` · last done ${format(new Date(lastDone), 'MMM d')}` : ''}
+            </p>
           </div>
         </button>
         <button onClick={onToggleEdit} className="p-2 text-ink-subtle hover:text-ink" aria-label="Edit workout">
@@ -212,25 +325,16 @@ function DayCard({ day, editing, onToggleEdit, onStart }: { day: ProgramDay; edi
       </div>
 
       {(open || editing) && (
-        <div className="mt-3 space-y-2">
-          {day.note && <p className="text-xs text-orange-400">{day.note}</p>}
-          {day.exercises.map((ex) => (
-            <div key={ex.id} className="flex items-start gap-2 text-sm border-t border-border pt-2">
-              <div className="flex-1 min-w-0">
-                <p className="text-ink font-medium">{ex.name}</p>
-                <p className="text-xs text-ink-subtle">{exerciseTarget(ex)}</p>
-                {ex.notes && <p className="text-xs text-ink-muted mt-0.5 italic">{ex.notes}</p>}
-              </div>
-              {editing && (
-                <button onClick={() => removeExercise(day.id, ex.id)} className="p-1 text-ink-subtle hover:text-danger" aria-label="Remove exercise">
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
+        <div className="mt-1">
+          {day.note && <p className="text-xs text-orange-400 mt-2">{day.note}</p>}
+          {day.exercises.length > 0 ? (
+            <ExerciseTable exercises={day.exercises} editing={editing} onRemove={(exId) => removeExercise(day.id, exId)} />
+          ) : (
+            <p className="text-xs text-ink-subtle mt-3">No exercises yet — tap the pencil to add some.</p>
+          )}
 
           {editing && (
-            <div className="pt-2 space-y-3">
+            <div className="pt-3 space-y-3">
               <AddExerciseForm dayId={day.id} />
               {day.source === 'custom' && (
                 <button onClick={() => removeDay(day.id)} className="btn btn-danger w-full !py-1.5 text-sm">
@@ -324,6 +428,7 @@ function Logger({ onFinish }: { onFinish: () => void }) {
   return (
     <div className="space-y-4 pb-32">
       <div>
+        {draft.weekName && <p className="text-xs font-semibold text-orange-400">{draft.weekName}</p>}
         <h1 className="font-display text-xl font-bold">{draft.dayName}</h1>
         <p className="text-xs text-ink-subtle">{format(new Date(draft.date), 'EEEE, MMM d · h:mm a')}</p>
       </div>
@@ -331,17 +436,29 @@ function Logger({ onFinish }: { onFinish: () => void }) {
       {draft.entries.map((ex, exIdx) => (
         <div key={ex.exerciseId} className="card p-4">
           <p className="font-semibold text-ink">{ex.name}</p>
-          <p className="text-xs text-ink-subtle mt-0.5">
-            target: {ex.target.reps}
-            {ex.target.rpe ? ` · RPE ${ex.target.rpe}` : ''}
-            {ex.target.percent1RM ? ` · ${ex.target.percent1RM}` : ''}
-            {ex.target.tempo ? ` · tempo ${ex.target.tempo}` : ''}
-          </p>
+          {/* TARGET (prescribed) */}
+          <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
+            <span className="text-ink-subtle">Target:</span>
+            <span className="chip !py-0.5">{ex.target.reps} reps</span>
+            {ex.target.percent1RM && <span className="chip !py-0.5">{ex.target.percent1RM}</span>}
+            {ex.target.rpe && <span className="chip !py-0.5">RPE {ex.target.rpe}</span>}
+            {ex.target.tempo && <span className="chip !py-0.5">tempo {ex.target.tempo}</span>}
+          </div>
 
-          <div className="mt-3 space-y-2">
-            {ex.sets.map((set, setIdx) => (
-              <SetRow key={set.id} exIdx={exIdx} setIdx={setIdx} set={set} unit={unit} />
-            ))}
+          {/* ACHIEVED (what you logged) */}
+          <div className="mt-3">
+            <div className="flex items-center gap-1.5 px-0.5 mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">
+              <span className="w-9 shrink-0">Set</span>
+              <span className="flex-1 text-center">{unit}</span>
+              <span className="flex-1 text-center">reps</span>
+              <span className="flex-1 text-center">RPE</span>
+              <span className="w-8 shrink-0 text-center">done</span>
+            </div>
+            <div className="space-y-2">
+              {ex.sets.map((set, setIdx) => (
+                <SetRow key={set.id} exIdx={exIdx} setIdx={setIdx} set={set} unit={unit} />
+              ))}
+            </div>
           </div>
 
           <div className="flex gap-2 mt-2">
@@ -390,7 +507,9 @@ function SessionCard({ session }: { session: WorkoutSession }) {
     <div className="card p-4">
       <div className="flex items-center gap-2">
         <button onClick={() => setOpen((o) => !o)} className="flex-1 text-left min-w-0">
-          <p className="font-semibold text-ink truncate">{session.dayName}</p>
+          <p className="font-semibold text-ink truncate">
+            {session.weekName ? `${session.weekName} · ${session.dayName}` : session.dayName}
+          </p>
           <p className="text-xs text-ink-subtle">
             {format(new Date(session.completedAt ?? session.date), 'MMM d, yyyy · h:mm a')} · {doneSets} sets logged
           </p>
@@ -438,15 +557,25 @@ function HistoryView() {
 }
 
 // ---------- root ----------
+type Tab = 'workout' | 'history' | 'programs';
+
 export default function Afterburn() {
   const draft = useAfterburn((s) => s.draft);
   const loadWorkouts = useAfterburn((s) => s.loadWorkouts);
-  const [tab, setTab] = useState<'program' | 'history'>('program');
+  // Start on "Programs" if there's no plan loaded yet, else on "Workout".
+  const hasProgram = useAfterburn((s) => s.program.weeks.length > 0 || s.program.custom.length > 0);
+  const [tab, setTab] = useState<Tab>(hasProgram ? 'workout' : 'programs');
 
   // Pull cloud workout data when entering the app (recency-guarded in the store).
   useEffect(() => {
     loadWorkouts();
   }, [loadWorkouts]);
+
+  const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
+    { id: 'workout', label: 'Workout', icon: Flame },
+    { id: 'history', label: 'History', icon: Check },
+    { id: 'programs', label: 'Programs', icon: LayoutGrid },
+  ];
 
   return (
     <div className="min-h-screen bg-background text-ink relative">
@@ -456,20 +585,28 @@ export default function Afterburn() {
         {!draft && (
           <div className="mx-auto max-w-2xl px-4 pt-4">
             <div className="flex bg-elevated p-0.5 rounded-lg border border-border w-fit">
-              {(['program', 'history'] as const).map((t) => (
+              {TABS.map((t) => (
                 <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className={cn('px-4 py-1.5 rounded-md text-sm font-medium capitalize transition-colors', tab === t ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted')}
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={cn('flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors', tab === t.id ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted')}
                 >
-                  {t}
+                  <t.icon className="w-3.5 h-3.5" /> {t.label}
                 </button>
               ))}
             </div>
           </div>
         )}
         <main className="mx-auto max-w-2xl px-4 py-4">
-          {draft ? <Logger onFinish={() => setTab('history')} /> : tab === 'program' ? <ProgramView onStart={() => undefined} /> : <HistoryView />}
+          {draft ? (
+            <Logger onFinish={() => setTab('history')} />
+          ) : tab === 'programs' ? (
+            <ProgramLibrary onPicked={() => setTab('workout')} />
+          ) : tab === 'history' ? (
+            <HistoryView />
+          ) : (
+            <ProgramView onStart={() => undefined} />
+          )}
         </main>
       </div>
     </div>
