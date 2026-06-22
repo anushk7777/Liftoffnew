@@ -499,6 +499,8 @@ function Logger({ onFinish }: { onFinish: () => void }) {
 // ---------- history ----------
 function SessionCard({ session }: { session: WorkoutSession }) {
   const deleteSession = useAfterburn((s) => s.deleteSession);
+  const setSessionWeek = useAfterburn((s) => s.setSessionWeek);
+  const weeks = useAfterburn((s) => s.program.weeks);
   const unit = useAfterburn((s) => s.program.unit);
   const [open, setOpen] = useState(false);
   const doneSets = session.entries.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0);
@@ -518,6 +520,26 @@ function SessionCard({ session }: { session: WorkoutSession }) {
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Which week was this? Setting it labels the log AND marks that week's day done. */}
+      {weeks.length > 0 && (
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          <span className="text-xs text-ink-subtle shrink-0">Week:</span>
+          <select
+            value={session.weekId ?? ''}
+            onChange={(e) => setSessionWeek(session.id, e.target.value)}
+            className={cn('input !py-1 !px-2 text-xs !w-auto', !session.weekId && 'text-ink-subtle')}
+          >
+            <option value="">— set week —</option>
+            {weeks.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+          {!session.weekId && <span className="text-[11px] text-orange-400">tap to tag this workout</span>}
+        </div>
+      )}
 
       {open && (
         <div className="mt-3 space-y-2 border-t border-border pt-3">
