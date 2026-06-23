@@ -27,6 +27,8 @@ export interface NutritionProfile {
   method: BmrMethod;
   proteinPerKg?: number; // optional override
   fatPct?: number; // optional override (% of kcal)
+  cycling?: boolean; // calorie cycling (zig-zag) on training vs rest days
+  trainingDays?: number; // 1–6 training days/week for cycling
 }
 
 export const DEFAULT_NUTRITION: NutritionProfile = {
@@ -37,6 +39,8 @@ export const DEFAULT_NUTRITION: NutritionProfile = {
   activity: 'moderate',
   goal: 'maintain',
   method: 'mifflin',
+  cycling: false,
+  trainingDays: 4,
 };
 
 export const ACTIVITY: { id: ActivityLevel; label: string; mult: number; etf: number }[] = [
@@ -96,6 +100,8 @@ export function tdeeFor(method: BmrMethod, p: NutritionProfile): number | null {
   return method === 'etf' ? bmr * a.etf : bmr * a.mult;
 }
 
+export type RateFlag = 'ideal' | 'aggressive' | 'slow' | 'none';
+
 export interface NutritionTargets {
   method: BmrMethod;
   bmr: number;
@@ -107,8 +113,30 @@ export interface NutritionTargets {
   fiberG: number;
   proteinPerMeal: number; // across 4 meals
   weeklyDeltaKg: number; // projected, START estimate only
+  weeklyDeltaPctBW: number; // projected weekly change as % of bodyweight
+  rateFlag: RateFlag; // pace guardrail (per Lecture 7)
   proteinPerKgUsed: number;
   basis: 'bodyweight' | 'lean mass';
+}
+
+/** Classify the projected weekly pace. Cuts: ideal 0.5–1.0% BW/wk, aggressive
+ *  above 1.0% (muscle/strength risk), slow below 0.25%. Gains: ideal 0.25–0.5%,
+ *  aggressive above 0.5% (more fat than muscle). [Lecture 7] */
+export function rateFlagFor(pctBWPerWeek: number, goal: Goal): RateFlag {
+  const g = goalOf(goal);
+  if (g.pct < 0) {
+    const loss = -pctBWPerWeek; // positive = losing
+    if (loss <= 0) return 'slow';
+    if (loss > 1.0) return 'aggressive';
+    if (loss < 0.25) return 'slow';
+    return 'ideal';
+  }
+  if (g.pct > 0) {
+    if (pctBWPerWeek > 0.5) return 'aggressive';
+    if (pctBWPerWeek < 0.1) return 'slow';
+    return 'ideal';
+  }
+  return 'none';
 }
 
 const round = (n: number) => Math.round(n);
@@ -137,6 +165,7 @@ export function computeTargets(p: NutritionProfile): NutritionTargets | null {
   const carbG = Math.max(0, round((goalCalories - proteinG * 4 - fatG * 9) / 4));
   const fiberG = round((goalCalories / 1000) * 14);
   const weeklyDeltaKg = Math.round((((goalCalories - tdee) * 7) / 7700) * 100) / 100;
+  const weeklyDeltaPctBW = p.weightKg > 0 ? Math.round((weeklyDeltaKg / p.weightKg) * 1000) / 10 : 0;
 
   return {
     method,
@@ -149,9 +178,35 @@ export function computeTargets(p: NutritionProfile): NutritionTargets | null {
     fiberG,
     proteinPerMeal: round(proteinG / 4),
     weeklyDeltaKg,
+    weeklyDeltaPctBW,
+    rateFlag: rateFlagFor(weeklyDeltaPctBW, p.goal),
     proteinPerKgUsed: proteinPerKg,
     basis,
   };
+}
+
+export interface CyclingPlan {
+  trainingDays: number;
+  restDays: number;
+  training: { kcal: number; proteinG: number; carbG: number; fatG: number };
+  rest: { kcal: number; proteinG: number; carbG: number; fatG: number };
+}
+
+/** Zig-zag the goal calories across training vs rest days while keeping the
+ *  weekly average fixed. Protein + fat are held constant daily (evidence-based);
+ *  carbs absorb the difference — more on training days. [Lecture 7] */
+export function computeCycling(t: NutritionTargets, trainingDaysInput: number): CyclingPlan {
+  const trainingDays = Math.min(6, Math.max(1, Math.round(trainingDaysInput)));
+  const restDays = 7 - trainingDays;
+  const weekly = t.goalCalories * 7;
+  // Training days get +15%; rest days take the remainder to hold the weekly avg.
+  const trainKcal = round(t.goalCalories * 1.15);
+  const restKcal = restDays > 0 ? round((weekly - trainKcal * trainingDays) / restDays) : trainKcal;
+  const macros = (kcal: number) => {
+    const carb = Math.max(0, round((kcal - t.proteinG * 4 - t.fatG * 9) / 4));
+    return { kcal, proteinG: t.proteinG, fatG: t.fatG, carbG: carb };
+  };
+  return { trainingDays, restDays, training: macros(trainKcal), rest: macros(restKcal) };
 }
 
 /** Least-squares slope of weight (kg) over time, in kg/week, from recent entries. */
@@ -180,15 +235,59 @@ export function weightTrendKgPerWeek(entries: BodyEntry[], days = 21): number | 
   return (num / den) * 7; // kg/day → kg/week
 }
 
-/** Suggest a calorie adjustment by comparing the real weight trend to the goal
- *  target (assumes the user is eating at goalCalories). Returns null if not enough
- *  data. Positive = eat more, negative = eat less. */
+/** Average weight over the window ending `endDaysAgo` days back. Null if empty. */
+export function rollingAverageKg(entries: BodyEntry[], windowDays: number, endDaysAgo = 0): number | null {
+  const end = Date.now() - endDaysAgo * 86_400_000;
+  const start = end - windowDays * 86_400_000;
+  const ws = entries
+    .map((e) => ({ t: new Date(e.date).getTime(), w: e.weight }))
+    .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.w) && p.t > start && p.t <= end)
+    .map((p) => p.w);
+  if (ws.length === 0) return null;
+  return ws.reduce((a, b) => a + b, 0) / ws.length;
+}
+
+export interface Recalibration {
+  observedWeeklyKg: number;
+  estMaintenanceKcal: number; // back-calculated from the trend (assumes intake ≈ target)
+  suggestedKcalChange: number; // 0 when on track
+  onTrack: boolean;
+}
+
+/** Compare the real weight trend to the goal target and suggest a calorie change.
+ *  Uses the Lecture 4/5 protocol — current 7-day average vs the 7-day average a
+ *  week earlier (falls back to the least-squares slope) — back-calculates true
+ *  maintenance, and only suggests a change when the gap exceeds ~0.3% BW/wk.
+ *  Assumes the user has been eating near `goalCalories`. */
 export function recalibration(
   entries: BodyEntry[],
   targetWeeklyDeltaKg: number,
-): { observedWeeklyKg: number; suggestedKcalChange: number } | null {
-  const observed = weightTrendKgPerWeek(entries);
+  goalCalories: number,
+  weightKg: number,
+): Recalibration | null {
+  const recent = rollingAverageKg(entries, 7, 0);
+  const prior = rollingAverageKg(entries, 7, 7);
+  let observed: number | null;
+  if (recent != null && prior != null) {
+    observed = recent - prior; // kg/week
+  } else {
+    observed = weightTrendKgPerWeek(entries); // fallback to regression
+  }
   if (observed == null) return null;
-  const suggestedKcalChange = Math.round(((targetWeeklyDeltaKg - observed) * 7700) / 7 / 25) * 25; // round to 25
-  return { observedWeeklyKg: Math.round(observed * 100) / 100, suggestedKcalChange };
+
+  const dailyImbalance = (observed * 7700) / 7; // kcal/day implied by the trend
+  const estMaintenanceKcal = Math.round((goalCalories - dailyImbalance) / 5) * 5;
+  const gapPctBW = weightKg > 0 ? (Math.abs(observed - targetWeeklyDeltaKg) / weightKg) * 100 : 0;
+  const onTrack = gapPctBW <= 0.3; // Lecture 5 threshold
+  const suggestedKcalChange = onTrack ? 0 : Math.round(((targetWeeklyDeltaKg - observed) * 7700) / 7 / 25) * 25;
+  return { observedWeeklyKg: Math.round(observed * 100) / 100, estMaintenanceKcal, suggestedKcalChange, onTrack };
+}
+
+/** Healthy body-fat context per Lecture 3. */
+export function bodyFatContext(bf: number, sex: Sex): { status: 'low' | 'healthy' | 'high'; note: string } {
+  const [lo, hi] = sex === 'male' ? [15, 20] : [20, 25];
+  if (bf < (sex === 'male' ? 6 : 14)) return { status: 'low', note: 'Very lean — sustainable only short-term.' };
+  if (bf < lo) return { status: 'low', note: `Lean (healthy ${lo}–${hi}%) — good time to build in a slight surplus.` };
+  if (bf <= hi) return { status: 'healthy', note: `Healthy range (${lo}–${hi}%).` };
+  return { status: 'high', note: `Above the ${lo}–${hi}% healthy range — a fat-loss phase fits well first.` };
 }

@@ -4,7 +4,7 @@
 // call). Reuses the shared streamGemini helper + the same local Gemini key.
 import { streamGemini } from '../lib/aicoach';
 import { completionMap, dayCompletionKey, exerciseProgress, loggedExerciseNames } from './store';
-import { computeTargets, weightTrendKgPerWeek, GOALS } from './nutrition';
+import { computeTargets, computeCycling, weightTrendKgPerWeek, GOALS } from './nutrition';
 import type { NutritionProfile } from './nutrition';
 import type { BodyEntry, WorkoutProgram, WorkoutSession } from './types';
 
@@ -14,8 +14,12 @@ Methodology (from the user's evidence-based guides — follow it):
 - Maintenance calories: BMR (Mifflin–St Jeor, or Katch–McArdle when body-fat% known) × activity (1.2/1.375/1.55/1.725/1.9). ETF quick check = 22 kcal × kg × 1.3–2.2.
 - Goal: fat loss = deficit (~10–25% below maintenance); lean gain = small surplus +5–10% (≈200–500 kcal); maintenance = eucaloric.
 - Protein 1.6–2.2 g/kg (toward the high end when cutting); fat 20–35% of kcal (≥0.6 g/kg); carbs fill the remainder; fibre ~30 g/day; added sugar <10%.
-- A 500 kcal deficit does NOT equal a fixed weight loss — metabolic adaptation means you must recalibrate from the real weekly weight trend, not the formula.
-- In a deficit, resistance training + high protein preserve muscle (mTOR/AMPK); keep training volume up while cutting.
+- A 500 kcal deficit does NOT equal a fixed weight loss — metabolic adaptation means you must recalibrate from the real weekly weight trend, not the formula. Track a 7-day rolling average; act on the trend, not daily swings (water/sodium).
+- In a deficit, resistance training + high protein preserve muscle (mTOR/AMPK); keep training volume up while cutting. Muscle is preserved by adequate protein AND sufficient total calories — avoid overly aggressive deficits.
+- Ideal fat-loss pace is 0.5–1.0 lb (≈0.25–1.0% BW) per week; faster (~1.1%/wk) cost athletes ~8% bench strength. For gaining, a modest +200–300 kcal surplus builds more muscle and less fat than a large one.
+- Metabolic adaptation is reversible — recover maintenance with a reverse diet (+50–100 kcal/week). Calorie cycling (zig-zag: higher on training days, lower on rest days, same weekly average) is a valid strategy.
+- NEAT (non-exercise activity) is a large, modifiable part of expenditure — daily steps matter. Meal timing is secondary to hitting total daily calories and protein.
+- Healthy body fat ≈ 15–20% (men) / 20–25% (women); 3–4% is unsustainable. Lean → favour a slight surplus; higher → run a fat-loss phase first.
 
 Style: lead with one sentence on how training + nutrition are trending. Then give 3 prioritized, concrete actions, each tied to a specific number from the data (name the lift, the week, the kcal/macro, the weight trend). Be honest and specific. Plain text only — no markdown headers or asterisks; use "- " for lists. One-shot: don't ask questions or offer more unless the user asked one.`;
 
@@ -100,6 +104,9 @@ function buildContext(d: CoachData): string {
           carb_g: targets.carbG,
           fiber_g: targets.fiberG,
           projectedWeeklyKg: targets.weeklyDeltaKg,
+          projectedPace: `${targets.weeklyDeltaPctBW}%BW/wk (${targets.rateFlag})`,
+          bodyFatPct: nutrition.bodyFatPct ?? null,
+          cycling: nutrition.cycling ? computeCycling(targets, nutrition.trainingDays ?? 4) : null,
         }
       : null,
   };
