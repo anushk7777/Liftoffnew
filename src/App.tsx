@@ -95,11 +95,14 @@ function Shell() {
       }
     };
     const onQuickAdd = () => setQuickAddOpen(true);
+    const onSearch = () => setPaletteOpen(true);
     window.addEventListener('keydown', onKey);
     window.addEventListener('liftoff:quickadd', onQuickAdd);
+    window.addEventListener('liftoff:search', onSearch);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('liftoff:quickadd', onQuickAdd);
+      window.removeEventListener('liftoff:search', onSearch);
     };
   }, []);
 
@@ -133,7 +136,14 @@ function Shell() {
 
   // ---- Workspace gate (after login): choose Focus vs Afterburn. ----
   if (appMode === null) return <ProfilePicker />;
-  if (appMode === 'afterburn') return <Afterburn />;
+  if (appMode === 'afterburn')
+    return (
+      <>
+        <Afterburn />
+        {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+        <AlarmOverlay />
+      </>
+    );
 
   // ---- Mobile: dedicated app shell (the single source of truth for mobile UX). ----
   if (isMobile) {

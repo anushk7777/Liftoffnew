@@ -6,7 +6,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { DEFAULT_PROGRAM } from './plan';
-import type { AppMode, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, WeekPlan, WorkoutProgram, WorkoutSession } from './types';
+import { DEFAULT_NUTRITION } from './nutrition';
+import type { NutritionProfile } from './nutrition';
+import type { AppMode, BodyEntry, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, WeekPlan, WorkoutProgram, WorkoutSession } from './types';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const blankSet = (): LoggedSet => ({ id: uid(), weight: '', reps: '', rpe: '', rating: 0, done: false });
@@ -40,7 +42,7 @@ function draftFromDay(day: ProgramDay, week?: WeekPlan): WorkoutSession {
     entries: day.exercises.map((ex) => ({
       exerciseId: ex.id,
       name: ex.name,
-      target: { reps: ex.reps, rpe: ex.rpe, percent1RM: ex.percent1RM, tempo: ex.tempo },
+      target: { reps: ex.reps, rpe: ex.rpe, percent1RM: ex.percent1RM, tempo: ex.tempo, rest: ex.rest },
       sets: Array.from({ length: Math.max(1, Number(ex.workingSets) || 1) }, blankSet),
       notes: '',
     })),
@@ -88,6 +90,63 @@ export function lastPerformance(
   return null;
 }
 
+/** Parse a prescribed rest string into seconds. "3-4 MIN"→180, "2.0"→120,
+ *  "30SEC"→30, "90"→90 (bare number assumed seconds if <10 → minutes). */
+export function restToSeconds(rest?: string): number {
+  if (!rest) return 0;
+  const s = rest.toUpperCase();
+  const num = s.match(/\d+(\.\d+)?/);
+  if (!num) return 0;
+  const n = parseFloat(num[0]);
+  if (s.includes('SEC')) return Math.round(n);
+  if (s.includes('MIN')) return Math.round(n * 60);
+  // Bare/decimal value: small numbers are minutes (e.g. "2.0"), large are seconds.
+  return Math.round(n < 10 ? n * 60 : n);
+}
+
+/** Distinct exercise names that appear in logged sessions (for the lift picker). */
+export function loggedExerciseNames(sessions: WorkoutSession[]): string[] {
+  const set = new Set<string>();
+  for (const s of sessions) for (const e of s.entries) if (e.sets.some((st) => st.weight)) set.add(e.name);
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+/** Per-session top-set weight + estimated 1RM (Epley) for one lift, oldest→newest. */
+export function exerciseProgress(
+  sessions: WorkoutSession[],
+  name: string,
+): { date: string; weight: number; est1RM: number }[] {
+  const out: { date: string; weight: number; est1RM: number }[] = [];
+  for (const s of sessions) {
+    const e = s.entries.find((x) => x.name === name);
+    if (!e) continue;
+    let top: { weight: number; reps: number } | null = null;
+    for (const st of e.sets) {
+      const w = parseFloat(st.weight);
+      const r = parseInt(st.reps, 10) || 0;
+      if (!Number.isFinite(w) || w <= 0) continue;
+      if (!top || w > top.weight) top = { weight: w, reps: r };
+    }
+    if (top) out.push({ date: s.completedAt ?? s.date, weight: top.weight, est1RM: Math.round(top.weight * (1 + top.reps / 30)) });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Greedy plates-per-side for a target total weight. */
+export function platesPerSide(target: number, bar: number, plates: number[]): { remaining: number; counts: { plate: number; n: number }[] } {
+  let perSide = (target - bar) / 2;
+  if (!Number.isFinite(perSide) || perSide <= 0) return { remaining: 0, counts: [] };
+  const counts: { plate: number; n: number }[] = [];
+  for (const p of [...plates].sort((a, b) => b - a)) {
+    const n = Math.floor(perSide / p + 1e-9);
+    if (n > 0) {
+      counts.push({ plate: p, n });
+      perSide -= n * p;
+    }
+  }
+  return { remaining: Math.round(perSide * 100) / 100, counts };
+}
+
 interface AfterburnState {
   program: WorkoutProgram;
   sessions: WorkoutSession[];
@@ -111,6 +170,11 @@ interface AfterburnState {
   deleteSession: (id: string) => void;
   setSessionWeek: (sessionId: string, weekId: string) => void;
   resetProgram: () => void;
+  bodyweight: BodyEntry[];
+  addBodyweight: (weight: number, note?: string) => void;
+  deleteBodyweight: (id: string) => void;
+  nutrition: NutritionProfile;
+  setNutrition: (patch: Partial<NutritionProfile>) => void;
 }
 
 export const useAfterburn = create<AfterburnState>()(
@@ -118,6 +182,8 @@ export const useAfterburn = create<AfterburnState>()(
     (set, get) => ({
       program: DEFAULT_PROGRAM,
       sessions: [],
+      bodyweight: [],
+      nutrition: DEFAULT_NUTRITION,
       draft: null,
       currentWeekId: '',
       setCurrentWeek: (id) => set({ currentWeekId: id }),
@@ -145,10 +211,20 @@ export const useAfterburn = create<AfterburnState>()(
           if (error && error.code !== 'PGRST116') console.error('Afterburn cloud load failed', error);
           const cloudTs = data?.updated_at ?? '';
           if (data?.data && cloudTs > getMarker()) {
-            const d = data.data as { program?: WorkoutProgram; sessions?: WorkoutSession[] };
+            const d = data.data as {
+              program?: WorkoutProgram;
+              sessions?: WorkoutSession[];
+              bodyweight?: BodyEntry[];
+              nutrition?: NutritionProfile;
+            };
             // Ignore an old-shape cloud program (pre-weeks) so it can't break the UI.
             const validProgram = d.program && Array.isArray(d.program.weeks) ? d.program : undefined;
-            set({ program: validProgram ?? get().program, sessions: d.sessions ?? get().sessions });
+            set({
+              program: validProgram ?? get().program,
+              sessions: d.sessions ?? get().sessions,
+              bodyweight: Array.isArray(d.bodyweight) ? d.bodyweight : get().bodyweight,
+              nutrition: d.nutrition ? { ...get().nutrition, ...d.nutrition } : get().nutrition,
+            });
             setMarker(cloudTs || new Date().toISOString());
           }
         } catch (e) {
@@ -240,6 +316,13 @@ export const useAfterburn = create<AfterburnState>()(
           };
         }),
       resetProgram: () => set({ program: DEFAULT_PROGRAM }),
+
+      addBodyweight: (weight, note) =>
+        set((s) => ({
+          bodyweight: [{ id: uid(), date: new Date().toISOString(), weight, note: note?.trim() || undefined }, ...s.bodyweight],
+        })),
+      deleteBodyweight: (id) => set((s) => ({ bodyweight: s.bodyweight.filter((b) => b.id !== id) })),
+      setNutrition: (patch) => set((s) => ({ nutrition: { ...s.nutrition, ...patch } })),
     }),
     {
       name: 'liftoff-afterburn',
@@ -254,7 +337,7 @@ export const useAfterburn = create<AfterburnState>()(
         }
         return p;
       },
-      partialize: (s) => ({ program: s.program, sessions: s.sessions, draft: s.draft, currentWeekId: s.currentWeekId }),
+      partialize: (s) => ({ program: s.program, sessions: s.sessions, bodyweight: s.bodyweight, nutrition: s.nutrition, draft: s.draft, currentWeekId: s.currentWeekId }),
     },
   ),
 );
@@ -263,12 +346,22 @@ export const useAfterburn = create<AfterburnState>()(
 // so we never overwrite the cloud before the first pull; ignores draft edits.
 let lastProgram = useAfterburn.getState().program;
 let lastSessions = useAfterburn.getState().sessions;
+let lastBodyweight = useAfterburn.getState().bodyweight;
+let lastNutrition = useAfterburn.getState().nutrition;
 let syncTimer: ReturnType<typeof setTimeout>;
 useAfterburn.subscribe((state) => {
   if (!isSupabaseConfigured || !state._cloudLoaded) return;
-  if (state.program === lastProgram && state.sessions === lastSessions) return;
+  if (
+    state.program === lastProgram &&
+    state.sessions === lastSessions &&
+    state.bodyweight === lastBodyweight &&
+    state.nutrition === lastNutrition
+  )
+    return;
   lastProgram = state.program;
   lastSessions = state.sessions;
+  lastBodyweight = state.bodyweight;
+  lastNutrition = state.nutrition;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
     try {
@@ -278,7 +371,7 @@ useAfterburn.subscribe((state) => {
       if (!session) return;
       const ts = new Date().toISOString();
       const { error } = await supabase.from('workout_data').upsert(
-        { id: session.user.id, data: { program: state.program, sessions: state.sessions }, updated_at: ts },
+        { id: session.user.id, data: { program: state.program, sessions: state.sessions, bodyweight: state.bodyweight, nutrition: state.nutrition }, updated_at: ts },
         { onConflict: 'id' },
       );
       if (error) {

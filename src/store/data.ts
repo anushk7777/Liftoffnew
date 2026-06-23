@@ -88,6 +88,7 @@ export interface FocusSession {
   durationMins: number;
   kind: 'focus' | 'break';
   taskTitle?: string;
+  taskId?: string; // links the session to a TodoTask when focused on one
 }
 
 export interface PomodoroSettings {

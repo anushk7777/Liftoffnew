@@ -34,13 +34,25 @@ function readSavedFocus(): SavedFocus | null {
 }
 
 export default function Focus() {
-  const { pomodoro, focusSessions, logFocusSession } = useStore();
+  const { pomodoro, focusSessions, logFocusSession, tasks, focusTaskId, setFocusTaskId } = useStore();
 
   const [saved] = useState<SavedFocus | null>(() => readSavedFocus());
 
   const [mode, setMode] = useState<Mode>(saved?.mode ?? 'focus');
   const [round, setRound] = useState(saved?.round ?? 1);
-  const [taskLabel, setTaskLabel] = useState(saved?.taskLabel ?? '');
+  // Consume a task pushed from the Tasks page ("Focus on this") at mount.
+  const [taskId, setTaskId] = useState<string | null>(() => useStore.getState().focusTaskId ?? null);
+  const [taskLabel, setTaskLabel] = useState(() => {
+    if (saved?.taskLabel) return saved.taskLabel;
+    const id = useStore.getState().focusTaskId;
+    return (id && useStore.getState().tasks.find((t) => t.id === id)?.title) || '';
+  });
+  const openTasks = tasks.filter((t) => t.status !== 'done');
+
+  // Clear the one-shot push marker once consumed.
+  useEffect(() => {
+    if (focusTaskId) setFocusTaskId(null);
+  }, [focusTaskId, setFocusTaskId]);
   const [endsAt, setEndsAt] = useState<number | null>(() =>
     saved && saved.endsAt > Date.now() ? saved.endsAt : null,
   );
@@ -81,14 +93,14 @@ export default function Focus() {
   const handleComplete = useCallback(() => {
     beep();
     if (mode === 'focus') {
-      logFocusSession(pomodoro.focusMins, 'focus', taskLabel.trim() || undefined);
+      logFocusSession(pomodoro.focusMins, 'focus', taskLabel.trim() || undefined, taskId ?? undefined);
       const isLong = round % pomodoro.roundsBeforeLong === 0;
       switchMode(isLong ? 'longBreak' : 'shortBreak', round);
     } else {
       logFocusSession(modeMinutes(mode), 'break');
       switchMode('focus', round + 1);
     }
-  }, [mode, round, pomodoro, taskLabel, logFocusSession, switchMode, modeMinutes]);
+  }, [mode, round, pomodoro, taskLabel, taskId, logFocusSession, switchMode, modeMinutes]);
 
   const completeRef = useRef(handleComplete);
   useEffect(() => {
@@ -243,12 +255,36 @@ export default function Focus() {
         </div>
 
         {mode === 'focus' && (
-          <input
-            value={taskLabel}
-            onChange={(e) => setTaskLabel(e.target.value)}
-            placeholder="What are you working on?"
-            className="input max-w-sm mt-6 text-center"
-          />
+          <div className="w-full max-w-sm mt-6 space-y-2">
+            <input
+              value={taskLabel}
+              onChange={(e) => {
+                setTaskLabel(e.target.value);
+                setTaskId(null); // free-form text unlinks any picked task
+              }}
+              placeholder="What are you working on?"
+              className="input w-full text-center"
+            />
+            {openTasks.length > 0 && (
+              <select
+                value={taskId ?? ''}
+                onChange={(e) => {
+                  const t = openTasks.find((x) => x.id === e.target.value);
+                  setTaskId(t ? t.id : null);
+                  if (t) setTaskLabel(t.title);
+                }}
+                className="input w-full text-sm"
+              >
+                <option value="">— or pick one of your tasks —</option>
+                {openTasks.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+            )}
+            {taskId && <p className="text-[11px] text-accent text-center">Linked to a task · time logs against it</p>}
+          </div>
         )}
       </div>
 
