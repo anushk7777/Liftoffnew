@@ -113,22 +113,19 @@ interface GeminiChunk {
 }
 
 /**
- * Stream a coaching response from Google Gemini. Calls `onText` with each chunk.
+ * Generic Gemini streaming helper (BYOK). Streams the model's reply to `onText`.
+ * Reused by both the productivity coach and the Afterburn workout coach.
  * Throws on missing key or API error (caller surfaces the message).
  */
-export async function generateCoaching(opts: {
-  state: CoachState;
-  question?: string;
+export async function streamGemini(opts: {
+  system: string;
+  user: string;
   onText: (chunk: string) => void;
+  maxOutputTokens?: number;
+  temperature?: number;
 }): Promise<void> {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('Add your free Google Gemini API key in Settings → AI Coach first.');
-
-  const context = buildContext(opts.state);
-  const q = opts.question?.trim();
-  const userText = q
-    ? `My current data:\n\n${context}\n\nMy question: ${q}`
-    : `My current data:\n\n${context}\n\nGive me a short, personalized briefing: where I stand against my goal, then my top 3 priorities right now — each tied to a specific task or habit above.`;
 
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${getModel()}` +
@@ -138,9 +135,9 @@ export async function generateCoaching(opts: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents: [{ role: 'user', parts: [{ text: userText }] }],
-      generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
+      system_instruction: { parts: [{ text: opts.system }] },
+      contents: [{ role: 'user', parts: [{ text: opts.user }] }],
+      generationConfig: { maxOutputTokens: opts.maxOutputTokens ?? 1024, temperature: opts.temperature ?? 0.7 },
     }),
   });
 
@@ -181,4 +178,20 @@ export async function generateCoaching(opts: {
       }
     }
   }
+}
+
+/**
+ * Stream a coaching response from Google Gemini for the productivity app.
+ */
+export async function generateCoaching(opts: {
+  state: CoachState;
+  question?: string;
+  onText: (chunk: string) => void;
+}): Promise<void> {
+  const context = buildContext(opts.state);
+  const q = opts.question?.trim();
+  const user = q
+    ? `My current data:\n\n${context}\n\nMy question: ${q}`
+    : `My current data:\n\n${context}\n\nGive me a short, personalized briefing: where I stand against my goal, then my top 3 priorities right now — each tied to a specific task or habit above.`;
+  await streamGemini({ system: SYSTEM_PROMPT, user, onText: opts.onText });
 }

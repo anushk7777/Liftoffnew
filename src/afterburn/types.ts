@@ -52,7 +52,7 @@ export interface LoggedSet {
 export interface LoggedExercise {
   exerciseId: string;
   name: string;
-  target: { reps: string; rpe?: string; percent1RM?: string; tempo?: string };
+  target: { reps: string; rpe?: string; percent1RM?: string; tempo?: string; rest?: string };
   sets: LoggedSet[];
   notes: string;
 }
@@ -66,4 +66,12 @@ export interface WorkoutSession {
   date: string; // ISO — when started
   completedAt?: string; // ISO — when finished
   entries: LoggedExercise[];
+}
+
+/** A bodyweight check-in for the Progress tab. */
+export interface BodyEntry {
+  id: string;
+  date: string; // ISO
+  weight: number;
+  note?: string;
 }

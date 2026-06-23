@@ -95,7 +95,11 @@ interface AppState {
   pomodoro: PomodoroSettings;
   setPomodoro: (updates: Partial<PomodoroSettings>) => void;
   focusSessions: FocusSession[];
-  logFocusSession: (durationMins: number, kind: 'focus' | 'break', taskTitle?: string) => void;
+  logFocusSession: (durationMins: number, kind: 'focus' | 'break', taskTitle?: string, taskId?: string) => void;
+
+  // Task pushed into Focus (runtime-only, not persisted/synced)
+  focusTaskId: string | null;
+  setFocusTaskId: (id: string | null) => void;
 
   // Gamification & Stats
   streak: number;
@@ -115,7 +119,7 @@ interface AppState {
   importData: (jsonStr: string) => void;
 }
 
-const NON_PERSISTED = new Set(['_initialized', 'deviceId']);
+const NON_PERSISTED = new Set(['_initialized', 'deviceId', 'focusTaskId']);
 
 // The persisted/synced slice of state: everything except functions and the
 // runtime-only / device-local fields above.
@@ -415,13 +419,16 @@ export const useStore = create<AppState>()(
   pomodoro: defaultPomodoro,
   setPomodoro: (updates) => set((s) => ({ pomodoro: { ...s.pomodoro, ...updates } })),
   focusSessions: [],
-  logFocusSession: (durationMins, kind, taskTitle) =>
+  logFocusSession: (durationMins, kind, taskTitle, taskId) =>
     set((state) => ({
       focusSessions: [
-        { id: uid(), date: nowISO(), durationMins, kind, taskTitle },
+        { id: uid(), date: nowISO(), durationMins, kind, taskTitle, taskId },
         ...state.focusSessions,
       ].slice(0, 1000),
     })),
+
+  focusTaskId: null,
+  setFocusTaskId: (id) => set({ focusTaskId: id }),
 
   // ---- Gamification ----
   streak: 0,

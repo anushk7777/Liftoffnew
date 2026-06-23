@@ -1,9 +1,15 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
-import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid } from 'lucide-react';
+import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid, TrendingUp, Timer, Calculator, ArrowRight, Search, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance } from './store';
+import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance, restToSeconds } from './store';
 import ProgramLibrary from './ProgramLibrary';
+import Progress from './Progress';
+import Coach from './Coach';
+import PlateCalc from './PlateCalc';
+import { beep } from '../lib/sound';
+import { haptics } from '../lib/haptics';
+import { notificationsSupported } from '../lib/reminders';
 import type { LoggedSet, ProgramDay, ProgramExercise, WeightUnit, WorkoutSession } from './types';
 
 // ---------- small inputs ----------
@@ -139,9 +145,18 @@ function Header() {
           <Flame className="w-5 h-5 text-orange-400" />
           <span className="font-display font-bold">Liftoff Afterburn</span>
         </div>
-        <button onClick={() => setMode('focus')} className="btn btn-secondary !py-1.5 !px-3 text-xs">
-          <Rocket className="w-4 h-4" /> Focus
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => window.dispatchEvent(new Event('liftoff:search'))}
+            className="btn btn-secondary !py-1.5 !px-2.5 text-xs"
+            aria-label="Search everything"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+          <button onClick={() => setMode('focus')} className="btn btn-secondary !py-1.5 !px-3 text-xs">
+            <Rocket className="w-4 h-4" /> Focus
+          </button>
+        </div>
       </div>
     </header>
   );
@@ -230,6 +245,16 @@ function ProgramView({ onStart }: { onStart: () => void }) {
                 </>
               )}
             </p>
+          )}
+
+          {/* Auto-advance prompt when the week is complete and another follows. */}
+          {week && weekDone === week.days.length && weekIdx < program.weeks.length - 1 && (
+            <button
+              onClick={() => setCurrentWeek(program.weeks[weekIdx + 1].id)}
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-accent/40 bg-accent-soft/40 px-3 py-2.5 text-sm font-medium text-ink hover:bg-accent-soft/60 transition-colors"
+            >
+              Week complete — start {program.weeks[weekIdx + 1].name} <ArrowRight className="w-4 h-4" />
+            </button>
           )}
 
           {week?.days.map((d) => renderDay(d, week?.id))}
@@ -404,7 +429,19 @@ function AddExerciseForm({ dayId }: { dayId: string }) {
 }
 
 // ---------- logger ----------
-function SetRow({ exIdx, setIdx, set, unit }: { exIdx: number; setIdx: number; set: LoggedSet; unit: WeightUnit }) {
+function SetRow({
+  exIdx,
+  setIdx,
+  set,
+  unit,
+  onDone,
+}: {
+  exIdx: number;
+  setIdx: number;
+  set: LoggedSet;
+  unit: WeightUnit;
+  onDone: (becameDone: boolean) => void;
+}) {
   const updateSet = useAfterburn((s) => s.updateSet);
   const u = (patch: Partial<LoggedSet>) => updateSet(exIdx, setIdx, patch);
   return (
@@ -415,7 +452,11 @@ function SetRow({ exIdx, setIdx, set, unit }: { exIdx: number; setIdx: number; s
         <NumInput value={set.reps} onChange={(v) => u({ reps: v })} placeholder="reps" />
         <NumInput value={set.rpe} onChange={(v) => u({ rpe: v })} placeholder="RPE" />
         <button
-          onClick={() => u({ done: !set.done })}
+          onClick={() => {
+            const next = !set.done;
+            u({ done: next });
+            onDone(next);
+          }}
           className={cn('shrink-0 w-8 h-8 rounded-md flex items-center justify-center border', set.done ? 'bg-success text-white border-success' : 'border-border text-ink-subtle hover:text-ink')}
           aria-label="Mark set done"
         >
@@ -425,6 +466,24 @@ function SetRow({ exIdx, setIdx, set, unit }: { exIdx: number; setIdx: number; s
       <div className="mt-1.5 pl-9">
         <Stars value={set.rating} onChange={(v) => u({ rating: v })} />
       </div>
+    </div>
+  );
+}
+
+// Sticky rest countdown shown above the logger footer. Beeps + vibrates at 0.
+function RestBar({ secondsLeft, onAdd, onSkip }: { secondsLeft: number; onAdd: (d: number) => void; onSkip: () => void }) {
+  const m = Math.floor(secondsLeft / 60);
+  const s = secondsLeft % 60;
+  return (
+    <div className="mx-auto max-w-2xl mb-2 flex items-center gap-2 rounded-lg border border-accent/40 bg-accent-soft/40 px-3 py-2">
+      <Timer className="w-4 h-4 text-accent shrink-0" />
+      <span className="font-mono-data font-bold text-ink tabular-nums">
+        {m}:{String(s).padStart(2, '0')}
+      </span>
+      <span className="text-xs text-ink-subtle flex-1">rest</span>
+      <button onClick={() => onAdd(-15)} className="btn btn-secondary !py-1 !px-2 text-xs">−15s</button>
+      <button onClick={() => onAdd(15)} className="btn btn-secondary !py-1 !px-2 text-xs">+15s</button>
+      <button onClick={onSkip} className="btn btn-secondary !py-1 !px-2 text-xs">Skip</button>
     </div>
   );
 }
@@ -439,16 +498,57 @@ function Logger({ onFinish }: { onFinish: () => void }) {
   const removeSet = useAfterburn((s) => s.removeSet);
   const setExerciseNotes = useAfterburn((s) => s.setExerciseNotes);
   const updateSet = useAfterburn((s) => s.updateSet);
+  const [plateOpen, setPlateOpen] = useState(false);
+
+  // Rest timer: counts down from an endsAt timestamp; alerts once at zero.
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const firedRef = useRef(false);
+  useEffect(() => {
+    if (restEndsAt === null) return;
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [restEndsAt]);
+  const secondsLeft = restEndsAt ? Math.max(0, Math.ceil((restEndsAt - now) / 1000)) : 0;
+  useEffect(() => {
+    if (restEndsAt !== null && secondsLeft === 0 && !firedRef.current) {
+      firedRef.current = true;
+      beep();
+      haptics.success();
+      if (notificationsSupported() && Notification.permission === 'granted') {
+        try {
+          new Notification('Rest over', { body: 'Time for your next set 💪', tag: 'afterburn-rest' });
+        } catch {
+          /* notification best-effort */
+        }
+      }
+      const t = setTimeout(() => setRestEndsAt(null), 4000); // auto-dismiss the bar
+      return () => clearTimeout(t);
+    }
+  }, [restEndsAt, secondsLeft]);
+  const startRest = (sec: number) => {
+    if (sec <= 0) return;
+    firedRef.current = false;
+    setNow(() => Date.now());
+    setRestEndsAt(() => Date.now() + sec * 1000);
+  };
 
   return (
-    <div className="space-y-4 pb-32">
-      <div>
-        {draft.weekName && <p className="text-xs font-semibold text-orange-400">{draft.weekName}</p>}
-        <h1 className="font-display text-xl font-bold">{draft.dayName}</h1>
-        <p className="text-xs text-ink-subtle">{format(new Date(draft.date), 'EEEE, MMM d · h:mm a')}</p>
+    <div className="space-y-4 pb-36">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          {draft.weekName && <p className="text-xs font-semibold text-orange-400">{draft.weekName}</p>}
+          <h1 className="font-display text-xl font-bold">{draft.dayName}</h1>
+          <p className="text-xs text-ink-subtle">{format(new Date(draft.date), 'EEEE, MMM d · h:mm a')}</p>
+        </div>
+        <button onClick={() => setPlateOpen(true)} className="btn btn-secondary !py-1.5 !px-2.5 text-xs shrink-0">
+          <Calculator className="w-4 h-4" /> Plates
+        </button>
       </div>
+      <PlateCalc open={plateOpen} onClose={() => setPlateOpen(false)} unit={unit} />
 
       {draft.entries.map((ex, exIdx) => {
+        const restSec = restToSeconds(ex.target.rest);
         const last = lastPerformance(sessions, ex.name);
         const prefill = () => {
           if (!last) return;
@@ -497,7 +597,14 @@ function Logger({ onFinish }: { onFinish: () => void }) {
             </div>
             <div className="space-y-2">
               {ex.sets.map((set, setIdx) => (
-                <SetRow key={set.id} exIdx={exIdx} setIdx={setIdx} set={set} unit={unit} />
+                <SetRow
+                  key={set.id}
+                  exIdx={exIdx}
+                  setIdx={setIdx}
+                  set={set}
+                  unit={unit}
+                  onDone={(becameDone) => becameDone && startRest(restSec)}
+                />
               ))}
             </div>
           </div>
@@ -527,6 +634,13 @@ function Logger({ onFinish }: { onFinish: () => void }) {
         className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur border-t border-border px-3 pt-3"
         style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
       >
+        {restEndsAt !== null && (
+          <RestBar
+            secondsLeft={secondsLeft}
+            onAdd={(d) => setRestEndsAt((e) => (e === null ? e : Math.max(Date.now(), e + d * 1000)))}
+            onSkip={() => setRestEndsAt(null)}
+          />
+        )}
         <div className="mx-auto max-w-2xl flex gap-2">
           <button onClick={cancelDraft} className="btn btn-secondary flex-1">Cancel</button>
           <button onClick={() => { finishDraft(); onFinish(); }} className="btn btn-primary flex-1">
@@ -621,7 +735,7 @@ function HistoryView() {
 }
 
 // ---------- root ----------
-type Tab = 'workout' | 'history' | 'programs';
+type Tab = 'workout' | 'history' | 'progress' | 'coach' | 'programs';
 
 export default function Afterburn() {
   const draft = useAfterburn((s) => s.draft);
@@ -638,6 +752,8 @@ export default function Afterburn() {
   const TABS: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
     { id: 'workout', label: 'Workout', icon: Flame },
     { id: 'history', label: 'History', icon: Check },
+    { id: 'progress', label: 'Progress', icon: TrendingUp },
+    { id: 'coach', label: 'Coach', icon: Sparkles },
     { id: 'programs', label: 'Programs', icon: LayoutGrid },
   ];
 
@@ -647,8 +763,8 @@ export default function Afterburn() {
       <div className="relative z-10">
         <Header />
         {!draft && (
-          <div className="mx-auto max-w-2xl px-4 pt-4">
-            <div className="flex bg-elevated p-0.5 rounded-lg border border-border w-fit">
+          <div className="mx-auto max-w-2xl px-4 pt-4 overflow-x-auto custom-scrollbar">
+            <div className="flex bg-elevated p-0.5 rounded-lg border border-border w-max">
               {TABS.map((t) => (
                 <button
                   key={t.id}
@@ -663,11 +779,15 @@ export default function Afterburn() {
         )}
         <main className="mx-auto max-w-2xl px-4 py-4">
           {draft ? (
-            <Logger onFinish={() => setTab('history')} />
+            <Logger onFinish={() => setTab('workout')} />
           ) : tab === 'programs' ? (
             <ProgramLibrary onPicked={() => setTab('workout')} />
           ) : tab === 'history' ? (
             <HistoryView />
+          ) : tab === 'progress' ? (
+            <Progress />
+          ) : tab === 'coach' ? (
+            <Coach />
           ) : (
             <ProgramView onStart={() => undefined} />
           )}

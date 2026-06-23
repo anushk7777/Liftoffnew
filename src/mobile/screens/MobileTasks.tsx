@@ -6,7 +6,8 @@ import { cn } from '../../lib/utils';
 import { haptics } from '../../lib/haptics';
 import { PriorityDot } from '../../components/ui';
 import { SwipeRow } from '../components/SwipeRow';
-import type { Status } from '../../store/data';
+import { TaskModal } from '../../pages/Tasks';
+import type { Status, TodoTask } from '../../store/data';
 
 type Filter = 'all' | 'todo' | 'doing' | 'done';
 const FILTERS: { key: Filter; label: string }[] = [
@@ -23,8 +24,9 @@ function StatusIcon({ status }: { status: Status }) {
 }
 
 export default function MobileTasks() {
-  const { tasks, cycleTaskStatus, setTaskStatus, deleteTask } = useStore();
+  const { tasks, cycleTaskStatus, setTaskStatus, deleteTask, updateTask } = useStore();
   const [filter, setFilter] = useState<Filter>('all');
+  const [editing, setEditing] = useState<TodoTask | null>(null);
 
   const filtered = useMemo(() => {
     const base = filter === 'all' ? tasks : tasks.filter((t) => t.status === filter);
@@ -77,11 +79,12 @@ export default function MobileTasks() {
                     >
                       <StatusIcon status={task.status} />
                     </button>
-                    <div className="flex-1 min-w-0">
+                    <button onClick={() => setEditing(task)} className="flex-1 min-w-0 text-left" aria-label="Open task">
                       <div className="flex items-center gap-2">
                         <PriorityDot priority={task.priority} />
                         <p className={cn('truncate text-base', task.status === 'done' && 'line-through text-ink-muted')}>{task.title}</p>
                       </div>
+                      {task.notes && <p className="truncate text-[11px] text-on-surface-variant mt-0.5">{task.notes}</p>}
                       {(task.dueDate || task.scheduledAt) && (
                         <p className={cn('text-[11px] font-mono-data text-on-surface-variant mt-0.5', overdue && 'text-danger')}>
                           {task.scheduledAt
@@ -89,7 +92,7 @@ export default function MobileTasks() {
                             : `${overdue ? 'Overdue · ' : 'Due '}${format(new Date(task.dueDate!), 'MMM d')}`}
                         </p>
                       )}
-                    </div>
+                    </button>
                     <button
                       onClick={() => { deleteTask(task.id); haptics.warn(); }}
                       aria-label="Delete task"
@@ -111,6 +114,16 @@ export default function MobileTasks() {
       >
         <Plus className="w-4 h-4" /> New task
       </button>
+
+      <TaskModal
+        open={!!editing}
+        editing={editing}
+        onClose={() => setEditing(null)}
+        onSave={(d) => {
+          if (editing) updateTask(editing.id, d);
+          setEditing(null);
+        }}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
@@ -10,6 +11,7 @@ import {
   CircleDot,
   Clock,
   Calendar,
+  Timer,
 } from 'lucide-react';
 import { format, isToday, isPast, startOfDay } from 'date-fns';
 import { useStore } from '../store/useStore';
@@ -290,7 +292,7 @@ function TaskRow({
   );
 }
 
-function TaskModal({
+export function TaskModal({
   open,
   onClose,
   editing,
@@ -325,6 +327,8 @@ function TaskForm({
   onClose: () => void;
   onSave: (data: Partial<TodoTask>) => void;
 }) {
+  const navigate = useNavigate();
+  const setFocusTaskId = useStore((s) => s.setFocusTaskId);
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const [title, setTitle] = useState(editing?.title ?? '');
   const [notes, setNotes] = useState(editing?.notes ?? '');
@@ -465,23 +469,40 @@ function TaskForm({
           />
         </div>
 
-        {/* Notes + Actions in one row */}
-        <div className="flex items-end gap-3 pt-1">
+        {/* Description */}
+        <div className="pt-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle mb-1 block">Description</span>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Notes (optional)"
-            rows={1}
-            className="input resize-none text-sm flex-1"
+            placeholder="Add details, links, sub-steps…"
+            rows={3}
+            className="input resize-y text-sm w-full"
           />
-          <div className="flex gap-2 shrink-0">
-            <button type="button" onClick={onClose} className="btn btn-secondary">
-              Cancel
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 pt-1">
+          {editing && (
+            <button
+              type="button"
+              onClick={() => {
+                onSave({ title: title.trim() || editing.title, notes });
+                setFocusTaskId(editing.id);
+                onClose();
+                navigate('/focus');
+              }}
+              className="btn btn-secondary mr-auto"
+            >
+              <Timer className="w-4 h-4" /> Focus on this
             </button>
-            <button type="submit" className="btn btn-primary">
-              {editing ? 'Save' : 'Add task'}
-            </button>
-          </div>
+          )}
+          <button type="button" onClick={onClose} className={cn('btn btn-secondary', !editing && 'ml-auto')}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary">
+            {editing ? 'Save' : 'Add task'}
+          </button>
         </div>
     </form>
   );
