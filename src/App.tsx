@@ -191,9 +191,7 @@ function Shell() {
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative z-10">
         {/* Decorative background */}
-        <div className="absolute top-0 right-0 w-[400px] h-[400px] z-0 pointer-events-none overflow-visible flex items-center justify-center bg-transparent">
-          <img alt="Glowing moon" className="w-[380px] h-[380px] object-contain mix-blend-screen opacity-50 transform translate-x-10 -translate-y-10" src="https://lh3.googleusercontent.com/aida/AP1WRLsozTQcci_eKwFiNlWjSiaryhyrkTTRaDy-r2t1v_2VRRgtuo-cN2RlK6n0qgGvuXT5R_tGjPGZLoOOp0YiOEKj3xAp2i0iPGBrpOVKMiM8bnKeHZo1Ag7M85Dms_eVV0vOVrPm36wiVqUiTCI9oCjPqArExJkfy9TB4o5iv8t8EknV918RBLuLbqlDAJKCwHN8WPQp-XL7IHp9t-XB0QL7EqH1Ne_g6ZAeqx2kSE_Ju-6ASU8Rm9c4GXB2" style={{ filter: 'drop-shadow(rgba(255, 248, 231, 0.1) 0px 0px 40px)' }} />
-        </div>
+        <div className="absolute top-0 right-0 w-[420px] h-[420px] z-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 70% 30%, rgba(255,255,255,0.06), transparent 60%)' }}></div>
 
         <main className="flex-1 overflow-y-auto custom-scrollbar">
           <div className="mx-auto w-full px-5 py-7 sm:px-8 sm:py-10 pb-12 transition-all duration-300 max-w-7xl">
@@ -224,7 +222,7 @@ function Shell() {
         onClick={() => setQuickAddOpen(true)}
         aria-label="Quick add task (Ctrl/Cmd N)"
         title="Quick add (Ctrl/⌘ N)"
-        className="fixed bottom-8 right-8 z-40 w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary text-on-primary shadow-[0_0_20px_-3px_rgba(192,193,255,0.4)] flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+        className="fixed bottom-8 right-8 z-40 w-16 h-16 rounded-full bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
       >
         <Plus className="w-8 h-8" />
       </button>

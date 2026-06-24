@@ -110,7 +110,7 @@ export default function Progress() {
                 ))}
               </div>
             </div>
-            <Chart points={liftPoints} unit={unit} accent="#fb923c" />
+            <Chart points={liftPoints} unit={unit} accent="#f4f3f1" />
           </div>
         )}
       </section>

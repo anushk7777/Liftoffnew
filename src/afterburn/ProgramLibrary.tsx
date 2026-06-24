@@ -49,13 +49,13 @@ export default function ProgramLibrary({ onPicked }: { onPicked: () => void }) {
               onClick={() => pick(t)}
               className={cn(
                 'card w-full p-4 flex items-center gap-4 text-left transition-colors',
-                disabled ? 'opacity-60 cursor-not-allowed' : 'hover:border-orange-400/50 hover:bg-hover',
+                disabled ? 'opacity-60 cursor-not-allowed' : 'hover:border-[var(--border-strong)] hover:bg-hover',
               )}
             >
               <div
                 className={cn(
                   'w-12 h-12 rounded-xl flex items-center justify-center shrink-0',
-                  disabled ? 'bg-elevated text-ink-subtle' : 'bg-orange-500/15 text-orange-400',
+                  disabled ? 'bg-elevated text-ink-subtle' : 'bg-[var(--accent-soft)] text-[var(--text)]',
                 )}
               >
                 {disabled ? <Lock className="w-5 h-5" /> : icon(t)}

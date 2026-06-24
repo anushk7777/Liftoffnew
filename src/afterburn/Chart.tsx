@@ -61,7 +61,7 @@ export default function Chart({
           </p>
           <p className="text-xs text-ink-subtle">
             {points.length} entries ·{' '}
-            <span className={delta === 0 ? 'text-ink-subtle' : delta > 0 ? 'text-success' : 'text-orange-400'}>
+            <span className={delta === 0 ? 'text-ink-subtle' : delta > 0 ? 'text-success' : 'text-[var(--accent)]'}>
               {delta > 0 ? '+' : ''}
               {delta} {unit} overall
             </span>

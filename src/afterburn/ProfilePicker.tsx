@@ -30,10 +30,10 @@ export default function ProfilePicker() {
 
           <button
             onClick={() => setMode('afterburn')}
-            className="card p-7 text-left hover:border-orange-400/50 hover:bg-hover transition-colors group"
+            className="card p-7 text-left hover:border-[var(--border-strong)] hover:bg-hover transition-colors group"
           >
-            <div className="w-12 h-12 rounded-xl bg-orange-500/15 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-              <Flame className="w-6 h-6 text-orange-400" />
+            <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <Flame className="w-6 h-6 text-[var(--accent)]" />
             </div>
             <h2 className="font-display text-xl font-bold">Liftoff Afterburn</h2>
             <p className="text-sm text-ink-muted mt-1">

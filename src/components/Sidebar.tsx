@@ -40,14 +40,11 @@ export default function Sidebar({
   return (
     <nav className="flex flex-col h-full py-6 px-4 w-64 bg-[var(--bg)] border-r border-white/5 z-50 transition-colors duration-300">
       {/* Brand / Header */}
-      <div className="flex items-center gap-3 mb-10 pl-2">
-        <div className="w-10 h-10 rounded-xl overflow-hidden neo-button shrink-0 shadow-lg">
-           <img src="/logo.png" alt="Liftoff Logo" className="w-full h-full object-cover" />
-        </div>
-        <div>
-          <h1 className="font-display text-2xl font-bold text-[var(--accent)] tracking-tight">Liftoff</h1>
-          <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">High Performance</p>
-        </div>
+      <div className="flex items-center gap-3 mb-10 pl-2 text-[var(--text)]">
+        <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true" className="shrink-0">
+          <path d="M12 2 L20 21 L12 16.5 L4 21 Z" fill="currentColor" />
+        </svg>
+        <span className="text-[28px] leading-none" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>Liftoff</span>
       </div>
 
       {/* Navigation Tabs */}
@@ -62,8 +59,8 @@ export default function Sidebar({
                 cn(
                   'flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-all duration-200 active:scale-95',
                   isActive 
-                    ? 'text-[var(--accent)] font-bold neo-pressed' 
-                    : 'text-[var(--text-muted)] hover:text-[var(--accent)] hover:neo-button'
+                    ? 'bg-[var(--accent)] text-[var(--accent-text)] font-semibold' 
+                    : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:neo-button'
                 )
               }
             >
@@ -78,7 +75,7 @@ export default function Sidebar({
       <div className="mt-auto pt-4 space-y-3 border-t border-white/5">
         <button
           onClick={() => setAppMode('afterburn')}
-          className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-orange-400 font-medium hover:neo-button transition-all duration-200 active:scale-95"
+          className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[var(--text-muted)] font-medium hover:text-[var(--text)] hover:neo-button transition-all duration-200 active:scale-95"
         >
           <Flame className="w-5 h-5 shrink-0" />
           <span className="font-body text-sm">Afterburn (workouts)</span>

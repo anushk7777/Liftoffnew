@@ -47,7 +47,7 @@ export default function PlateCalc({ open, onClose, unit }: { open: boolean; onCl
               <p className="text-sm text-ink">Just the bar.</p>
             )}
             {result.remaining > 0 && (
-              <p className="text-xs text-orange-400">
+              <p className="text-xs text-[var(--accent)]">
                 {result.remaining}{unit} per side can't be made with standard plates — round to the nearest loadable weight.
               </p>
             )}

@@ -62,7 +62,7 @@ export default function Coach() {
       ) : (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-orange-400" />
+            <Sparkles className="w-5 h-5 text-[var(--accent)]" />
             <div>
               <h2 className="font-display text-xl font-bold">AI coach</h2>
               <p className="text-xs text-ink-subtle">Grounded in your logged training + nutrition · {modelShortLabel()}</p>
