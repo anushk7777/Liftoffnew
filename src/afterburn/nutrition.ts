@@ -15,6 +15,7 @@ export type Sex = 'male' | 'female';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'very' | 'extra';
 export type BmrMethod = 'mifflin' | 'harris' | 'katch' | 'etf';
 export type Goal = 'aggressive_cut' | 'cut' | 'slight_cut' | 'maintain' | 'lean_gain' | 'gain';
+export type DietStyle = 'balanced' | 'higher_carb' | 'higher_fat';
 
 export interface NutritionProfile {
   sex: Sex;
@@ -29,6 +30,7 @@ export interface NutritionProfile {
   fatPct?: number; // optional override (% of kcal)
   cycling?: boolean; // calorie cycling (zig-zag) on training vs rest days
   trainingDays?: number; // 1–6 training days/week for cycling
+  dietStyle?: DietStyle; // carb:fat ratio preference (Module 2, Lecture 11)
 }
 
 export const DEFAULT_NUTRITION: NutritionProfile = {
@@ -41,6 +43,7 @@ export const DEFAULT_NUTRITION: NutritionProfile = {
   method: 'mifflin',
   cycling: false,
   trainingDays: 4,
+  dietStyle: 'balanced',
 };
 
 export const ACTIVITY: { id: ActivityLevel; label: string; mult: number; etf: number }[] = [
@@ -60,8 +63,18 @@ export const GOALS: { id: Goal; label: string; pct: number; proteinPerKg: number
   { id: 'gain', label: 'Muscle gain (+17.5%)', pct: 0.175, proteinPerKg: 1.8 },
 ];
 
+// Diet style sets the fat share of calories; carbs take the remainder, so a
+// lower-fat style means more carbs (and vice-versa). Protein & total kcal are
+// unchanged. Fat 15–30% of energy is the evidence-based band. [Lecture 11]
+export const DIET_STYLES: { id: DietStyle; label: string; fatPct: number; hint: string }[] = [
+  { id: 'higher_carb', label: 'Higher-carb', fatPct: 20, hint: 'Best when lean & insulin-sensitive or training high volume — carbs fuel performance.' },
+  { id: 'balanced', label: 'Balanced', fatPct: 25, hint: 'A sensible default split of carbs and fat.' },
+  { id: 'higher_fat', label: 'Higher-fat', fatPct: 35, hint: 'Can suit insulin resistance or a preference for fattier foods — still keeps protein fixed.' },
+];
+
 const activityOf = (a: ActivityLevel) => ACTIVITY.find((x) => x.id === a) ?? ACTIVITY[2];
 const goalOf = (g: Goal) => GOALS.find((x) => x.id === g) ?? GOALS[3];
+const dietStyleOf = (d: DietStyle | undefined) => DIET_STYLES.find((x) => x.id === d) ?? DIET_STYLES[1];
 
 export function leanBodyMassKg(p: NutritionProfile): number | null {
   if (p.bodyFatPct == null || p.bodyFatPct <= 0 || p.bodyFatPct >= 60) return null;
@@ -111,7 +124,12 @@ export interface NutritionTargets {
   fatG: number;
   carbG: number;
   fiberG: number;
-  proteinPerMeal: number; // across 4 meals
+  recommendedMeals: number; // meals that keep each protein dose in the 25–40 g MPS band
+  proteinPerMealG: number; // protein per recommended meal
+  fatPerKg: number; // fat grams ÷ bodyweight
+  carbPerKg: number; // carb grams ÷ bodyweight
+  dietStyle: DietStyle;
+  warnings: string[]; // macro-quality flags (Module 2)
   weeklyDeltaKg: number; // projected, START estimate only
   weeklyDeltaPctBW: number; // projected weekly change as % of bodyweight
   rateFlag: RateFlag; // pace guardrail (per Lecture 7)
@@ -157,15 +175,32 @@ export function computeTargets(p: NutritionProfile): NutritionTargets | null {
   const basis: 'bodyweight' | 'lean mass' = lbm != null ? 'lean mass' : 'bodyweight';
   const proteinG = round(proteinPerKg * (lbm ?? p.weightKg));
 
-  const fatPct = p.fatPct ?? 25;
-  let fatG = round((goalCalories * (fatPct / 100)) / 9);
+  const style = dietStyleOf(p.dietStyle);
+  const fatPct = p.fatPct ?? style.fatPct;
   const fatFloor = round(0.6 * p.weightKg); // hormonal floor
-  if (fatG < fatFloor) fatG = fatFloor;
+  const rawFatG = round((goalCalories * (fatPct / 100)) / 9);
+  const fatFloored = rawFatG < fatFloor;
+  const fatG = fatFloored ? fatFloor : rawFatG;
 
   const carbG = Math.max(0, round((goalCalories - proteinG * 4 - fatG * 9) / 4));
   const fiberG = round((goalCalories / 1000) * 14);
   const weeklyDeltaKg = Math.round((((goalCalories - tdee) * 7) / 7700) * 100) / 100;
   const weeklyDeltaPctBW = p.weightKg > 0 ? Math.round((weeklyDeltaKg / p.weightKg) * 1000) / 10 : 0;
+
+  // Per-meal protein optimizer: target the 25–40 g/meal MPS window. [Lecture 8]
+  const recommendedMeals = Math.min(6, Math.max(3, round(proteinG / 33)));
+  const proteinPerMealG = round(proteinG / recommendedMeals);
+
+  const per1 = (n: number) => Math.round((n / p.weightKg) * 10) / 10;
+  const fatPerKg = p.weightKg > 0 ? per1(fatG) : 0;
+  const carbPerKg = p.weightKg > 0 ? per1(carbG) : 0;
+
+  // Macro-quality warnings (Module 2). Carbs expected to be low when cutting,
+  // so only flag low carbs outside a deliberate deficit.
+  const warnings: string[] = [];
+  if (fatFloored) warnings.push('Fat held at its 0.6 g/kg floor — at this calorie level a higher-carb split would push fat too low for healthy testosterone, fat-soluble vitamin (A/D/E/K) absorption and joints.');
+  if (carbPerKg < 2 && g.pct >= 0) warnings.push('Carbs are low (<2 g/kg) — can blunt thyroid output, energy and high-volume training.');
+  if (proteinPerMealG > 40) warnings.push('Per-meal protein is high (>40 g) — spreading it across more meals better stimulates muscle protein synthesis.');
 
   return {
     method,
@@ -176,7 +211,12 @@ export function computeTargets(p: NutritionProfile): NutritionTargets | null {
     fatG,
     carbG,
     fiberG,
-    proteinPerMeal: round(proteinG / 4),
+    recommendedMeals,
+    proteinPerMealG,
+    fatPerKg,
+    carbPerKg,
+    dietStyle: style.id,
+    warnings,
     weeklyDeltaKg,
     weeklyDeltaPctBW,
     rateFlag: rateFlagFor(weeklyDeltaPctBW, p.goal),

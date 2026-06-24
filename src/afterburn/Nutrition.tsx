@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { cn } from '../lib/utils';
 import { useAfterburn } from './store';
-import { ACTIVITY, GOALS, computeTargets, allBmr, recalibration, computeCycling, bodyFatContext } from './nutrition';
+import { ACTIVITY, GOALS, DIET_STYLES, computeTargets, allBmr, recalibration, computeCycling, bodyFatContext } from './nutrition';
 import type { ActivityLevel, BmrMethod, Goal, RateFlag, Sex } from './nutrition';
 
 const RATE_BADGE: Record<RateFlag, { label: string; cls: string } | null> = {
@@ -107,6 +107,22 @@ export default function Nutrition() {
           </select>
         </label>
 
+        <div>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle mb-1 block">Diet style (carb : fat split)</span>
+          <div className="flex gap-2">
+            {DIET_STYLES.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => setNutrition({ dietStyle: d.id })}
+                className={cn('flex-1 btn !py-1.5 text-xs', (n.dietStyle ?? 'balanced') === d.id ? 'btn-primary' : 'btn-secondary')}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-ink-subtle mt-1">{DIET_STYLES.find((d) => d.id === (n.dietStyle ?? 'balanced'))?.hint}</p>
+        </div>
+
         <label className="block">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle mb-1 block">BMR formula</span>
           <select value={n.method} onChange={(e) => setNutrition({ method: e.target.value as BmrMethod })} className="input !py-1.5 text-sm">
@@ -137,17 +153,25 @@ export default function Nutrition() {
 
             {/* Macro bars */}
             <div className="mt-4 space-y-2">
-              <MacroRow label="Protein" grams={targets.proteinG} kcal={targets.proteinG * 4} total={targets.goalCalories} color="#fb923c" />
-              <MacroRow label="Carbs" grams={targets.carbG} kcal={targets.carbG * 4} total={targets.goalCalories} color="#60a5fa" />
-              <MacroRow label="Fat" grams={targets.fatG} kcal={targets.fatG * 9} total={targets.goalCalories} color="#facc15" />
+              <MacroRow label="Protein" grams={targets.proteinG} kcal={targets.proteinG * 4} total={targets.goalCalories} perKg={targets.proteinPerKgUsed} color="#fb923c" />
+              <MacroRow label="Carbs" grams={targets.carbG} kcal={targets.carbG * 4} total={targets.goalCalories} perKg={targets.carbPerKg} color="#60a5fa" />
+              <MacroRow label="Fat" grams={targets.fatG} kcal={targets.fatG * 9} total={targets.goalCalories} perKg={targets.fatPerKg} color="#facc15" />
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-ink-subtle">
               <p>Fiber target: <span className="text-ink font-medium">{targets.fiberG} g</span></p>
-              <p>Protein/meal (×4): <span className="text-ink font-medium">{targets.proteinPerMeal} g</span></p>
+              <p>Protein/meal (×{targets.recommendedMeals}): <span className="text-ink font-medium">{targets.proteinPerMealG} g</span></p>
               <p>Protein basis: <span className="text-ink font-medium">{targets.proteinPerKgUsed} g/kg {targets.basis}</span></p>
               <p>Projected: <span className={cn('font-medium', targets.weeklyDeltaKg < 0 ? 'text-orange-400' : targets.weeklyDeltaKg > 0 ? 'text-success' : 'text-ink')}>{targets.weeklyDeltaKg > 0 ? '+' : ''}{targets.weeklyDeltaKg} kg/wk ({targets.weeklyDeltaPctBW > 0 ? '+' : ''}{targets.weeklyDeltaPctBW}% BW)</span></p>
             </div>
+
+            {targets.warnings.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {targets.warnings.map((w) => (
+                  <p key={w} className="text-[11px] text-orange-300 bg-orange-500/10 rounded-md px-2 py-1.5">{w}</p>
+                ))}
+              </div>
+            )}
 
             {RATE_BADGE[targets.rateFlag] && (
               <span className={cn('inline-block mt-3 px-2 py-1 rounded-md text-[11px] font-semibold', RATE_BADGE[targets.rateFlag]!.cls)}>
@@ -251,13 +275,13 @@ function CycleCard({ title, d }: { title: string; d: { kcal: number; proteinG: n
   );
 }
 
-function MacroRow({ label, grams, kcal, total, color }: { label: string; grams: number; kcal: number; total: number; color: string }) {
+function MacroRow({ label, grams, kcal, total, perKg, color }: { label: string; grams: number; kcal: number; total: number; perKg?: number; color: string }) {
   const pct = total > 0 ? Math.round((kcal / total) * 100) : 0;
   return (
     <div>
       <div className="flex justify-between text-xs mb-0.5">
         <span className="text-ink font-medium">{label}</span>
-        <span className="text-ink-subtle">{grams} g · {pct}%</span>
+        <span className="text-ink-subtle">{grams} g{perKg != null ? ` · ${perKg} g/kg` : ''} · {pct}%</span>
       </div>
       <div className="h-2 rounded-full bg-elevated overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
