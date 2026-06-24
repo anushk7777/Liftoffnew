@@ -1,14 +1,16 @@
-// Evidence-based calorie + macro engine. Faithful to the user's guides:
-//  - BMR: Mifflin–St Jeor (default), Harris–Benedict (revised), Katch–McArdle
-//    (LBM-based, auto-preferred when body-fat% is known), and the ETF quick
-//    estimate (22 kcal × kg). [DIY Transformation Guide pp.14-15; Basics of
-//    Nutrition p.4]
-//  - TDEE = BMR × activity multiplier (1.2/1.375/1.55/1.725/1.9). [DIY]
-//  - Goal calories via evidence-based % of TDEE; weekly Δ uses ~7700 kcal/kg
-//    but is flagged as a START estimate (Lecture 2: 500 kcal ≠ 1 lb due to
-//    metabolic adaptation → recalibrate from real weight trend).
-//  - Macros: protein g/kg (LBM when bf% known), fat 25% (floor 0.6 g/kg),
-//    carbs = remainder, fiber 14 g / 1000 kcal. [Basics p.7; DIY pp.16-17]
+// Evidence-based calorie + macro engine.
+//  - BMR equations: Mifflin–St Jeor (default, the validated best predictor —
+//    within ~10% for most, unbiased across body sizes; PubMed 23631843),
+//    Harris–Benedict (revised), Katch–McArdle (LBM-based, auto-preferred when
+//    body-fat% is known).
+//  - Quick estimate: Jeff Nippard's bodyweight method — maintenance =
+//    bodyweight(lbs) × 14–18 (by activity), a DIRECT maintenance figure (no
+//    second activity multiply). [jeffnippard.com — Get Lean & Stay Lean]
+//  - TDEE = BMR × activity multiplier (1.2/1.375/1.55/1.725/1.9). The activity
+//    level is the biggest error source (people overestimate ≈300–400 kcal), so
+//    the result is a START estimate to refine from the real weight trend.
+//  - Macros: protein g/kg (LBM when bf% known), fat 15–30% of kcal (floor
+//    0.6 g/kg), carbs = remainder, fiber 14 g / 1000 kcal.
 import type { BodyEntry } from './types';
 
 export type Sex = 'male' | 'female';
@@ -46,13 +48,19 @@ export const DEFAULT_NUTRITION: NutritionProfile = {
   dietStyle: 'balanced',
 };
 
-export const ACTIVITY: { id: ActivityLevel; label: string; mult: number; etf: number }[] = [
-  { id: 'sedentary', label: 'Sedentary (little/no exercise)', mult: 1.2, etf: 1.45 },
-  { id: 'light', label: 'Lightly active (1–3 days/wk)', mult: 1.375, etf: 1.65 },
-  { id: 'moderate', label: 'Moderately active (3–5 days/wk)', mult: 1.55, etf: 1.85 },
-  { id: 'very', label: 'Very active (6–7 days/wk)', mult: 1.725, etf: 2.05 },
-  { id: 'extra', label: 'Extra active (hard daily / physical job)', mult: 1.9, etf: 2.15 },
+// `mult` = standard BMR→TDEE multiplier (Mifflin/Harris/Katch). `lbsFactor` =
+// Jeff Nippard's bodyweight-method multiplier (kcal per lb of bodyweight) used
+// by the quick estimate, which already includes activity — so it is NOT
+// re-multiplied by `mult`.
+export const ACTIVITY: { id: ActivityLevel; label: string; mult: number; lbsFactor: number }[] = [
+  { id: 'sedentary', label: 'Sedentary (little/no exercise)', mult: 1.2, lbsFactor: 14 },
+  { id: 'light', label: 'Lightly active (1–3 days/wk)', mult: 1.375, lbsFactor: 15 },
+  { id: 'moderate', label: 'Moderately active (3–5 days/wk)', mult: 1.55, lbsFactor: 16 },
+  { id: 'very', label: 'Very active (6–7 days/wk)', mult: 1.725, lbsFactor: 17 },
+  { id: 'extra', label: 'Extra active (hard daily / physical job)', mult: 1.9, lbsFactor: 18 },
 ];
+
+const LB_PER_KG = 2.2046;
 
 export const GOALS: { id: Goal; label: string; pct: number; proteinPerKg: number }[] = [
   { id: 'aggressive_cut', label: 'Aggressive fat loss (−25%)', pct: -0.25, proteinPerKg: 2.2 },
@@ -97,20 +105,31 @@ export function bmrFor(method: BmrMethod, p: NutritionProfile): number | null {
       return lbm == null ? null : 370 + 21.6 * lbm;
     }
     case 'etf':
-      return 22 * kg; // multiplied by the ETF activity factor in tdeeFor
+      return null; // the quick method estimates maintenance directly, not BMR
   }
 }
 
-/** All four BMR estimates side-by-side (null when not computable). */
-export function allBmr(p: NutritionProfile): Record<BmrMethod, number | null> {
-  return { mifflin: bmrFor('mifflin', p), harris: bmrFor('harris', p), katch: bmrFor('katch', p), etf: bmrFor('etf', p) };
+/** Maintenance (TDEE) for a method. The quick method (`etf`) is Jeff Nippard's
+ *  bodyweight × 14–18 — a direct maintenance figure, NOT BMR × activity. */
+export function tdeeFor(method: BmrMethod, p: NutritionProfile): number | null {
+  const a = activityOf(p.activity);
+  if (method === 'etf') {
+    return p.weightKg > 0 ? p.weightKg * LB_PER_KG * a.lbsFactor : null;
+  }
+  const bmr = bmrFor(method, p);
+  return bmr == null ? null : bmr * a.mult;
 }
 
-export function tdeeFor(method: BmrMethod, p: NutritionProfile): number | null {
-  const bmr = bmrFor(method, p);
-  if (bmr == null) return null;
-  const a = activityOf(p.activity);
-  return method === 'etf' ? bmr * a.etf : bmr * a.mult;
+/** Maintenance estimate for every method, side-by-side (null when not computable). */
+export function allMaintenance(p: NutritionProfile): Record<BmrMethod, number | null> {
+  return { mifflin: tdeeFor('mifflin', p), harris: tdeeFor('harris', p), katch: tdeeFor('katch', p), etf: tdeeFor('etf', p) };
+}
+
+/** Body Mass Index (kg/m²), or null if inputs are insufficient. */
+export function bmiOf(p: NutritionProfile): number | null {
+  if (p.heightCm <= 0 || p.weightKg <= 0) return null;
+  const m = p.heightCm / 100;
+  return p.weightKg / (m * m);
 }
 
 export type RateFlag = 'ideal' | 'aggressive' | 'slow' | 'none';
@@ -162,8 +181,9 @@ const round = (n: number) => Math.round(n);
 /** Full target set for the chosen method + goal. Returns null if BMR unknown. */
 export function computeTargets(p: NutritionProfile): NutritionTargets | null {
   const method: BmrMethod = p.method === 'katch' && leanBodyMassKg(p) == null ? 'mifflin' : p.method;
-  const bmr = bmrFor(method, p);
   const tdee = tdeeFor(method, p);
+  // The quick method has no BMR of its own; use Mifflin as the floor reference.
+  const bmr = bmrFor(method, p) ?? bmrFor('mifflin', p);
   if (bmr == null || tdee == null) return null;
 
   const g = goalOf(p.goal);

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { cn } from '../lib/utils';
 import { useAfterburn } from './store';
-import { ACTIVITY, GOALS, DIET_STYLES, computeTargets, allBmr, recalibration, computeCycling, bodyFatContext } from './nutrition';
+import { ACTIVITY, GOALS, DIET_STYLES, computeTargets, allMaintenance, bmiOf, recalibration, computeCycling, bodyFatContext } from './nutrition';
 import type { ActivityLevel, BmrMethod, Goal, RateFlag, Sex } from './nutrition';
 
 const RATE_BADGE: Record<RateFlag, { label: string; cls: string } | null> = {
@@ -12,10 +12,10 @@ const RATE_BADGE: Record<RateFlag, { label: string; cls: string } | null> = {
 };
 
 const METHODS: { id: BmrMethod; label: string }[] = [
-  { id: 'mifflin', label: 'Mifflin–St Jeor' },
+  { id: 'mifflin', label: 'Mifflin–St Jeor (recommended)' },
   { id: 'katch', label: 'Katch–McArdle (needs body-fat %)' },
   { id: 'harris', label: 'Harris–Benedict' },
-  { id: 'etf', label: 'ETF quick (22 × kg)' },
+  { id: 'etf', label: 'Quick estimate (bodyweight × 14–18)' },
 ];
 
 function Num({ label, value, onChange, suffix, placeholder }: { label: string; value: number | undefined; onChange: (v: number | undefined) => void; suffix?: string; placeholder?: string }) {
@@ -44,7 +44,9 @@ export default function Nutrition() {
 
   const latest = bodyweight[0]?.weight;
   const targets = useMemo(() => computeTargets(n), [n]);
-  const bmrs = useMemo(() => allBmr(n), [n]);
+  const maint = useMemo(() => allMaintenance(n), [n]);
+  const bmi = useMemo(() => bmiOf(n), [n]);
+  const showBfTip = bmi != null && bmi >= 30 && n.bodyFatPct == null;
   const recal = useMemo(
     () => (targets ? recalibration(bodyweight, targets.weeklyDeltaKg, targets.goalCalories, n.weightKg) : null),
     [bodyweight, targets, n.weightKg],
@@ -96,6 +98,7 @@ export default function Nutrition() {
               <option key={a.id} value={a.id}>{a.label}</option>
             ))}
           </select>
+          <p className="text-[11px] text-ink-subtle mt-1">Be honest — most people overestimate. Picking "Moderate" when you're really "Light" can add 300–400 kcal. This is a starting estimate; refine it from your real weight trend below.</p>
         </label>
 
         <label className="block">
@@ -146,10 +149,16 @@ export default function Nutrition() {
                 </p>
               </div>
               <div className="text-right text-xs text-ink-subtle">
-                <p>BMR {targets.bmr}</p>
+                <p>BMR {targets.method === 'etf' ? '—' : targets.bmr}</p>
                 <p>Maintenance {targets.tdee}</p>
               </div>
             </div>
+
+            {showBfTip && (
+              <p className="mt-3 text-[11px] text-orange-400">
+                At higher body fat, prediction equations over-estimate (they assume average body composition). Enter your body-fat % above to use Katch–McArdle (lean-mass based) — and treat this as a starting estimate to refine from your weight trend.
+              </p>
+            )}
 
             {/* Macro bars */}
             <div className="mt-4 space-y-2">
@@ -223,17 +232,18 @@ export default function Nutrition() {
             )}
           </div>
 
-          {/* Cross-check: all BMR methods */}
+          {/* Cross-check: estimated maintenance by every method */}
           <div className="card p-4">
-            <p className="section-label mb-2">BMR cross-check (all methods)</p>
+            <p className="section-label mb-2">Estimated maintenance (all methods)</p>
             <div className="grid grid-cols-2 gap-1.5 text-xs">
               {METHODS.map((m) => (
-                <div key={m.id} className="flex justify-between">
-                  <span className="text-ink-subtle">{m.label.split(' (')[0]}</span>
-                  <span className="text-ink font-medium">{bmrs[m.id] != null ? Math.round(bmrs[m.id]!) : '—'}</span>
+                <div key={m.id} className={cn('flex justify-between', m.id === targets.method && 'text-accent')}>
+                  <span className={m.id === targets.method ? 'text-accent' : 'text-ink-subtle'}>{m.label.split(' (')[0]}</span>
+                  <span className="font-medium">{maint[m.id] != null ? Math.round(maint[m.id]!) : '—'}</span>
                 </div>
               ))}
             </div>
+            <p className="text-[11px] text-ink-subtle mt-2">Equations disagree by design — they're estimates. Mifflin–St Jeor is the validated best starting point; your real weight trend is the source of truth.</p>
           </div>
 
           {/* Auto-recalibration from the weight log */}
