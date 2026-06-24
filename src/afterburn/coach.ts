@@ -21,6 +21,14 @@ Methodology (from the user's evidence-based guides — follow it):
 - NEAT (non-exercise activity) is a large, modifiable part of expenditure — daily steps matter. Meal timing is secondary to hitting total daily calories and protein.
 - Healthy body fat ≈ 15–20% (men) / 20–25% (women); 3–4% is unsustainable. Lean → favour a slight surplus; higher → run a fat-loss phase first.
 
+Macronutrient quality & ratio (Module 2 — use when relevant):
+- For hypertrophy the macro priority is carbs → protein → fat: glucose fuels the 20–60 s work sets, so high-volume training NEEDS carbs (2–7 g/kg/day). Keto can lose fat but can't optimally build muscle.
+- "High-carb vs high-fat" is individual — performance can vary up to ~4×. Lean / insulin-sensitive lifters and high-volume training do best on higher carbs; the insulin-resistant (or those who simply prefer it) can tolerate a higher-fat split. Carbs and fat trade off; protein stays fixed.
+- Fat 0.5–1.5 g/kg and 15–30% of energy; never below ~0.5 g/kg — too little fat impairs testosterone, fat-soluble vitamin (A/D/E/K) absorption and joint comfort (especially in a deficit). Fat quality matters: Omega-3/PUFA improve cell-membrane fluidity and mTOR signalling (leaner gains), saturated fat supports testosterone, MCTs give quick energy.
+- Protein: best in 25–40 g doses per meal to stimulate muscle protein synthesis (ceiling ~70 g); the post-workout anabolic window is wide (~24 h), so total daily protein matters more than timing. Protein has the highest thermic effect and is the most satiating macro.
+- Very low carb raises cortisol (→ muscle breakdown) and can lower thyroid output and energy; the body makes glucose from protein via gluconeogenesis but that is not a reason to under-eat carbs when training hard.
+- Fibre ~14 g/1000 kcal: prefer mixed sources; raw resistant starch (uncooked oats/potato) can bloat, while beta-glucan (oats/barley) helps lower cholesterol.
+
 Style: lead with one sentence on how training + nutrition are trending. Then give 3 prioritized, concrete actions, each tied to a specific number from the data (name the lift, the week, the kcal/macro, the weight trend). Be honest and specific. Plain text only — no markdown headers or asterisks; use "- " for lists. One-shot: don't ask questions or offer more unless the user asked one.`;
 
 export interface CoachData {
@@ -103,6 +111,12 @@ function buildContext(d: CoachData): string {
           fat_g: targets.fatG,
           carb_g: targets.carbG,
           fiber_g: targets.fiberG,
+          dietStyle: targets.dietStyle,
+          fat_g_per_kg: targets.fatPerKg,
+          carb_g_per_kg: targets.carbPerKg,
+          protein_per_meal_g: targets.proteinPerMealG,
+          recommendedMeals: targets.recommendedMeals,
+          macroWarnings: targets.warnings,
           projectedWeeklyKg: targets.weeklyDeltaKg,
           projectedPace: `${targets.weeklyDeltaPctBW}%BW/wk (${targets.rateFlag})`,
           bodyFatPct: nutrition.bodyFatPct ?? null,
