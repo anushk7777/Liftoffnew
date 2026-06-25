@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 
@@ -57,12 +56,14 @@ export default function Login() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center h-screen bg-background p-8 animate-rise">
       <div className="w-full max-w-sm card p-8 flex flex-col items-center text-center space-y-6">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg">
-          <Sparkles className="w-8 h-8 text-on-primary" />
+        <div className="w-16 h-16 rounded-2xl bg-[var(--accent)] flex items-center justify-center shadow-lg">
+          <svg width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2 L20 21 L12 16.5 L4 21 Z" fill="var(--accent-text)" />
+          </svg>
         </div>
         
         <div className="space-y-2">
-          <h1 className="font-display text-3xl font-bold bg-gradient-to-br from-primary to-secondary bg-clip-text text-transparent">
+          <h1 className="text-4xl text-[var(--text)] leading-none" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
             Liftoff
           </h1>
           <p className="text-sm text-ink-subtle">

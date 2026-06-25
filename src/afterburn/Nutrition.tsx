@@ -155,29 +155,29 @@ export default function Nutrition() {
             </div>
 
             {showBfTip && (
-              <p className="mt-3 text-[11px] text-orange-400">
+              <p className="mt-3 text-[11px] text-[var(--accent)]">
                 At higher body fat, prediction equations over-estimate (they assume average body composition). Enter your body-fat % above to use Katch–McArdle (lean-mass based) — and treat this as a starting estimate to refine from your weight trend.
               </p>
             )}
 
             {/* Macro bars */}
             <div className="mt-4 space-y-2">
-              <MacroRow label="Protein" grams={targets.proteinG} kcal={targets.proteinG * 4} total={targets.goalCalories} perKg={targets.proteinPerKgUsed} color="#fb923c" />
-              <MacroRow label="Carbs" grams={targets.carbG} kcal={targets.carbG * 4} total={targets.goalCalories} perKg={targets.carbPerKg} color="#60a5fa" />
-              <MacroRow label="Fat" grams={targets.fatG} kcal={targets.fatG * 9} total={targets.goalCalories} perKg={targets.fatPerKg} color="#facc15" />
+              <MacroRow label="Protein" grams={targets.proteinG} kcal={targets.proteinG * 4} total={targets.goalCalories} perKg={targets.proteinPerKgUsed} color="#f4f3f1" />
+              <MacroRow label="Carbs" grams={targets.carbG} kcal={targets.carbG * 4} total={targets.goalCalories} perKg={targets.carbPerKg} color="#9a99a0" />
+              <MacroRow label="Fat" grams={targets.fatG} kcal={targets.fatG * 9} total={targets.goalCalories} perKg={targets.fatPerKg} color="#5a595f" />
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-ink-subtle">
               <p>Fiber target: <span className="text-ink font-medium">{targets.fiberG} g</span></p>
               <p>Protein/meal (×{targets.recommendedMeals}): <span className="text-ink font-medium">{targets.proteinPerMealG} g</span></p>
               <p>Protein basis: <span className="text-ink font-medium">{targets.proteinPerKgUsed} g/kg {targets.basis}</span></p>
-              <p>Projected: <span className={cn('font-medium', targets.weeklyDeltaKg < 0 ? 'text-orange-400' : targets.weeklyDeltaKg > 0 ? 'text-success' : 'text-ink')}>{targets.weeklyDeltaKg > 0 ? '+' : ''}{targets.weeklyDeltaKg} kg/wk ({targets.weeklyDeltaPctBW > 0 ? '+' : ''}{targets.weeklyDeltaPctBW}% BW)</span></p>
+              <p>Projected: <span className={cn('font-medium', targets.weeklyDeltaKg < 0 ? 'text-[var(--accent)]' : targets.weeklyDeltaKg > 0 ? 'text-success' : 'text-ink')}>{targets.weeklyDeltaKg > 0 ? '+' : ''}{targets.weeklyDeltaKg} kg/wk ({targets.weeklyDeltaPctBW > 0 ? '+' : ''}{targets.weeklyDeltaPctBW}% BW)</span></p>
             </div>
 
             {targets.warnings.length > 0 && (
               <div className="mt-3 space-y-1.5">
                 {targets.warnings.map((w) => (
-                  <p key={w} className="text-[11px] text-orange-300 bg-orange-500/10 rounded-md px-2 py-1.5">{w}</p>
+                  <p key={w} className="text-[11px] text-[var(--warning)] bg-[var(--accent-soft)] rounded-md px-2 py-1.5">{w}</p>
                 ))}
               </div>
             )}
@@ -259,7 +259,7 @@ export default function Nutrition() {
                   <p className="text-success">On track (within 0.3% BW/wk) — no change needed.</p>
                 ) : (
                   <p className="text-ink">
-                    Suggestion: <span className={cn('font-semibold', recal.suggestedKcalChange < 0 ? 'text-orange-400' : 'text-success')}>{recal.suggestedKcalChange > 0 ? 'add' : 'cut'} {Math.abs(recal.suggestedKcalChange)} kcal/day</span> (≈ {targets.goalCalories + recal.suggestedKcalChange} kcal). Assumes you've eaten near your target.
+                    Suggestion: <span className={cn('font-semibold', recal.suggestedKcalChange < 0 ? 'text-[var(--accent)]' : 'text-success')}>{recal.suggestedKcalChange > 0 ? 'add' : 'cut'} {Math.abs(recal.suggestedKcalChange)} kcal/day</span> (≈ {targets.goalCalories + recal.suggestedKcalChange} kcal). Assumes you've eaten near your target.
                   </p>
                 )}
               </div>

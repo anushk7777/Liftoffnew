@@ -104,7 +104,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
       <button
         onClick={() => { window.dispatchEvent(new Event('liftoff:quickadd')); haptics.tap(); }}
         aria-label="Quick add task"
-        className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-40 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-secondary text-on-primary shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+        className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-40 w-14 h-14 rounded-full bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex items-center justify-center active:scale-95 transition-transform"
       >
         <Plus className="w-7 h-7" />
       </button>
@@ -156,7 +156,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
           ))}
           <button
             onClick={() => { setMoreOpen(false); haptics.tap(); setAppMode('afterburn'); }}
-            className="card flex flex-col items-center justify-center gap-2 py-5 active:scale-95 transition-transform text-orange-400 border-orange-400/30"
+            className="card flex flex-col items-center justify-center gap-2 py-5 active:scale-95 transition-transform text-[var(--text-muted)] border-[var(--border)]"
           >
             <Flame className="w-6 h-6" />
             <span className="text-xs font-medium">Afterburn</span>

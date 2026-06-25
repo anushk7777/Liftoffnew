@@ -31,7 +31,7 @@ function Stars({ value, onChange }: { value: number; onChange: (v: number) => vo
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map((i) => (
         <button key={i} type="button" onClick={() => onChange(value === i ? 0 : i)} className="p-0.5" aria-label={`Rate ${i} of 5`}>
-          <Star className={cn('w-4 h-4', i <= value ? 'text-amber-400 fill-amber-400' : 'text-ink-subtle')} />
+          <Star className={cn('w-4 h-4', i <= value ? 'text-[var(--accent)] fill-[var(--accent)]' : 'text-ink-subtle')} />
         </button>
       ))}
     </div>
@@ -139,22 +139,27 @@ function Field({ label, value }: { label: string; value: string }) {
 function Header() {
   const setMode = useAppMode((s) => s.setMode);
   return (
-    <header className="sticky top-0 z-30 bg-background/90 backdrop-blur border-b border-border pt-[env(safe-area-inset-top)]">
-      <div className="mx-auto max-w-2xl px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Flame className="w-5 h-5 text-orange-400" />
-          <span className="font-display font-bold">Liftoff Afterburn</span>
+    <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border pt-[env(safe-area-inset-top)]">
+      <div className="mx-auto max-w-2xl px-4 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'linear-gradient(150deg,#ff8a3d,#ff3d2e)', boxShadow: '0 6px 18px rgba(255,80,30,0.4)' }}
+          >
+            <Flame className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-[26px] leading-none text-[var(--text)]" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>Afterburn</span>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => window.dispatchEvent(new Event('liftoff:search'))}
-            className="btn btn-secondary !py-1.5 !px-2.5 text-xs"
+            className="w-9 h-9 rounded-full bg-elevated border border-border flex items-center justify-center text-ink-muted hover:text-ink transition-colors"
             aria-label="Search everything"
           >
             <Search className="w-4 h-4" />
           </button>
-          <button onClick={() => setMode('focus')} className="btn btn-secondary !py-1.5 !px-3 text-xs">
-            <Rocket className="w-4 h-4" /> Focus
+          <button onClick={() => setMode('focus')} className="mode-switch mode-switch-ink !py-2 !px-3.5 text-xs">
+            <Rocket className="w-4 h-4" /> Liftoff
           </button>
         </div>
       </div>
@@ -364,7 +369,7 @@ function DayCard({
 
       {(open || editing) && (
         <div className="mt-1">
-          {day.note && <p className="text-xs text-orange-400 mt-2">{day.note}</p>}
+          {day.note && <p className="text-xs text-[var(--accent)] mt-2">{day.note}</p>}
           {day.exercises.length > 0 ? (
             <ExerciseTable exercises={day.exercises} editing={editing} onRemove={(exId) => removeExercise(day.id, exId)} />
           ) : (
@@ -537,7 +542,7 @@ function Logger({ onFinish }: { onFinish: () => void }) {
     <div className="space-y-4 pb-36">
       <div className="flex items-start justify-between gap-2">
         <div>
-          {draft.weekName && <p className="text-xs font-semibold text-orange-400">{draft.weekName}</p>}
+          {draft.weekName && <p className="text-xs font-semibold text-[var(--accent)]">{draft.weekName}</p>}
           <h1 className="font-display text-xl font-bold">{draft.dayName}</h1>
           <p className="text-xs text-ink-subtle">{format(new Date(draft.date), 'EEEE, MMM d · h:mm a')}</p>
         </div>
@@ -693,7 +698,7 @@ function SessionCard({ session }: { session: WorkoutSession }) {
               </option>
             ))}
           </select>
-          {!session.weekId && <span className="text-[11px] text-orange-400">tap to tag this workout</span>}
+          {!session.weekId && <span className="text-[11px] text-[var(--accent)]">tap to tag this workout</span>}
         </div>
       )}
 
