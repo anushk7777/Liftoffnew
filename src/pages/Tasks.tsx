@@ -1,25 +1,24 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
-  Check,
   Trash2,
   Pencil,
-  CheckSquare,
-  Circle,
-  CircleDot,
   Clock,
-  Calendar,
   Timer,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Inbox,
+  CalendarClock,
+  CornerDownRight,
+  Check,
 } from 'lucide-react';
-import { format, isToday, isPast, startOfDay } from 'date-fns';
+import { format, isToday, isSameDay, startOfDay, addDays, setHours } from 'date-fns';
 import { useStore } from '../store/useStore';
-import { buildICS, downloadICS, googleCalendarUrl } from '../lib/ics';
 import type { TodoTask, Priority, Status } from '../store/data';
 import { cn } from '../lib/utils';
-import { springSoft } from '../lib/motion';
-import { PageHeader, EmptyState, Modal, PriorityDot } from '../components/ui';
+import { PageHeader, Modal, PriorityDot } from '../components/ui';
 import { DateTimePicker } from '../components/DateTimePicker';
 
 const toLocalInput = (d: Date) => {
@@ -27,118 +26,291 @@ const toLocalInput = (d: Date) => {
   return local.toISOString().slice(0, 16);
 };
 
-type Filter = 'all' | 'todo' | 'doing' | 'done';
-
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'todo', label: 'To do' },
-  { key: 'doing', label: 'In progress' },
-  { key: 'done', label: 'Done' },
+const DAY_START_HOUR = 7; // 7 AM
+const DAY_END_HOUR = 22; // 10 PM
+const QUICK_HOURS: { label: string; hour: number }[] = [
+  { label: '9a', hour: 9 },
+  { label: '12p', hour: 12 },
+  { label: '3p', hour: 15 },
+  { label: '6p', hour: 18 },
 ];
 
+const sameDay = (iso: string | undefined, day: Date) => !!iso && isSameDay(new Date(iso), day);
+const hourLabel = (h: number) => format(setHours(new Date(), h), 'h a');
+
+/**
+ * The Tasks route is a day-planner diary: pick a day, capture tasks onto it,
+ * time-block them on an hour timeline, and check them off. Arrow between days
+ * like flipping a diary. Backs onto the same task store (dueDate = the day,
+ * scheduledAt = the time-block).
+ */
 export default function Tasks() {
-  const { tasks, addTask, updateTask, deleteTask, cycleTaskStatus } = useStore();
-  const [filter, setFilter] = useState<Filter>('all');
+  const { tasks, addTask, updateTask, deleteTask, setTaskStatus } = useStore();
+  const [day, setDay] = useState<Date>(() => startOfDay(new Date()));
+  const [quick, setQuick] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TodoTask | null>(null);
+  const [draftDefaults, setDraftDefaults] = useState<Partial<TodoTask> | undefined>(undefined);
 
-  const filtered = useMemo(() => {
-    const base = filter === 'all' ? tasks : tasks.filter((t) => t.status === filter);
-    const prioRank = { high: 0, medium: 1, low: 2 };
-    return [...base].sort((a, b) => {
-      const stRank = { doing: 0, todo: 1, done: 2 };
-      if (stRank[a.status] !== stRank[b.status]) return stRank[a.status] - stRank[b.status];
-      return prioRank[a.priority] - prioRank[b.priority];
-    });
-  }, [tasks, filter]);
+  const dayISO = day.toISOString();
+  const viewingToday = isToday(day);
 
-  const counts = useMemo(
-    () => ({
-      all: tasks.length,
-      todo: tasks.filter((t) => t.status === 'todo').length,
-      doing: tasks.filter((t) => t.status === 'doing').length,
-      done: tasks.filter((t) => t.status === 'done').length,
-    }),
+  const dayTasks = useMemo(
+    () =>
+      tasks.filter(
+        (t) =>
+          sameDay(t.scheduledAt, day) ||
+          sameDay(t.dueDate, day) ||
+          (t.status === 'done' && sameDay(t.completedAt, day)),
+      ),
+    [tasks, day],
+  );
+
+  const scheduled = useMemo(
+    () =>
+      dayTasks
+        .filter((t) => t.scheduledAt && t.status !== 'done')
+        .sort((a, b) => new Date(a.scheduledAt!).getTime() - new Date(b.scheduledAt!).getTime()),
+    [dayTasks],
+  );
+  const unscheduled = useMemo(
+    () => dayTasks.filter((t) => !t.scheduledAt && t.status !== 'done'),
+    [dayTasks],
+  );
+  const doneToday = useMemo(() => dayTasks.filter((t) => t.status === 'done'), [dayTasks]);
+  const backlog = useMemo(
+    () => tasks.filter((t) => !t.dueDate && !t.scheduledAt && t.status !== 'done'),
     [tasks],
   );
 
-  const openNew = () => {
+  const total = scheduled.length + unscheduled.length + doneToday.length;
+  const progress = total > 0 ? Math.round((doneToday.length / total) * 100) : 0;
+
+  // Expand the hour window to fit any task scheduled outside the default range.
+  const hours = useMemo(() => {
+    let start = DAY_START_HOUR;
+    let end = DAY_END_HOUR;
+    for (const t of scheduled) {
+      const h = new Date(t.scheduledAt!).getHours();
+      if (h < start) start = h;
+      if (h > end) end = h;
+    }
+    const out: number[] = [];
+    for (let h = start; h <= end; h++) out.push(h);
+    return out;
+  }, [scheduled]);
+
+  const atHour = (h: number) => {
+    const d = new Date(day);
+    d.setHours(h, 0, 0, 0);
+    return d;
+  };
+
+  const addForDay = () => {
+    if (!quick.trim()) return;
+    addTask({ title: quick.trim(), dueDate: dayISO, priority: 'medium' });
+    setQuick('');
+  };
+  const scheduleAt = (t: TodoTask, h: number) => updateTask(t.id, { scheduledAt: atHour(h).toISOString(), dueDate: dayISO });
+  const unschedule = (t: TodoTask) => updateTask(t.id, { scheduledAt: undefined });
+  const moveToDay = (t: TodoTask) => updateTask(t.id, { dueDate: dayISO });
+  const toggleDone = (t: TodoTask) => setTaskStatus(t.id, t.status === 'done' ? 'todo' : 'done');
+
+  const openNew = (defaults?: Partial<TodoTask>) => {
     setEditing(null);
+    setDraftDefaults(defaults ?? { dueDate: dayISO });
     setModalOpen(true);
   };
   const openEdit = (t: TodoTask) => {
     setEditing(t);
+    setDraftDefaults(undefined);
     setModalOpen(true);
-  };
-
-  const handleCycle = (t: TodoTask) => {
-    cycleTaskStatus(t.id);
   };
 
   return (
     <div className="animate-rise">
       <PageHeader
-        title="Tasks"
-        subtitle="Everything you need to do, in one place."
-        icon={<CheckSquare className="w-5 h-5" />}
+        title="Diary"
+        subtitle="Plan your day, hour by hour."
+        icon={<CalendarDays className="w-5 h-5" />}
         actions={
-          <button onClick={openNew} className="btn btn-primary">
+          <button onClick={() => openNew()} className="btn btn-primary">
             <Plus className="w-4 h-4" /> New task
           </button>
         }
       />
 
-      {/* Filter bar */}
-      <div className="flex items-center gap-1 mb-6 p-1.5 rounded-2xl bg-black/20 border border-white/5 w-fit">
-        {FILTERS.map((f) => (
+      {/* Date navigator + day progress */}
+      <div className="glass-panel rounded-2xl p-4 mb-6 flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
           <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={cn(
-              'px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300',
-              filter === f.key ? 'bg-primary/10 text-primary border border-primary/20 glow-indigo shadow-md' : 'text-on-surface-variant hover:text-on-surface hover:bg-white/5 border border-transparent',
-            )}
+            onClick={() => setDay((d) => startOfDay(addDays(d, -1)))}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-white/5 transition-colors"
+            title="Previous day"
           >
-            {f.label}
-            <span className={cn("ml-2 text-[10px] font-mono-data px-1.5 py-0.5 rounded", filter === f.key ? "bg-primary/20" : "bg-white/5")}>{counts[f.key]}</span>
+            <ChevronLeft className="w-5 h-5" />
           </button>
-        ))}
+          <div className="text-center min-w-[9rem]">
+            <p className="font-headline-md text-on-surface leading-tight">{format(day, 'EEEE')}</p>
+            <p className="font-mono-data text-xs text-on-surface-variant">{format(day, 'MMMM d')}</p>
+          </div>
+          <button
+            onClick={() => setDay((d) => startOfDay(addDays(d, 1)))}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-white/5 transition-colors"
+            title="Next day"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+        {!viewingToday && (
+          <button
+            onClick={() => setDay(startOfDay(new Date()))}
+            className="text-xs font-label-caps px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+          >
+            Today
+          </button>
+        )}
+        <div className="ml-auto flex items-center gap-3">
+          <span className="font-mono-data text-xs text-on-surface-variant">
+            {doneToday.length}/{total} done
+          </span>
+          <div className="w-28 h-2 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={<CheckSquare className="w-7 h-7" />}
-          title="No tasks here yet"
-          hint="Create a task to start building momentum toward your goal."
-        />
-      ) : (
-        <motion.div layout className="flex flex-col gap-2">
-          <AnimatePresence initial={false}>
-            {filtered.map((task) => (
-              <motion.div
-                key={task.id}
-                layout
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.97 }}
-                transition={springSoft}
-              >
-                <TaskRow
-                  task={task}
-                  onCycle={() => handleCycle(task)}
-                  onEdit={() => openEdit(task)}
-                  onDelete={() => deleteTask(task.id)}
-                />
-              </motion.div>
+      {/* Capture box for the selected day */}
+      <div className="relative group mb-6">
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/40 to-secondary/40 rounded-2xl blur opacity-0 group-focus-within:opacity-40 transition duration-500" />
+        <div className="relative glass-panel rounded-2xl flex items-center p-2 pl-5 ring-1 ring-white/10 focus-within:ring-primary/40">
+          <input
+            value={quick}
+            onChange={(e) => setQuick(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addForDay()}
+            placeholder={viewingToday ? 'Capture a task for today…' : `Capture a task for ${format(day, 'MMM d')}…`}
+            className="flex-1 bg-transparent border-none focus:ring-0 text-base text-on-surface placeholder:text-on-surface-variant/40"
+          />
+          <button
+            onClick={addForDay}
+            className="bg-primary text-on-primary p-2.5 rounded-xl hover:scale-105 active:scale-95 transition-transform"
+            aria-label="Add task to this day"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Timeline */}
+        <div className="lg:col-span-8 glass-panel rounded-2xl p-5">
+          <h3 className="font-label-caps text-on-surface-variant mb-4 flex items-center gap-2">
+            <CalendarClock className="w-4 h-4" /> Timeline
+          </h3>
+          <div className="flex flex-col">
+            {hours.map((h) => {
+              const items = scheduled.filter((t) => new Date(t.scheduledAt!).getHours() === h);
+              return (
+                <div key={h} className="flex gap-3 group/hour">
+                  <div className="w-14 shrink-0 text-right pt-2 font-mono-data text-[11px] text-on-surface-variant/60">
+                    {hourLabel(h)}
+                  </div>
+                  <div className="flex-1 border-l border-white/10 pl-3 min-h-[3.25rem] py-2 space-y-2">
+                    {items.map((t) => (
+                      <ScheduledItem
+                        key={t.id}
+                        task={t}
+                        onToggle={() => toggleDone(t)}
+                        onEdit={() => openEdit(t)}
+                        onUnschedule={() => unschedule(t)}
+                      />
+                    ))}
+                    <button
+                      onClick={() => openNew({ scheduledAt: atHour(h).toISOString(), dueDate: dayISO, priority: 'medium' })}
+                      className="opacity-0 group-hover/hour:opacity-100 transition-opacity text-xs text-on-surface-variant/60 hover:text-primary inline-flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> add at {hourLabel(h)}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Side rail: unscheduled-for-day + backlog */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className="glass-panel rounded-2xl p-5">
+            <h3 className="font-label-caps text-on-surface-variant mb-3 flex items-center gap-2">
+              <Clock className="w-4 h-4" /> No time set · {unscheduled.length}
+            </h3>
+            {unscheduled.length === 0 ? (
+              <p className="text-sm text-on-surface-variant/50 py-2">Everything for this day has a time block.</p>
+            ) : (
+              <div className="space-y-2">
+                {unscheduled.map((t) => (
+                  <LooseItem
+                    key={t.id}
+                    task={t}
+                    onToggle={() => toggleDone(t)}
+                    onEdit={() => openEdit(t)}
+                    onDelete={() => deleteTask(t.id)}
+                    quickHours={QUICK_HOURS}
+                    onSchedule={(h) => scheduleAt(t, h)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="glass-panel rounded-2xl p-5">
+            <h3 className="font-label-caps text-on-surface-variant mb-3 flex items-center gap-2">
+              <Inbox className="w-4 h-4" /> Backlog · {backlog.length}
+            </h3>
+            {backlog.length === 0 ? (
+              <p className="text-sm text-on-surface-variant/50 py-2">No undated tasks waiting.</p>
+            ) : (
+              <div className="space-y-2">
+                {backlog.slice(0, 12).map((t) => (
+                  <BacklogItem
+                    key={t.id}
+                    task={t}
+                    dayLabel={viewingToday ? 'today' : format(day, 'MMM d')}
+                    onMove={() => moveToDay(t)}
+                    onEdit={() => openEdit(t)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Completed on this day */}
+      {doneToday.length > 0 && (
+        <div className="glass-panel rounded-2xl p-5 mt-6">
+          <h3 className="font-label-caps text-on-surface-variant mb-3 flex items-center gap-2">
+            <Check className="w-4 h-4" /> Done · {doneToday.length}
+          </h3>
+          <div className="space-y-2">
+            {doneToday.map((t) => (
+              <LooseItem
+                key={t.id}
+                task={t}
+                onToggle={() => toggleDone(t)}
+                onEdit={() => openEdit(t)}
+                onDelete={() => deleteTask(t.id)}
+              />
             ))}
-          </AnimatePresence>
-        </motion.div>
+          </div>
+        </div>
       )}
 
       <TaskModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         editing={editing}
+        defaults={draftDefaults}
         onSave={(data) => {
           if (editing) updateTask(editing.id, data);
           else addTask({ title: data.title || 'Untitled', ...data });
@@ -149,145 +321,126 @@ export default function Tasks() {
   );
 }
 
-function StatusIcon({ status }: { status: Status }) {
-  if (status === 'done') return <Check className="w-3.5 h-3.5" />;
-  if (status === 'doing') return <CircleDot className="w-3.5 h-3.5" />;
-  return <Circle className="w-3.5 h-3.5" />;
+function StatusToggle({ status, onToggle }: { status: Status; onToggle: () => void }) {
+  const done = status === 'done';
+  return (
+    <button
+      onClick={onToggle}
+      title={done ? 'Mark not done' : 'Mark done'}
+      className={cn(
+        'mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all hover:scale-110 active:scale-95',
+        done
+          ? 'bg-primary border-primary text-on-primary shadow-[0_0_10px_rgba(192,193,255,0.5)]'
+          : status === 'doing'
+            ? 'border-secondary text-secondary bg-secondary/10'
+            : 'border-on-surface-variant/40 text-transparent hover:border-primary bg-black/20',
+      )}
+    >
+      <Check className="w-3 h-3" />
+    </button>
+  );
 }
 
-function TaskRow({
+function ScheduledItem({
   task,
-  onCycle,
+  onToggle,
   onEdit,
-  onDelete,
+  onUnschedule,
 }: {
   task: TodoTask;
-  onCycle: () => void;
+  onToggle: () => void;
+  onEdit: () => void;
+  onUnschedule: () => void;
+}) {
+  return (
+    <div className="group/item glass-panel rounded-xl px-3 py-2 flex items-center gap-3 hover:border-primary/40 transition-colors">
+      <StatusToggle status={task.status} onToggle={onToggle} />
+      <span className="font-mono-data text-[11px] text-primary w-14 shrink-0">{format(new Date(task.scheduledAt!), 'h:mm a')}</span>
+      <PriorityDot priority={task.priority} />
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left text-sm text-on-surface hover:text-primary truncate">
+        {task.title}
+      </button>
+      <button onClick={onUnschedule} title="Remove time" className="opacity-0 group-hover/item:opacity-100 transition-opacity p-1 rounded text-on-surface-variant hover:text-danger">
+        <Clock className="w-3.5 h-3.5" />
+      </button>
+      <button onClick={onEdit} title="Edit" className="opacity-0 group-hover/item:opacity-100 transition-opacity p-1 rounded text-on-surface-variant hover:text-primary">
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function LooseItem({
+  task,
+  onToggle,
+  onEdit,
+  onDelete,
+  quickHours,
+  onSchedule,
+}: {
+  task: TodoTask;
+  onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  quickHours?: { label: string; hour: number }[];
+  onSchedule?: (h: number) => void;
 }) {
-  const overdue =
-    task.dueDate &&
-    task.status !== 'done' &&
-    isPast(new Date(task.dueDate)) &&
-    !isToday(new Date(task.dueDate));
-
+  const done = task.status === 'done';
   return (
-    <div className={cn(
-      "glass-panel group p-5 rounded-xl flex items-start gap-4 transition-all duration-300 relative overflow-hidden",
-      task.status === 'doing' ? "border-primary/40 ring-1 ring-primary/20 glow-indigo" : "hover:border-primary/40",
-      task.status === 'done' && "opacity-60 hover:opacity-100"
-    )}>
-      {task.status === 'doing' && (
-        <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-100 transition-opacity">
-          <Clock className="w-4 h-4 animate-spin text-primary" />
+    <div className="group/item glass-panel rounded-xl px-3 py-2 flex items-center gap-3 hover:border-primary/40 transition-colors">
+      <StatusToggle status={task.status} onToggle={onToggle} />
+      <PriorityDot priority={task.priority} />
+      <button
+        onClick={onEdit}
+        className={cn('flex-1 min-w-0 text-left text-sm truncate', done ? 'line-through text-on-surface-variant/50' : 'text-on-surface hover:text-primary')}
+      >
+        {task.title}
+      </button>
+      {quickHours && onSchedule && (
+        <div className="hidden group-hover/item:flex items-center gap-1">
+          {quickHours.map((q) => (
+            <button
+              key={q.hour}
+              onClick={() => onSchedule(q.hour)}
+              title={`Schedule at ${hourLabel(q.hour)}`}
+              className="font-mono-data text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-on-surface-variant hover:bg-primary/20 hover:text-primary transition-colors"
+            >
+              {q.label}
+            </button>
+          ))}
         </div>
       )}
-      <button
-        onClick={onCycle}
-        title="Cycle status"
-        className={cn(
-          'mt-1 w-6 h-6 rounded-full border flex items-center justify-center transition-all shrink-0 hover:scale-110 active:scale-95',
-          task.status === 'done'
-            ? 'bg-primary border-primary text-on-primary shadow-[0_0_10px_rgba(192,193,255,0.6)]'
-            : task.status === 'doing'
-              ? 'border-secondary text-secondary glow-cyan bg-secondary/10'
-              : 'border-on-surface-variant/50 text-on-surface-variant hover:border-primary hover:text-primary bg-black/20',
-        )}
-      >
-        <StatusIcon status={task.status} />
+      <button onClick={onDelete} title="Delete" className="opacity-0 group-hover/item:opacity-100 transition-opacity p-1 rounded text-on-surface-variant hover:text-danger">
+        <Trash2 className="w-3.5 h-3.5" />
       </button>
+    </div>
+  );
+}
 
-      <div
-        className="flex-1 min-w-0 cursor-pointer"
-        onClick={onEdit}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onEdit();
-          }
-        }}
+function BacklogItem({
+  task,
+  dayLabel,
+  onMove,
+  onEdit,
+}: {
+  task: TodoTask;
+  dayLabel: string;
+  onMove: () => void;
+  onEdit: () => void;
+}) {
+  return (
+    <div className="group/item glass-panel rounded-xl px-3 py-2 flex items-center gap-2 hover:border-primary/40 transition-colors">
+      <PriorityDot priority={task.priority} />
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left text-sm text-on-surface hover:text-primary truncate">
+        {task.title}
+      </button>
+      <button
+        onClick={onMove}
+        title={`Move to ${dayLabel}`}
+        className="shrink-0 inline-flex items-center gap-1 font-mono-data text-[10px] px-2 py-1 rounded-lg bg-white/5 text-on-surface-variant hover:bg-primary/20 hover:text-primary transition-colors"
       >
-        <div className="flex items-center gap-3">
-          <PriorityDot priority={task.priority} />
-          <p
-            className={cn(
-              'text-base font-headline-md truncate transition-colors',
-              task.status === 'done' ? 'line-through text-on-surface-variant/50' : 'text-on-surface group-hover:text-primary',
-            )}
-          >
-            {task.title}
-          </p>
-        </div>
-        {(task.notes || task.category || task.dueDate || task.estimate || task.scheduledAt) && (
-          <div className="flex flex-wrap items-center gap-3 mt-2.5 text-[11px] font-mono-data text-on-surface-variant">
-            {task.category && <span className="px-2 py-0.5 bg-white/5 rounded text-on-surface">{task.category}</span>}
-            {task.estimate && <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {task.estimate}</span>}
-            {task.scheduledAt ? (
-              <span className={cn('inline-flex items-center gap-1', overdue && 'text-danger font-medium')}>
-                <Clock className="w-3 h-3" />
-                {format(new Date(task.scheduledAt), 'MMM d, h:mm a')}
-              </span>
-            ) : (
-              task.dueDate && (
-                <span className={cn(overdue && 'text-danger font-medium')}>
-                  {overdue ? 'Overdue · ' : 'Due '}
-                  {format(new Date(task.dueDate), 'MMM d')}
-                </span>
-              )
-            )}
-            {task.notes && <span className="truncate max-w-[200px] font-body-sm text-on-surface-variant/70">— {task.notes}</span>}
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        {task.scheduledAt && (
-          <>
-            <button
-              onClick={() => {
-                const icsStr = buildICS({
-                  title: task.title,
-                  description: task.notes || '',
-                  start: task.scheduledAt!,
-                  durationMins: 30,
-                });
-                downloadICS(`task-${task.id}.ics`, icsStr);
-              }}
-              className="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-white/5 transition-colors"
-              title="Download .ics"
-            >
-              <Calendar className="w-4 h-4" />
-            </button>
-            <a
-              href={googleCalendarUrl({
-                title: task.title,
-                description: task.notes || '',
-                start: task.scheduledAt!,
-                durationMins: 30,
-              })}
-              target="_blank"
-              rel="noreferrer"
-              className="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-white/5 text-[10px] font-label-caps transition-colors"
-              title="Add to Google Calendar"
-            >
-              GCAL
-            </a>
-          </>
-        )}
-        <button onClick={onEdit} className="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-white/5 transition-colors" title="Edit task">
-          <Pencil className="w-4 h-4" />
-        </button>
-        <button
-          onClick={onDelete}
-          className="p-2 rounded-lg text-on-surface-variant hover:text-danger hover:bg-danger/10 transition-colors"
-          title="Delete task"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
+        <CornerDownRight className="w-3 h-3" /> {dayLabel}
+      </button>
     </div>
   );
 }
@@ -296,11 +449,13 @@ export function TaskModal({
   open,
   onClose,
   editing,
+  defaults,
   onSave,
 }: {
   open: boolean;
   onClose: () => void;
   editing: TodoTask | null;
+  defaults?: Partial<TodoTask>;
   onSave: (data: Partial<TodoTask>) => void;
 }) {
   return (
@@ -308,8 +463,9 @@ export function TaskModal({
       {/* Remount on open / when switching target so fields initialise from props */}
       {open && (
         <TaskForm
-          key={editing?.id ?? 'new'}
+          key={editing?.id ?? defaults?.scheduledAt ?? defaults?.dueDate ?? 'new'}
           editing={editing}
+          defaults={defaults}
           onClose={onClose}
           onSave={onSave}
         />
@@ -320,27 +476,30 @@ export function TaskModal({
 
 function TaskForm({
   editing,
+  defaults,
   onClose,
   onSave,
 }: {
   editing: TodoTask | null;
+  defaults?: Partial<TodoTask>;
   onClose: () => void;
   onSave: (data: Partial<TodoTask>) => void;
 }) {
   const navigate = useNavigate();
   const setFocusTaskId = useStore((s) => s.setFocusTaskId);
+  const base = editing ?? defaults ?? null;
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const [title, setTitle] = useState(editing?.title ?? '');
-  const [notes, setNotes] = useState(editing?.notes ?? '');
-  const [priority, setPriority] = useState<Priority>(editing?.priority ?? 'medium');
-  const [status, setStatus] = useState<Status>(editing?.status ?? 'todo');
-  const [category, setCategory] = useState(editing?.category ?? '');
-  const [estimate, setEstimate] = useState(editing?.estimate ?? '');
+  const [title, setTitle] = useState(base?.title ?? '');
+  const [notes, setNotes] = useState(base?.notes ?? '');
+  const [priority, setPriority] = useState<Priority>(base?.priority ?? 'medium');
+  const [status, setStatus] = useState<Status>(base?.status ?? 'todo');
+  const [category, setCategory] = useState(base?.category ?? '');
+  const [estimate, setEstimate] = useState(base?.estimate ?? '');
   const [dueDate, setDueDate] = useState(
-    editing?.dueDate ? format(new Date(editing.dueDate), 'yyyy-MM-dd') : '',
+    base?.dueDate ? format(new Date(base.dueDate), 'yyyy-MM-dd') : '',
   );
   const [scheduledAt, setScheduledAt] = useState(
-    editing?.scheduledAt ? toLocalInput(new Date(editing.scheduledAt)) : '',
+    base?.scheduledAt ? toLocalInput(new Date(base.scheduledAt)) : '',
   );
 
   const submit = (e: React.FormEvent) => {
@@ -406,8 +565,8 @@ function TaskForm({
             {quickDate('Tomorrow', tomorrowStr)}
             {quickDate('Next week', nextWeekStr)}
           </div>
-          <DateTimePicker 
-            value={scheduledAt || (dueDate ? `${dueDate}T00:00:00` : '')} 
+          <DateTimePicker
+            value={scheduledAt || (dueDate ? `${dueDate}T00:00:00` : '')}
             onChange={(val) => {
               if (!val) {
                 setDueDate('');
@@ -507,5 +666,3 @@ function TaskForm({
     </form>
   );
 }
-
-
