@@ -34,9 +34,13 @@
 
     --glow: rgba(0, 0, 0, 0.05);
 
+    --card-grad: linear-gradient(165deg, #ffffff 0%, #f3f1ee 100%);
+    --card-grad-strong: linear-gradient(160deg, #ffffff 0%, #eceae6 100%);
+
     --shadow-sm: 0 1px 2px rgba(20, 20, 25, 0.05);
     --shadow-md: 0 6px 22px rgba(20, 20, 25, 0.07);
     --shadow-lg: 0 18px 50px rgba(20, 20, 25, 0.1);
+    --shadow-hover: 0 24px 60px rgba(20, 20, 25, 0.14);
 
     --radius: 14px;
     --font-body: 'Inter', system-ui, sans-serif;
@@ -73,9 +77,13 @@
 
     --glow: rgba(255, 255, 255, 0.1);
 
+    --card-grad: linear-gradient(165deg, #151518 0%, #0f0f11 100%);
+    --card-grad-strong: linear-gradient(160deg, #1b1b1f 0%, #111113 100%);
+
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
     --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.55);
     --shadow-lg: 0 26px 70px rgba(0, 0, 0, 0.7);
+    --shadow-hover: 0 24px 60px rgba(0, 0, 0, 0.6);
 
     color-scheme: dark;
   }
@@ -314,18 +322,26 @@
 
 @layer components {
   .neo-card {
-      background: var(--surface);
-      border-radius: 20px;
+      background: var(--card-grad);
+      border-radius: 22px;
       box-shadow: var(--shadow-md);
       border: 1px solid var(--border);
-      transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.18s ease;
+      transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.35s ease, border-color 0.3s ease, background 0.3s ease;
+  }
+  .neo-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-strong);
+      box-shadow: var(--shadow-hover), 0 0 0 1px var(--accent-soft);
   }
   .neo-card-inset {
       background: var(--bg);
       border-radius: 16px;
       box-shadow: none;
       border: 1px solid var(--border);
-      transition: background-color 0.3s ease;
+      transition: background-color 0.3s ease, border-color 0.2s ease;
+  }
+  .neo-card-inset:hover {
+      border-color: var(--border-strong);
   }
   .neo-button {
       background: var(--elevated);
@@ -347,9 +363,51 @@
   .heatmap-cell:hover { transform: scale(1.1); }
   .progress-track { background: var(--elevated); box-shadow: none; }
   .progress-fill { box-shadow: none; }
-  .dial-ring { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-md); }
+  .dial-ring { background: var(--card-grad); border: 1px solid var(--border); box-shadow: var(--shadow-md); animation: breathe 4.5s ease-in-out infinite; }
   .dial-inner { background: var(--bg); box-shadow: inset 0 0 0 1px var(--border); }
 }
+
+@layer components {
+  /* Premium card surface for the generic .card used across pages + Afterburn */
+  .card {
+      background: var(--card-grad);
+      box-shadow: var(--shadow-sm);
+  }
+  .card-hover {
+      transition: transform 0.32s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.32s ease, border-color 0.25s ease;
+  }
+  .card-hover:hover {
+      transform: translateY(-3px);
+      border-color: var(--border-strong);
+      box-shadow: var(--shadow-hover);
+  }
+  .fab-btn {
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+      animation: pulseRing 2.8s ease-out infinite;
+  }
+  .fab-btn:hover { animation-play-state: paused; }
+  .task-row {
+      transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.25s ease, border-color 0.25s ease;
+  }
+  .task-row:hover {
+      transform: translateX(4px);
+      background: var(--hover) !important;
+      border-color: var(--border-strong) !important;
+  }
+}
+
+@keyframes breathe {
+  0%, 100% { box-shadow: var(--shadow-md); }
+  50% { box-shadow: var(--shadow-md), 0 0 26px -6px var(--accent-soft); }
+}
+@keyframes pulseRing {
+  0% { box-shadow: 0 14px 40px rgba(0,0,0,0.5), 0 0 0 0 var(--accent-soft); }
+  70% { box-shadow: 0 14px 40px rgba(0,0,0,0.5), 0 0 0 14px rgba(244,243,241,0); }
+  100% { box-shadow: 0 14px 40px rgba(0,0,0,0.5), 0 0 0 0 rgba(244,243,241,0); }
+}
+@keyframes drawStroke { to { stroke-dashoffset: 0; } }
+@keyframes growBar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
 
 @layer components {
@@ -396,10 +454,11 @@
 
 @layer components {
   .neo-dial {
-      background: var(--surface);
+      background: var(--card-grad);
       border: 1px solid var(--border);
       box-shadow: var(--shadow-md);
       border-radius: 50%;
+      animation: breathe 4.5s ease-in-out infinite;
   }
   .neo-dial-inner {
       background: var(--bg);
@@ -407,10 +466,56 @@
       border-radius: 50%;
   }
   .neo-card-sm {
-      background: var(--surface);
+      background: var(--card-grad);
       box-shadow: var(--shadow-sm);
       border: 1px solid var(--border);
       border-radius: 14px;
   }
+}
+
+@layer components {
+  /* Premium workspace-switch pills (Liftoff ↔ Afterburn) */
+  .mode-switch {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.6rem 1.05rem;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+  .mode-switch::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 35%;
+      background: linear-gradient(100deg, transparent, rgba(255,255,255,0.18), transparent);
+      transform: translateX(-160%);
+      transition: transform 0.6s ease;
+  }
+  .mode-switch:hover::after { transform: translateX(320%); }
+  .mode-switch:active { transform: scale(0.96); }
+
+  /* Afterburn ember variant (warm signature for the workout app) */
+  .mode-switch-ember {
+      background: linear-gradient(150deg, #ff8a3d, #ff3d2e);
+      color: #fff;
+      border: 1px solid rgba(255,140,80,0.5);
+      box-shadow: 0 8px 26px rgba(255,80,30,0.4);
+  }
+  .mode-switch-ember:hover { box-shadow: 0 12px 34px rgba(255,80,30,0.55); }
+
+  /* Liftoff ink variant (cool signature for the focus app) */
+  .mode-switch-ink {
+      background: var(--accent);
+      color: var(--accent-text);
+      border: 1px solid var(--border-strong);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .mode-switch-ink:hover { box-shadow: 0 12px 30px rgba(0,0,0,0.5); }
 }
 

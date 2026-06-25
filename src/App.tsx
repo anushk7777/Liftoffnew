@@ -8,6 +8,7 @@ import { pageVariants, fast, useReducedMotion } from './lib/motion';
 import { useReminders } from './lib/reminders';
 import Sidebar from './components/Sidebar';
 import MobileShell from './mobile/MobileShell';
+import ModeTransition from './components/ModeTransition';
 import PWAPrompt from './components/PWAPrompt';
 import PanicButton from './components/PanicButton';
 import CommandPalette from './components/CommandPalette';
@@ -222,7 +223,7 @@ function Shell() {
         onClick={() => setQuickAddOpen(true)}
         aria-label="Quick add task (Ctrl/Cmd N)"
         title="Quick add (Ctrl/⌘ N)"
-        className="fixed bottom-8 right-8 z-40 w-16 h-16 rounded-full bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+        className="fab-btn fixed bottom-8 right-8 z-40 w-16 h-16 rounded-full bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
       >
         <Plus className="w-8 h-8" />
       </button>
@@ -250,6 +251,7 @@ function App() {
   return (
     <BrowserRouter>
       <MotionConfig reducedMotion={reduceMotion ? 'always' : 'never'}>
+        <ModeTransition />
         <Shell />
       </MotionConfig>
     </BrowserRouter>

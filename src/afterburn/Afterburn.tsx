@@ -139,22 +139,27 @@ function Field({ label, value }: { label: string; value: string }) {
 function Header() {
   const setMode = useAppMode((s) => s.setMode);
   return (
-    <header className="sticky top-0 z-30 bg-background/90 backdrop-blur border-b border-border pt-[env(safe-area-inset-top)]">
-      <div className="mx-auto max-w-2xl px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Flame className="w-5 h-5 text-[var(--accent)]" />
-          <span className="font-display font-bold">Liftoff Afterburn</span>
+    <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border pt-[env(safe-area-inset-top)]">
+      <div className="mx-auto max-w-2xl px-4 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'linear-gradient(150deg,#ff8a3d,#ff3d2e)', boxShadow: '0 6px 18px rgba(255,80,30,0.4)' }}
+          >
+            <Flame className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-[26px] leading-none text-[var(--text)]" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>Afterburn</span>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => window.dispatchEvent(new Event('liftoff:search'))}
-            className="btn btn-secondary !py-1.5 !px-2.5 text-xs"
+            className="w-9 h-9 rounded-full bg-elevated border border-border flex items-center justify-center text-ink-muted hover:text-ink transition-colors"
             aria-label="Search everything"
           >
             <Search className="w-4 h-4" />
           </button>
-          <button onClick={() => setMode('focus')} className="btn btn-secondary !py-1.5 !px-3 text-xs">
-            <Rocket className="w-4 h-4" /> Focus
+          <button onClick={() => setMode('focus')} className="mode-switch mode-switch-ink !py-2 !px-3.5 text-xs">
+            <Rocket className="w-4 h-4" /> Liftoff
           </button>
         </div>
       </div>

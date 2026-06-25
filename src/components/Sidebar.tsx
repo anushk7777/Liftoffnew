@@ -75,10 +75,10 @@ export default function Sidebar({
       <div className="mt-auto pt-4 space-y-3 border-t border-white/5">
         <button
           onClick={() => setAppMode('afterburn')}
-          className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[var(--text-muted)] font-medium hover:text-[var(--text)] hover:neo-button transition-all duration-200 active:scale-95"
+          className="mode-switch mode-switch-ember w-full justify-center"
         >
           <Flame className="w-5 h-5 shrink-0" />
-          <span className="font-body text-sm">Afterburn (workouts)</span>
+          <span className="font-body text-sm">Enter Afterburn</span>
         </button>
         <button
           onClick={toggleTheme}
