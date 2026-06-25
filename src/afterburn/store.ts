@@ -132,6 +132,42 @@ export function exerciseProgress(
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** Total training load (Σ weight×reps across every logged set) per calendar
+ *  week (Mon-start), oldest→newest. A unit-agnostic load number that's robust
+ *  to which exercises were trained — the right progress lens when per-exercise
+ *  volume gets reshuffled week to week. */
+export function weeklyVolume(sessions: WorkoutSession[]): { weekStart: string; volume: number; sets: number }[] {
+  const mondayStartISO = (iso: string): string | null => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back up to Monday
+    return d.toISOString();
+  };
+  const byWeek = new Map<string, { volume: number; sets: number }>();
+  for (const s of sessions) {
+    const key = mondayStartISO(s.completedAt ?? s.date);
+    if (!key) continue;
+    let agg = byWeek.get(key);
+    if (!agg) {
+      agg = { volume: 0, sets: 0 };
+      byWeek.set(key, agg);
+    }
+    for (const e of s.entries) {
+      for (const st of e.sets) {
+        const w = parseFloat(st.weight);
+        const r = parseInt(st.reps, 10);
+        if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(r) || r <= 0) continue;
+        agg.volume += w * r;
+        agg.sets += 1;
+      }
+    }
+  }
+  return [...byWeek.entries()]
+    .map(([weekStart, v]) => ({ weekStart, volume: Math.round(v.volume), sets: v.sets }))
+    .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+}
+
 /** Greedy plates-per-side for a target total weight. */
 export function platesPerSide(target: number, bar: number, plates: number[]): { remaining: number; counts: { plate: number; n: number }[] } {
   let perSide = (target - bar) / 2;

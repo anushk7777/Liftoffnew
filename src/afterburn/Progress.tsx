@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { Plus, Trash2, Scale, TrendingUp } from 'lucide-react';
-import { cn } from '../lib/utils';
-import { useAfterburn, exerciseProgress, loggedExerciseNames } from './store';
+import { useAfterburn, weeklyVolume } from './store';
 import Chart from './Chart';
 import type { ChartPoint } from './Chart';
 
@@ -14,13 +13,10 @@ export default function Progress() {
   const deleteBodyweight = useAfterburn((s) => s.deleteBodyweight);
 
   const [w, setW] = useState('');
-  const lifts = useMemo(() => loggedExerciseNames(sessions), [sessions]);
-  const [lift, setLift] = useState('');
-  const [metric, setMetric] = useState<'weight' | 'est1RM'>('weight');
 
-  const selectedLift = lift || lifts[0] || '';
-  const liftSeries = useMemo(() => exerciseProgress(sessions, selectedLift), [sessions, selectedLift]);
-  const liftPoints: ChartPoint[] = liftSeries.map((d) => ({ date: d.date, value: metric === 'weight' ? d.weight : d.est1RM }));
+  const volume = useMemo(() => weeklyVolume(sessions), [sessions]);
+  const volPoints: ChartPoint[] = volume.map((v) => ({ date: v.weekStart, value: v.volume }));
+  const latestWeek = volume[volume.length - 1];
 
   const bwPoints: ChartPoint[] = useMemo(
     () => [...bodyweight].sort((a, b) => a.date.localeCompare(b.date)).map((b) => ({ date: b.date, value: b.weight })),
@@ -81,36 +77,22 @@ export default function Progress() {
         )}
       </section>
 
-      {/* Per-lift progress */}
+      {/* Weekly training volume — overall progress, not per-exercise */}
       <section className="space-y-3">
         <h2 className="section-label flex items-center gap-1.5">
-          <TrendingUp className="w-3.5 h-3.5" /> Lift progress
+          <TrendingUp className="w-3.5 h-3.5" /> Weekly volume
         </h2>
-        {lifts.length === 0 ? (
-          <p className="text-sm text-ink-subtle">Log some workouts and your strength trend per exercise shows up here.</p>
+        {volume.length === 0 ? (
+          <p className="text-sm text-ink-subtle">Log some workouts and your total weekly training volume shows up here.</p>
         ) : (
-          <div className="card p-4 space-y-3">
-            <div className="flex gap-2">
-              <select value={selectedLift} onChange={(e) => setLift(e.target.value)} className="input flex-1 text-sm">
-                {lifts.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-              <div className="flex bg-elevated p-0.5 rounded-lg border border-border shrink-0">
-                {(['weight', 'est1RM'] as const).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMetric(m)}
-                    className={cn('px-2.5 py-1 rounded-md text-xs font-medium', metric === m ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted')}
-                  >
-                    {m === 'weight' ? 'Top set' : 'Est 1RM'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <Chart points={liftPoints} unit={unit} accent="#fb923c" />
+          <div className="card p-4 space-y-2">
+            <Chart points={volPoints} unit="" accent="#fb923c" />
+            <p className="text-[11px] text-ink-subtle">
+              Total load = weight × reps across <span className="text-ink">all</span> lifts, bucketed by week (in {unit}).
+              {latestWeek && (
+                <> Latest week: <span className="text-ink font-medium">{latestWeek.volume.toLocaleString()} {unit}·reps</span> over {latestWeek.sets} sets.</>
+              )}
+            </p>
           </div>
         )}
       </section>
