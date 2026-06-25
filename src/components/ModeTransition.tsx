@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Rocket, Flame } from 'lucide-react';
+import { Flame } from 'lucide-react';
 import { useAppMode } from '../afterburn/store';
 import { useReducedMotion } from '../lib/motion';
 

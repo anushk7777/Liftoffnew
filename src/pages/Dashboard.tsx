@@ -179,13 +179,6 @@ export default function Dashboard() {
     });
   };
 
-  const briefingColor =
-    briefing.status === 'behind'
-      ? 'text-[var(--danger)]'
-      : briefing.status === 'ahead'
-        ? 'text-[var(--success)]'
-        : 'text-[var(--text)]';
-
   return (
     <div className="relative z-10 w-full flex flex-col gap-6 pb-10">
       {/* Hero */}
