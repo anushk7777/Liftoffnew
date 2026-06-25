@@ -349,11 +349,18 @@ export default function Dashboard() {
               <p className="text-xs text-[var(--text-muted)] mt-0.5">Focus minutes · last 14 days</p>
             </div>
             <span className="font-code text-xs text-[var(--success)] flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5" /> {focusToday}m today
+              <TrendingUp className="w-3.5 h-3.5" /> {focusToday}m today · {focusSeries.reduce((a, b) => a + b, 0)}m / 14d
             </span>
           </div>
           <div className="mt-3">
-            <Sparkline data={focusSeries.some((v) => v > 0) ? focusSeries : [0, 1, 0, 2, 1, 3, 2, 4, 3, 5, 4, 6, 5, 7]} height={170} />
+            {focusSeries.some((v) => v > 0) ? (
+              <Sparkline data={focusSeries} height={170} />
+            ) : (
+              <div className="h-[170px] flex flex-col items-center justify-center text-center gap-1">
+                <p className="text-sm text-[var(--text-muted)]">No focus time logged in the last 14 days.</p>
+                <Link to="/focus" className="text-xs font-semibold text-[var(--accent)] hover:underline">Run a focus session →</Link>
+              </div>
+            )}
           </div>
         </div>
 
