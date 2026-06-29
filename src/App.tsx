@@ -141,6 +141,13 @@ function Shell() {
     return (
       <>
         <Afterburn />
+        {/* Global overlays that must reach Afterburn too — most importantly the
+            PWA "Update available" prompt, so users who live in Afterburn on
+            mobile actually receive new builds. Focus-only widgets (panic button,
+            quick-add) are intentionally left out to keep Afterburn clean. */}
+        <OfflineBanner />
+        <PWAPrompt />
+        <InstallPrompt />
         {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
         <AlarmOverlay />
       </>

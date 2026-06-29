@@ -187,7 +187,15 @@ function Header() {
   return (
     <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-2xl px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMode('focus')}
+            className="w-9 h-9 rounded-full bg-elevated border border-border flex items-center justify-center text-ink-muted hover:text-ink transition-colors shrink-0"
+            aria-label="Back to Liftoff"
+            title="Back to Liftoff"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
             style={{ background: 'linear-gradient(150deg,#ff8a3d,#ff3d2e)', boxShadow: '0 6px 18px rgba(255,80,30,0.4)' }}
