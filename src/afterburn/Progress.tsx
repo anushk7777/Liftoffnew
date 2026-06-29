@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useAfterburn, weeklyVolume, volumeTrend, weekAdherence, detectPRs } from './store';
+import { useAfterburn, weeklyVolume, volumeTrend, weekAdherence, detectPRs, formatVolume } from './store';
 import { GOALS, weightTrendKgPerWeek } from './nutrition';
 import { AnimatedNumber } from '../components/ui';
 import { useReducedMotion, springSoft } from '../lib/motion';
@@ -222,11 +222,11 @@ export default function Progress() {
           <p className="text-sm text-ink-subtle">Log some workouts and your total weekly training volume shows up here.</p>
         ) : (
           <div className="card p-4 space-y-2">
-            <Chart points={volPoints} unit="" accent="var(--ember)" />
+            <Chart points={volPoints} unit="" accent="var(--ember)" format={(v) => formatVolume(v, unit)} />
             <p className="text-[11px] text-ink-subtle">
               Total load = weight × reps across <span className="text-ink">all</span> lifts, bucketed by week (in {unit}).
               {latestWeek && (
-                <> Latest week: <span className="text-ink font-medium">{latestWeek.volume.toLocaleString()} {unit}·reps</span> over {latestWeek.sets} sets.</>
+                <> Latest week: <span className="text-ink font-medium">{formatVolume(latestWeek.volume, unit)}</span> over {latestWeek.sets} sets.</>
               )}
             </p>
           </div>
