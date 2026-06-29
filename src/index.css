@@ -32,6 +32,12 @@
     --success: #4f9472;
     --warning: #b1823f;
 
+    /* Afterburn signature ember — used ONLY to highlight key progress metrics
+       (PRs, momentum verdict, trend charts, rest timer), never the whole UI. */
+    --ember: #f2562a;
+    --ember-soft: rgba(255, 90, 30, 0.12);
+    --ember-grad: linear-gradient(150deg, #ff8a3d, #ff3d2e);
+
     --glow: rgba(0, 0, 0, 0.05);
 
     --card-grad: linear-gradient(165deg, #ffffff 0%, #f3f1ee 100%);
@@ -74,6 +80,11 @@
     --danger: #d98a8a;
     --success: #8fbf9a;
     --warning: #d9b06a;
+
+    /* Ember stays brand-orange in both themes; a touch stronger soft-fill on dark. */
+    --ember: #ff6a3d;
+    --ember-soft: rgba(255, 106, 61, 0.16);
+    --ember-grad: linear-gradient(150deg, #ff8a3d, #ff3d2e);
 
     --glow: rgba(255, 255, 255, 0.1);
 
@@ -408,6 +419,13 @@
 @keyframes drawStroke { to { stroke-dashoffset: 0; } }
 @keyframes growBar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+/* Afterburn ember accents — opt-in utilities applied only to key metrics. */
+.text-ember { color: var(--ember); }
+.bg-ember-soft { background: var(--ember-soft); }
+.ember-grad { background-image: var(--ember-grad); }
+.ember-glow { box-shadow: 0 0 0 1px var(--ember-soft), 0 8px 26px -8px rgba(255, 90, 30, 0.45); }
+.border-ember { border-color: color-mix(in srgb, var(--ember) 40%, transparent); }
 
 
 @layer components {

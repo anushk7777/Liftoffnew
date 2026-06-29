@@ -6,19 +6,27 @@ import { cn } from '../lib/utils';
 import { useAfterburn, weeklyVolume, volumeTrend, weekAdherence, detectPRs } from './store';
 import { GOALS, weightTrendKgPerWeek } from './nutrition';
 import { AnimatedNumber } from '../components/ui';
-import { useReducedMotion } from '../lib/motion';
+import { useReducedMotion, springSoft } from '../lib/motion';
 import Chart from './Chart';
 import type { ChartPoint } from './Chart';
 
+const tileVariants = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
+
 function MomentumTile({ icon, label, children, tone }: { icon: ReactNode; label: string; children: ReactNode; tone: 'up' | 'down' | 'flat' }) {
+  const rm = useReducedMotion();
   return (
-    <div className="rounded-2xl bg-elevated border border-border p-3">
+    <motion.div
+      variants={tileVariants}
+      whileHover={rm ? undefined : { y: -3 }}
+      transition={springSoft}
+      className="rounded-2xl bg-elevated border border-border p-3"
+    >
       <div className="flex items-center gap-1.5 text-ink-subtle">
-        <span className={cn(tone === 'up' ? 'text-[var(--success)]' : tone === 'down' ? 'text-[var(--warning)]' : 'text-ink-muted')}>{icon}</span>
+        <span className={cn(tone === 'up' ? 'text-ember' : tone === 'down' ? 'text-[var(--warning)]' : 'text-ink-muted')}>{icon}</span>
         <span className="text-[10px] font-semibold uppercase tracking-wide">{label}</span>
       </div>
       <div className="mt-1.5 text-ink font-display text-lg font-bold leading-tight">{children}</div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -101,15 +109,20 @@ export default function Progress() {
               <span
                 className={cn(
                   'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0',
-                  verdict === 'Progressing' ? 'text-[var(--success)]' : verdict === 'Easing off' ? 'text-[var(--warning)]' : 'text-[var(--accent)]',
+                  verdict === 'Progressing' ? 'text-ember' : verdict === 'Easing off' ? 'text-[var(--warning)]' : 'text-[var(--accent)]',
                 )}
-                style={{ background: 'var(--accent-soft)' }}
+                style={{ background: verdict === 'Progressing' ? 'var(--ember-soft)' : 'var(--accent-soft)' }}
               >
                 {verdict === 'Progressing' ? <TrendingUp className="w-6 h-6" /> : verdict === 'Easing off' ? <TrendingDown className="w-6 h-6" /> : <Activity className="w-6 h-6" />}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+            <motion.div
+              className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4"
+              initial={rm ? false : 'hidden'}
+              animate="show"
+              variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.1 } } }}
+            >
               <MomentumTile icon={vt.dir === 'up' ? <TrendingUp className="w-3.5 h-3.5" /> : vt.dir === 'down' ? <TrendingDown className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />} label="Volume vs last wk" tone={vt.dir === 'up' ? 'up' : vt.dir === 'down' ? 'down' : 'flat'}>
                 {vt.deltaPct == null ? '—' : (<><span>{vt.deltaPct > 0 ? '+' : ''}<AnimatedNumber value={vt.deltaPct} />%</span></>)}
               </MomentumTile>
@@ -122,12 +135,12 @@ export default function Progress() {
               <MomentumTile icon={<Trophy className="w-3.5 h-3.5" />} label="PRs last workout" tone={recentPRs.length ? 'up' : 'flat'}>
                 <AnimatedNumber value={recentPRs.length} />
               </MomentumTile>
-            </div>
+            </motion.div>
 
             {recentPRs.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {recentPRs.slice(0, 5).map((pr, i) => (
-                  <span key={i} className="chip text-[var(--accent)] border-accent/30 bg-accent/10">
+                  <span key={i} className="chip text-ember border-ember bg-ember-soft">
                     <Trophy className="w-3 h-3" /> {pr.lift} {pr.kind === 'weight' ? `${pr.value}${unit}` : `${pr.value} e1RM`}
                   </span>
                 ))}
@@ -177,7 +190,7 @@ export default function Progress() {
           </div>
 
           {bwPoints.length > 0 ? (
-            <Chart points={bwPoints} unit={unit} accent="var(--accent)" />
+            <Chart points={bwPoints} unit={unit} accent="var(--ember)" />
           ) : (
             <p className="text-sm text-ink-subtle text-center py-4">Log your weight to start a trend.</p>
           )}
@@ -209,7 +222,7 @@ export default function Progress() {
           <p className="text-sm text-ink-subtle">Log some workouts and your total weekly training volume shows up here.</p>
         ) : (
           <div className="card p-4 space-y-2">
-            <Chart points={volPoints} unit="" accent="#fb923c" />
+            <Chart points={volPoints} unit="" accent="var(--ember)" />
             <p className="text-[11px] text-ink-subtle">
               Total load = weight × reps across <span className="text-ink">all</span> lifts, bucketed by week (in {unit}).
               {latestWeek && (

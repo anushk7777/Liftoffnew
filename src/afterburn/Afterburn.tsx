@@ -425,7 +425,13 @@ function DayCard({
   const rm = useReducedMotion();
 
   return (
-    <div className={cn('card p-4', day.isPrimary && 'border-accent/50', !day.isPrimary && lastDone && 'border-success/40')}>
+    <motion.div
+      className={cn('card card-hover p-4', day.isPrimary && 'border-ember ember-glow', !day.isPrimary && lastDone && 'border-success/40')}
+      initial={rm ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={rm ? undefined : { y: -2 }}
+      transition={springSoft}
+    >
       <div className="flex items-center gap-2">
         <button onClick={() => setOpen((o) => !o)} className="flex-1 flex items-center gap-2 text-left min-w-0">
           {open ? <ChevronDown className="w-4 h-4 text-ink-subtle shrink-0" /> : <ChevronRight className="w-4 h-4 text-ink-subtle shrink-0" />}
@@ -433,8 +439,8 @@ function DayCard({
             <div className="flex items-center gap-2 min-w-0">
               <p className="font-semibold text-ink truncate">{day.name}</p>
               {day.isPrimary && (
-                <span className="chip text-accent border-accent/30 bg-accent/10 shrink-0 !py-0.5">
-                  <Star className="w-3 h-3 fill-[var(--accent)]" /> Primary
+                <span className="chip text-ember border-ember bg-ember-soft shrink-0 !py-0.5">
+                  <Star className="w-3 h-3 fill-[var(--ember)]" /> Primary
                 </span>
               )}
               {lastDone && (
@@ -450,11 +456,11 @@ function DayCard({
         </button>
         <button
           onClick={() => setPrimaryDay(day.id)}
-          className={cn('p-2 hover:text-accent', day.isPrimary ? 'text-accent' : 'text-ink-subtle')}
+          className={cn('p-2 hover:text-ember', day.isPrimary ? 'text-ember' : 'text-ink-subtle')}
           aria-label={day.isPrimary ? 'Unpin primary workout' : 'Make primary workout'}
           title={day.isPrimary ? 'Unpin primary workout' : 'Make this my primary workout'}
         >
-          <Star className={cn('w-4 h-4', day.isPrimary && 'fill-[var(--accent)]')} />
+          <Star className={cn('w-4 h-4', day.isPrimary && 'fill-[var(--ember)]')} />
         </button>
         <button onClick={onToggleEdit} className="p-2 text-ink-subtle hover:text-ink" aria-label="Edit workout">
           <Pencil className="w-4 h-4" />
@@ -493,7 +499,7 @@ function DayCard({
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
 
@@ -584,19 +590,37 @@ function SetRow({
 }
 
 // Sticky rest countdown shown above the logger footer. Beeps + vibrates at 0.
-function RestBar({ secondsLeft, onAdd, onSkip }: { secondsLeft: number; onAdd: (d: number) => void; onSkip: () => void }) {
+// The ember fill shrinks as the rest runs down and the digits pulse each second.
+function RestBar({ secondsLeft, total, onAdd, onSkip }: { secondsLeft: number; total: number; onAdd: (d: number) => void; onSkip: () => void }) {
+  const rm = useReducedMotion();
   const m = Math.floor(secondsLeft / 60);
   const s = secondsLeft % 60;
+  const pct = total > 0 ? Math.max(0, Math.min(100, (secondsLeft / total) * 100)) : 0;
   return (
-    <div className="mx-auto max-w-2xl mb-2 flex items-center gap-2 rounded-lg border border-accent/40 bg-accent-soft/40 px-3 py-2">
-      <Timer className="w-4 h-4 text-accent shrink-0" />
-      <span className="font-mono-data font-bold text-ink tabular-nums">
-        {m}:{String(s).padStart(2, '0')}
-      </span>
-      <span className="text-xs text-ink-subtle flex-1">rest</span>
-      <button onClick={() => onAdd(-15)} className="btn btn-secondary !py-1 !px-2 text-xs">−15s</button>
-      <button onClick={() => onAdd(15)} className="btn btn-secondary !py-1 !px-2 text-xs">+15s</button>
-      <button onClick={onSkip} className="btn btn-secondary !py-1 !px-2 text-xs">Skip</button>
+    <div className="mx-auto max-w-2xl mb-2 rounded-lg border border-ember bg-ember-soft px-3 py-2">
+      <div className="flex items-center gap-2">
+        <Timer className="w-4 h-4 text-ember shrink-0" />
+        <motion.span
+          key={secondsLeft}
+          initial={rm ? false : { scale: 1.18 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 0.18 }}
+          className="font-mono-data font-bold text-ink tabular-nums"
+        >
+          {m}:{String(s).padStart(2, '0')}
+        </motion.span>
+        <span className="text-xs text-ink-subtle flex-1">rest</span>
+        <button onClick={() => onAdd(-15)} className="btn btn-secondary !py-1 !px-2 text-xs">−15s</button>
+        <button onClick={() => onAdd(15)} className="btn btn-secondary !py-1 !px-2 text-xs">+15s</button>
+        <button onClick={onSkip} className="btn btn-secondary !py-1 !px-2 text-xs">Skip</button>
+      </div>
+      <div className="mt-2 h-1.5 rounded-full bg-[var(--elevated)] overflow-hidden">
+        <motion.div
+          className="h-full rounded-full ember-grad"
+          animate={{ width: `${pct}%` }}
+          transition={{ ease: 'linear', duration: 0.25 }}
+        />
+      </div>
     </div>
   );
 }
@@ -616,6 +640,7 @@ function Logger({ onFinish, onBack }: { onFinish: () => void; onBack: () => void
 
   // Rest timer: counts down from an endsAt timestamp; alerts once at zero.
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
+  const [restTotal, setRestTotal] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const firedRef = useRef(false);
   useEffect(() => {
@@ -644,6 +669,7 @@ function Logger({ onFinish, onBack }: { onFinish: () => void; onBack: () => void
     if (sec <= 0) return;
     firedRef.current = false;
     setNow(() => Date.now());
+    setRestTotal(sec);
     setRestEndsAt(() => Date.now() + sec * 1000);
   };
 
@@ -819,6 +845,7 @@ function Logger({ onFinish, onBack }: { onFinish: () => void; onBack: () => void
         {restEndsAt !== null && (
           <RestBar
             secondsLeft={secondsLeft}
+            total={restTotal}
             onAdd={(d) => setRestEndsAt((e) => (e === null ? e : Math.max(Date.now(), e + d * 1000)))}
             onSkip={() => setRestEndsAt(null)}
           />
