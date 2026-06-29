@@ -4,6 +4,7 @@
 // Logged sessions are never touched by loading a template.
 import type { WorkoutProgram } from './types';
 import { POWERBUILDING_PROGRAM } from './plan';
+import { PURE_BODYBUILDING_PROGRAM } from './pureBodybuilding';
 
 export type ProgramTemplateStatus = 'available' | 'coming-soon' | 'custom';
 
@@ -28,10 +29,11 @@ export const PROGRAM_TEMPLATES: ProgramTemplate[] = [
     build: () => clone(POWERBUILDING_PROGRAM),
   },
   {
-    id: 'bodybuilding',
-    title: 'Bodybuilding',
-    subtitle: 'Coming soon — upload your plan to add it here',
-    status: 'coming-soon',
+    id: 'pure-bodybuilding',
+    title: 'The Pure Bodybuilding Program',
+    subtitle: 'Jeff Nippard · 10-week PPL/Arms — 2 blocks, async 10-day cycle, with substitutions',
+    status: 'available',
+    build: () => clone(PURE_BODYBUILDING_PROGRAM),
   },
   {
     id: 'custom',
