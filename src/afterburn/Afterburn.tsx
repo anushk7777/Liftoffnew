@@ -39,14 +39,38 @@ function Stars({ value, onChange }: { value: number; onChange: (v: number) => vo
 }
 
 // Combined intensity target column (mirrors the source program's "%1RM / RPE").
+// Shows early→last RPE when the program splits them (Pure Bodybuilding does).
 function intensity(ex: ProgramExercise): string {
   const parts = [];
   if (ex.percent1RM) parts.push(ex.percent1RM);
-  if (ex.rpe) parts.push(`RPE ${ex.rpe}`);
+  const early = ex.rpe;
+  const last = ex.lastSetRpe;
+  if (early && last && early !== last) parts.push(`RPE ${early}→${last}`);
+  else if (early || last) parts.push(`RPE ${early || last}`);
   return parts.join(' · ') || '—';
 }
 const setsReps = (ex: ProgramExercise) => `${ex.workingSets} × ${ex.reps}`;
 const dash = (v?: string | number) => (v === undefined || v === '' || v === 0 ? '—' : String(v));
+const warmOf = (ex: ProgramExercise) => ex.warmup ?? (ex.warmupSets != null ? String(ex.warmupSets) : undefined);
+
+// One-line "how to do it" for each last-set intensity technique in the program.
+const TECHNIQUE_INFO: Record<string, string> = {
+  'Myo-reps': 'Take the set to RPE 9-10, rest ~5 deep breaths, then do mini-sets of 3-5 reps (resting 5 breaths between) until you can\'t hit 3.',
+  Dropset: 'Hit failure, immediately strip ~20-30% of the weight and rep out again (no rest).',
+  'Long-length Partials': 'After full reps, keep doing partial reps in the stretched (bottom) portion of the range until failure.',
+  'Integrated Partials': 'Alternate one full-ROM rep with one half-ROM rep (in the stretched half) throughout the set.',
+  'Mechanical Dropset': 'At failure, shift to a stronger position/angle of the same movement and keep repping without rest.',
+  'Slow Eccentric': 'Use a deliberate 3-4 second lowering (negative) on every rep.',
+  'Pec Static Stretch': 'After the set, hold a deep loaded pec stretch for ~30 seconds.',
+  'Calf Static Stretch': 'After the set, hold a deep loaded calf stretch for ~30 seconds.',
+  'Lat Static Stretch': 'After the set, hold a deep loaded lat stretch for ~30 seconds.',
+};
+// Look up the explainer by the leading words of the technique label.
+const techniqueInfo = (t?: string): string | undefined => {
+  if (!t) return undefined;
+  const key = Object.keys(TECHNIQUE_INFO).find((k) => t.startsWith(k));
+  return key ? TECHNIQUE_INFO[key] : undefined;
+};
 
 // The day's exercises laid out like the written program: a true table on wider
 // screens, stacked labelled rows on phones (this is a mobile PWA).
@@ -79,8 +103,16 @@ function ExerciseTable({
           <tbody>
             {exercises.map((ex) => (
               <tr key={ex.id} className="border-b border-border/60 align-top">
-                <td className="py-2 pr-2 font-medium text-ink">{ex.name}</td>
-                <td className="py-2 px-2 text-center text-ink-muted">{dash(ex.warmupSets)}</td>
+                <td className="py-2 pr-2 font-medium text-ink">
+                  {ex.name}
+                  {ex.lastSetTechnique && (
+                    <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[10px] font-semibold align-middle">{ex.lastSetTechnique}</span>
+                  )}
+                  {ex.substitutions && ex.substitutions.length > 0 && (
+                    <span className="block text-[10px] text-ink-subtle font-normal mt-0.5">or: {ex.substitutions.join(' · ')}</span>
+                  )}
+                </td>
+                <td className="py-2 px-2 text-center text-ink-muted">{dash(warmOf(ex))}</td>
                 <td className="py-2 px-2 text-center text-ink whitespace-nowrap">{setsReps(ex)}</td>
                 <td className="py-2 px-2 text-center text-ink-muted whitespace-nowrap">{intensity(ex)}</td>
                 <td className="py-2 px-2 text-center text-ink-muted">{dash(ex.tempo)}</td>
@@ -104,7 +136,17 @@ function ExerciseTable({
         {exercises.map((ex) => (
           <div key={ex.id} className="border-t border-border pt-2">
             <div className="flex items-start gap-2">
-              <p className="flex-1 font-medium text-ink text-sm">{ex.name}</p>
+              <div className="flex-1">
+                <p className="font-medium text-ink text-sm">
+                  {ex.name}
+                  {ex.lastSetTechnique && (
+                    <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[10px] font-semibold align-middle">{ex.lastSetTechnique}</span>
+                  )}
+                </p>
+                {ex.substitutions && ex.substitutions.length > 0 && (
+                  <p className="text-[10px] text-ink-subtle mt-0.5">or: {ex.substitutions.join(' · ')}</p>
+                )}
+              </div>
               {editing && (
                 <button onClick={() => onRemove(ex.id)} className="p-1 text-ink-subtle hover:text-danger shrink-0" aria-label="Remove exercise">
                   <X className="w-4 h-4" />
@@ -114,7 +156,7 @@ function ExerciseTable({
             <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1 text-xs">
               <Field label="Sets × Reps" value={setsReps(ex)} />
               <Field label="%1RM / RPE" value={intensity(ex)} />
-              <Field label="Warm-up" value={dash(ex.warmupSets)} />
+              <Field label="Warm-up" value={dash(warmOf(ex))} />
               <Field label="Tempo" value={dash(ex.tempo)} />
               <Field label="Rest" value={dash(ex.rest)} />
             </div>
@@ -184,6 +226,12 @@ function ProgramView({ onStart }: { onStart: () => void }) {
   const weekIdx = Math.max(0, program.weeks.findIndex((w) => w.id === currentWeekId));
   const week = program.weeks[weekIdx] ?? program.weeks[0];
   const weekDone = week ? week.days.filter((d) => done.has(dayCompletionKey(week.id, d.id))).length : 0;
+  // Phase chip ("Build" / "Deload" / "Novelty") parsed from "Week N · Phase".
+  const phase = week?.name.includes('·') ? week.name.split('·').pop()!.trim() : null;
+  // Next workout in the async cycle = first day this week not yet logged.
+  const nextDay = week?.days.find((d) => !done.has(dayCompletionKey(week.id, d.id)));
+  // Pinned "primary" workout floats to the top of its list.
+  const sortPrimary = (days: ProgramDay[]) => [...days].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
 
   const renderDay = (day: ProgramDay, weekId?: string) => (
     <DayCard
@@ -241,15 +289,27 @@ function ProgramView({ onStart }: { onStart: () => void }) {
           </div>
 
           {week && (
-            <p className="text-xs text-ink-subtle px-1">
+            <p className="text-xs text-ink-subtle px-1 flex items-center gap-2">
+              {phase && (
+                <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide', phase === 'Deload' ? 'bg-warning/15 text-warning' : 'bg-accent/15 text-accent')}>{phase}</span>
+              )}
               {weekDone === week.days.length ? (
                 <span className="text-success font-medium">✓ All {week.days.length} days done this week</span>
               ) : (
-                <>
-                  {weekDone}/{week.days.length} days done this week
-                </>
+                <span>{weekDone}/{week.days.length} days done this week</span>
               )}
             </p>
+          )}
+
+          {/* Async-cycle hint: jump straight into the next un-logged day. */}
+          {week && nextDay && weekDone < week.days.length && (
+            <button
+              onClick={() => { startDay(nextDay.id); onStart(); }}
+              className="w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-elevated px-3 py-2 text-sm hover:border-accent/40 transition-colors"
+            >
+              <span className="text-ink-subtle">Next in your cycle</span>
+              <span className="font-medium text-ink flex items-center gap-1.5">{nextDay.name} <ArrowRight className="w-4 h-4 text-accent" /></span>
+            </button>
           )}
 
           {/* Auto-advance prompt when the week is complete and another follows. */}
@@ -262,7 +322,7 @@ function ProgramView({ onStart }: { onStart: () => void }) {
             </button>
           )}
 
-          {week?.days.map((d) => renderDay(d, week?.id))}
+          {week && sortPrimary(week.days).map((d) => renderDay(d, week.id))}
         </>
       )}
 
@@ -271,7 +331,7 @@ function ProgramView({ onStart }: { onStart: () => void }) {
       {program.custom.length === 0 && !adding && (
         <p className="text-xs text-ink-subtle">Add your own workout in the same format below.</p>
       )}
-      {program.custom.map((d) => renderDay(d))}
+      {sortPrimary(program.custom).map((d) => renderDay(d))}
 
       {adding ? (
         <div className="card p-4 space-y-3">
@@ -340,16 +400,22 @@ function DayCard({
 }) {
   const removeExercise = useAfterburn((s) => s.removeExercise);
   const removeDay = useAfterburn((s) => s.removeDay);
+  const setPrimaryDay = useAfterburn((s) => s.setPrimaryDay);
   const [open, setOpen] = useState(false);
 
   return (
-    <div className={cn('card p-4', lastDone && 'border-success/40')}>
+    <div className={cn('card p-4', day.isPrimary && 'border-accent/50', !day.isPrimary && lastDone && 'border-success/40')}>
       <div className="flex items-center gap-2">
         <button onClick={() => setOpen((o) => !o)} className="flex-1 flex items-center gap-2 text-left min-w-0">
           {open ? <ChevronDown className="w-4 h-4 text-ink-subtle shrink-0" /> : <ChevronRight className="w-4 h-4 text-ink-subtle shrink-0" />}
           <div className="min-w-0">
             <div className="flex items-center gap-2 min-w-0">
               <p className="font-semibold text-ink truncate">{day.name}</p>
+              {day.isPrimary && (
+                <span className="chip text-accent border-accent/30 bg-accent/10 shrink-0 !py-0.5">
+                  <Star className="w-3 h-3 fill-[var(--accent)]" /> Primary
+                </span>
+              )}
               {lastDone && (
                 <span className="chip text-success border-success/30 bg-success/10 shrink-0 !py-0.5">
                   <CheckCircle2 className="w-3 h-3" /> Done
@@ -360,6 +426,14 @@ function DayCard({
               {day.exercises.length} exercises{lastDone ? ` · last done ${format(new Date(lastDone), 'MMM d')}` : ''}
             </p>
           </div>
+        </button>
+        <button
+          onClick={() => setPrimaryDay(day.id)}
+          className={cn('p-2 hover:text-accent', day.isPrimary ? 'text-accent' : 'text-ink-subtle')}
+          aria-label={day.isPrimary ? 'Unpin primary workout' : 'Make primary workout'}
+          title={day.isPrimary ? 'Unpin primary workout' : 'Make this my primary workout'}
+        >
+          <Star className={cn('w-4 h-4', day.isPrimary && 'fill-[var(--accent)]')} />
         </button>
         <button onClick={onToggleEdit} className="p-2 text-ink-subtle hover:text-ink" aria-label="Edit workout">
           <Pencil className="w-4 h-4" />
@@ -502,7 +576,9 @@ function Logger({ onFinish }: { onFinish: () => void }) {
   const addSet = useAfterburn((s) => s.addSet);
   const removeSet = useAfterburn((s) => s.removeSet);
   const setExerciseNotes = useAfterburn((s) => s.setExerciseNotes);
+  const swapDraftExercise = useAfterburn((s) => s.swapDraftExercise);
   const updateSet = useAfterburn((s) => s.updateSet);
+  const weakPoints = useAfterburn((s) => s.program.weakPoints) ?? [];
   const [plateOpen, setPlateOpen] = useState(false);
 
   // Rest timer: counts down from an endsAt timestamp; alerts once at zero.
@@ -564,15 +640,73 @@ function Logger({ onFinish }: { onFinish: () => void }) {
         };
         return (
         <div key={ex.exerciseId} className="card p-4">
-          <p className="font-semibold text-ink">{ex.name}</p>
+          {/* NAME — a picker when the exercise has substitutions or is a weak-point slot */}
+          {ex.target.weakPointSlot ? (
+            weakPoints.length > 0 ? (
+              <select
+                value={ex.name}
+                onChange={(e) => swapDraftExercise(exIdx, e.target.value)}
+                className="input !py-1.5 text-sm font-semibold w-full"
+              >
+                <option value={ex.target.baseName}>{ex.target.baseName} — pick one ↓</option>
+                {weakPoints.map((g) => (
+                  <optgroup key={g.muscle} label={g.muscle}>
+                    {(ex.target.weakPointSlot === 1 ? g.exercise1 : g.exercise2).map((n) => (
+                      <option key={g.muscle + n} value={n}>{n}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            ) : (
+              <div>
+                <input
+                  value={ex.name.startsWith('Weak Point Exercise') ? '' : ex.name}
+                  onChange={(e) => swapDraftExercise(exIdx, e.target.value.trim() || ex.target.baseName || ex.name)}
+                  placeholder="Type your weak-point exercise"
+                  className="input !py-1.5 text-sm font-semibold w-full"
+                />
+                <p className="text-[10px] text-ink-subtle mt-1">Choose from your Weak Point Table — paste the table in to get a dropdown here.</p>
+              </div>
+            )
+          ) : ex.target.substitutions && ex.target.substitutions.length > 0 ? (
+            <select
+              value={ex.name}
+              onChange={(e) => swapDraftExercise(exIdx, e.target.value)}
+              className="input !py-1.5 text-sm font-semibold w-full"
+              aria-label="Exercise (swap to a substitution)"
+            >
+              {Array.from(new Set([ex.target.baseName ?? ex.name, ...ex.target.substitutions])).map((n) => (
+                <option key={n} value={n}>{n === (ex.target.baseName ?? ex.name) ? n : `${n} (sub)`}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="font-semibold text-ink">{ex.name}</p>
+          )}
+
           {/* TARGET (prescribed) */}
-          <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
+          <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
             <span className="text-ink-subtle">Target:</span>
             <span className="chip !py-0.5">{ex.target.reps} reps</span>
             {ex.target.percent1RM && <span className="chip !py-0.5">{ex.target.percent1RM}</span>}
-            {ex.target.rpe && <span className="chip !py-0.5">RPE {ex.target.rpe}</span>}
+            {ex.target.rpe && (
+              <span className="chip !py-0.5">
+                RPE {ex.target.rpe}
+                {ex.target.lastSetRpe && ex.target.lastSetRpe !== ex.target.rpe ? `→${ex.target.lastSetRpe}` : ''}
+              </span>
+            )}
+            {!ex.target.rpe && ex.target.lastSetRpe && <span className="chip !py-0.5">RPE {ex.target.lastSetRpe}</span>}
             {ex.target.tempo && <span className="chip !py-0.5">tempo {ex.target.tempo}</span>}
           </div>
+
+          {/* LAST-SET INTENSITY TECHNIQUE + how to do it */}
+          {ex.target.lastSetTechnique && (
+            <div className="mt-2 text-xs rounded-md bg-accent/10 border border-accent/20 p-2">
+              <span className="font-semibold text-[var(--accent)]">Last set: {ex.target.lastSetTechnique}</span>
+              {techniqueInfo(ex.target.lastSetTechnique) && (
+                <span className="text-ink-subtle"> — {techniqueInfo(ex.target.lastSetTechnique)}</span>
+              )}
+            </div>
+          )}
 
           {/* LAST TIME (progressive-overload reference) */}
           {last && (

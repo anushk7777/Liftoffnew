@@ -8,13 +8,26 @@ export interface ProgramExercise {
   id: string;
   name: string;
   warmupSets?: number;
+  warmup?: string; // free-text warm-up count/range, e.g. "1-2" (takes precedence over warmupSets for display)
   workingSets: number;
   reps: string; // "8", "6-8", "10+5+5"
   percent1RM?: string; // "72.5-77.5%"
-  rpe?: string; // target RPE, "8.5" | "9"
+  rpe?: string; // early-set target RPE, "8.5" | "~9-10"
+  lastSetRpe?: string; // last-set target RPE (Pure Bodybuilding splits early vs last set)
+  lastSetTechnique?: string; // e.g. "Myo-reps", "Dropset", "Long-length Partials"
+  substitutions?: string[]; // alternate exercises the user can swap to
+  weakPointSlot?: 1 | 2; // marks a "pick your weak-point exercise" slot on Arms days
   tempo?: string; // "2.1.1.1"
   rest?: string; // "3-4 MIN" | "2.0"
   notes?: string;
+}
+
+/** A weak-point muscle group and its exercise options (from the Hypertrophy
+ *  Handbook's Weak Point Table). Populates the weak-point picker on Arms days. */
+export interface WeakPointGroup {
+  muscle: string;
+  exercise1: string[];
+  exercise2: string[];
 }
 
 export interface ProgramDay {
@@ -22,6 +35,7 @@ export interface ProgramDay {
   name: string;
   source: ExerciseSource;
   note?: string;
+  isPrimary?: boolean; // user-pinned "primary" workout
   exercises: ProgramExercise[];
 }
 
@@ -37,6 +51,8 @@ export interface WorkoutProgram {
   weeks: WeekPlan[];
   /** User-added workouts, available regardless of selected week. */
   custom: ProgramDay[];
+  /** Weak Point Table (optional) — enables the weak-point picker on Arms days. */
+  weakPoints?: WeakPointGroup[];
 }
 
 /** One logged set. Inputs kept as strings for friction-free typing. */
@@ -52,7 +68,18 @@ export interface LoggedSet {
 export interface LoggedExercise {
   exerciseId: string;
   name: string;
-  target: { reps: string; rpe?: string; percent1RM?: string; tempo?: string; rest?: string };
+  target: {
+    reps: string;
+    rpe?: string;
+    percent1RM?: string;
+    tempo?: string;
+    rest?: string;
+    lastSetRpe?: string;
+    lastSetTechnique?: string;
+    substitutions?: string[];
+    weakPointSlot?: 1 | 2;
+    baseName?: string; // the prescribed exercise name (so the substitution picker can always offer it)
+  };
   sets: LoggedSet[];
   notes: string;
 }

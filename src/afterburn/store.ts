@@ -42,7 +42,18 @@ function draftFromDay(day: ProgramDay, week?: WeekPlan): WorkoutSession {
     entries: day.exercises.map((ex) => ({
       exerciseId: ex.id,
       name: ex.name,
-      target: { reps: ex.reps, rpe: ex.rpe, percent1RM: ex.percent1RM, tempo: ex.tempo, rest: ex.rest },
+      target: {
+        reps: ex.reps,
+        rpe: ex.rpe,
+        percent1RM: ex.percent1RM,
+        tempo: ex.tempo,
+        rest: ex.rest,
+        lastSetRpe: ex.lastSetRpe,
+        lastSetTechnique: ex.lastSetTechnique,
+        substitutions: ex.substitutions,
+        weakPointSlot: ex.weakPointSlot,
+        baseName: ex.name,
+      },
       sets: Array.from({ length: Math.max(1, Number(ex.workingSets) || 1) }, blankSet),
       notes: '',
     })),
@@ -199,6 +210,8 @@ interface AfterburnState {
   addSet: (exIdx: number) => void;
   removeSet: (exIdx: number) => void;
   setExerciseNotes: (exIdx: number, notes: string) => void;
+  swapDraftExercise: (exIdx: number, name: string) => void;
+  setPrimaryDay: (dayId: string) => void;
   addCustomDay: (name: string) => string;
   addExercise: (dayId: string, ex: Omit<ProgramExercise, 'id'>) => void;
   removeExercise: (dayId: string, exId: string) => void;
@@ -323,6 +336,26 @@ export const useAfterburn = create<AfterburnState>()(
           if (!s.draft) return s;
           const entries = s.draft.entries.map((e, i) => (i !== exIdx ? e : { ...e, notes }));
           return { draft: { ...s.draft, entries } };
+        }),
+      // Swap the logged exercise's name (substitution picker / weak-point pick).
+      // The session records what was actually performed.
+      swapDraftExercise: (exIdx, name) =>
+        set((s) => {
+          if (!s.draft) return s;
+          const entries = s.draft.entries.map((e, i) => (i !== exIdx ? e : { ...e, name }));
+          return { draft: { ...s.draft, entries } };
+        }),
+      // Pin a single day as "primary" (clears the flag on every other day).
+      setPrimaryDay: (dayId) =>
+        set((s) => {
+          const flag = (d: ProgramDay): ProgramDay => ({ ...d, isPrimary: d.id === dayId ? !d.isPrimary : false });
+          return {
+            program: {
+              ...s.program,
+              weeks: s.program.weeks.map((w) => ({ ...w, days: w.days.map(flag) })),
+              custom: s.program.custom.map(flag),
+            },
+          };
         }),
 
       addCustomDay: (name) => {
