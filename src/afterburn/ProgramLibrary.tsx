@@ -1,5 +1,7 @@
 import { Dumbbell, Flame, Plus, ChevronRight, Lock } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
+import { springSoft, useReducedMotion } from '../lib/motion';
 import { useAfterburn } from './store';
 import { PROGRAM_TEMPLATES } from './library';
 import type { ProgramTemplate } from './library';
@@ -32,6 +34,8 @@ export default function ProgramLibrary({ onPicked }: { onPicked: () => void }) {
   const icon = (t: ProgramTemplate) =>
     t.status === 'custom' ? <Plus className="w-6 h-6" /> : t.id === 'powerbuilding' ? <Dumbbell className="w-6 h-6" /> : <Flame className="w-6 h-6" />;
 
+  const rm = useReducedMotion();
+
   return (
     <div className="space-y-4">
       <div>
@@ -39,16 +43,25 @@ export default function ProgramLibrary({ onPicked }: { onPicked: () => void }) {
         <p className="text-xs text-ink-subtle mt-0.5">Pick a plan to train — or build your own. Your logged history is never lost.</p>
       </div>
 
-      <div className="space-y-3">
+      <motion.div
+        className="space-y-3"
+        initial={rm ? false : 'hidden'}
+        animate="show"
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.07, delayChildren: 0.04 } } }}
+      >
         {PROGRAM_TEMPLATES.map((t) => {
           const disabled = t.status === 'coming-soon';
           return (
-            <button
+            <motion.button
               key={t.id}
               disabled={disabled}
               onClick={() => pick(t)}
+              variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+              whileHover={disabled || rm ? undefined : { y: -3 }}
+              whileTap={disabled || rm ? undefined : { scale: 0.99 }}
+              transition={springSoft}
               className={cn(
-                'card w-full p-4 flex items-center gap-4 text-left transition-colors',
+                'card card-hover w-full p-4 flex items-center gap-4 text-left transition-colors',
                 disabled ? 'opacity-60 cursor-not-allowed' : 'hover:border-[var(--border-strong)] hover:bg-hover',
               )}
             >
@@ -65,10 +78,10 @@ export default function ProgramLibrary({ onPicked }: { onPicked: () => void }) {
                 <p className="text-xs text-ink-subtle mt-0.5">{t.subtitle}</p>
               </div>
               {!disabled && <ChevronRight className="w-5 h-5 text-ink-subtle shrink-0" />}
-            </button>
+            </motion.button>
           );
         })}
-      </div>
+      </motion.div>
     </div>
   );
 }
