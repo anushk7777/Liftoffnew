@@ -10,6 +10,17 @@ export default function PWAPrompt() {
     onRegisterError(error: unknown) {
       console.error('SW registration error', error);
     },
+    // Installed PWAs rarely full-reload, so actively poll for a new build:
+    // every 30 min and whenever the app is brought back to the foreground.
+    // This is what reliably surfaces the "Update available" toast on mobile.
+    onRegisteredSW(_swUrl: string, r: ServiceWorkerRegistration | undefined) {
+      if (!r) return;
+      const check = () => { r.update().catch(() => {}); };
+      setInterval(check, 30 * 60 * 1000);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') check();
+      });
+    },
   });
 
   // "Ready to work offline" confirmation (shown once, dismissible).

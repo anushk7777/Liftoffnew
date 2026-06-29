@@ -137,6 +137,24 @@ export default function Progress() {
         </motion.section>
       )}
 
+      {/* Momentum teaser before any workouts are logged */}
+      {!hasSignals && (
+        <section className="space-y-3">
+          <h2 className="section-label flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5" /> Momentum
+          </h2>
+          <div className="neo-card p-5 text-center">
+            <span className="w-12 h-12 mx-auto rounded-2xl flex items-center justify-center" style={{ background: 'var(--accent-soft)' }}>
+              <Activity className="w-6 h-6 text-[var(--accent)]" />
+            </span>
+            <p className="font-display text-lg font-bold text-ink mt-3">Track your direction</p>
+            <p className="text-xs text-ink-subtle mt-1 max-w-xs mx-auto">
+              Log a workout and this shows whether you're trending up — volume vs last week, consistency, bodyweight direction and any new PRs.
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* Bodyweight */}
       <section className="space-y-3">
         <h2 className="section-label flex items-center gap-1.5">
