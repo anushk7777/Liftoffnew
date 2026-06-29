@@ -1,22 +1,71 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
-import { Plus, Trash2, Scale, TrendingUp } from 'lucide-react';
-import { useAfterburn, weeklyVolume } from './store';
+import { motion } from 'framer-motion';
+import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus, Sparkles } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { useAfterburn, weeklyVolume, volumeTrend, weekAdherence, detectPRs } from './store';
+import { GOALS, weightTrendKgPerWeek } from './nutrition';
+import { AnimatedNumber } from '../components/ui';
+import { useReducedMotion } from '../lib/motion';
 import Chart from './Chart';
 import type { ChartPoint } from './Chart';
+
+function MomentumTile({ icon, label, children, tone }: { icon: ReactNode; label: string; children: ReactNode; tone: 'up' | 'down' | 'flat' }) {
+  return (
+    <div className="rounded-2xl bg-elevated border border-border p-3">
+      <div className="flex items-center gap-1.5 text-ink-subtle">
+        <span className={cn(tone === 'up' ? 'text-[var(--success)]' : tone === 'down' ? 'text-[var(--warning)]' : 'text-ink-muted')}>{icon}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wide">{label}</span>
+      </div>
+      <div className="mt-1.5 text-ink font-display text-lg font-bold leading-tight">{children}</div>
+    </div>
+  );
+}
 
 export default function Progress() {
   const unit = useAfterburn((s) => s.program.unit);
   const bodyweight = useAfterburn((s) => s.bodyweight);
   const sessions = useAfterburn((s) => s.sessions);
+  const program = useAfterburn((s) => s.program);
+  const currentWeekId = useAfterburn((s) => s.currentWeekId);
+  const nutrition = useAfterburn((s) => s.nutrition);
   const addBodyweight = useAfterburn((s) => s.addBodyweight);
   const deleteBodyweight = useAfterburn((s) => s.deleteBodyweight);
+  const rm = useReducedMotion();
 
   const [w, setW] = useState('');
 
   const volume = useMemo(() => weeklyVolume(sessions), [sessions]);
   const volPoints: ChartPoint[] = volume.map((v) => ({ date: v.weekStart, value: v.volume }));
   const latestWeek = volume[volume.length - 1];
+
+  // ---- "Momentum" progress signals ----
+  const vt = useMemo(() => volumeTrend(sessions), [sessions]);
+  const adh = useMemo(() => weekAdherence(program, sessions, currentWeekId), [program, sessions, currentWeekId]);
+  const recentPRs = useMemo(() => (sessions.length ? detectPRs(sessions, sessions[0]) : []), [sessions]);
+  const bwPerWeek = useMemo(() => weightTrendKgPerWeek(bodyweight), [bodyweight]);
+  const goalPct = GOALS.find((g) => g.id === nutrition.goal)?.pct ?? 0;
+  // Does the bodyweight trend point the way the goal wants?
+  const bwAligned = bwPerWeek == null
+    ? null
+    : goalPct < 0
+      ? bwPerWeek < -0.05
+      : goalPct > 0
+        ? bwPerWeek > 0.05
+        : Math.abs(bwPerWeek) < 0.15;
+  const score =
+    (vt.dir === 'up' ? 1 : vt.dir === 'down' ? -1 : 0) +
+    (adh.total > 0 && adh.pct >= 80 ? 1 : adh.total > 0 && adh.pct < 50 ? -1 : 0) +
+    (recentPRs.length ? 1 : 0) +
+    (bwAligned === true ? 1 : bwAligned === false ? -1 : 0);
+  const verdict = score >= 2 ? 'Progressing' : score <= -1 ? 'Easing off' : 'Holding steady';
+  const verdictHint =
+    verdict === 'Progressing'
+      ? 'Volume, consistency and strength are trending your way. Keep it up.'
+      : verdict === 'Easing off'
+        ? 'A few signals dipped — a lighter patch is fine, just keep showing up.'
+        : 'Steady work. Small, consistent progress compounds.';
+  const hasSignals = sessions.length > 0;
 
   const bwPoints: ChartPoint[] = useMemo(
     () => [...bodyweight].sort((a, b) => a.date.localeCompare(b.date)).map((b) => ({ date: b.date, value: b.weight })),
@@ -32,6 +81,62 @@ export default function Progress() {
 
   return (
     <div className="space-y-6">
+      {/* Momentum — are you moving in the right direction? */}
+      {hasSignals && (
+        <motion.section
+          initial={rm ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
+          className="space-y-3"
+        >
+          <h2 className="section-label flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5" /> Momentum
+          </h2>
+          <div className="neo-card p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-display text-2xl font-bold text-ink">{verdict}</p>
+                <p className="text-xs text-ink-subtle mt-0.5 max-w-[22rem]">{verdictHint}</p>
+              </div>
+              <span
+                className={cn(
+                  'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0',
+                  verdict === 'Progressing' ? 'text-[var(--success)]' : verdict === 'Easing off' ? 'text-[var(--warning)]' : 'text-[var(--accent)]',
+                )}
+                style={{ background: 'var(--accent-soft)' }}
+              >
+                {verdict === 'Progressing' ? <TrendingUp className="w-6 h-6" /> : verdict === 'Easing off' ? <TrendingDown className="w-6 h-6" /> : <Activity className="w-6 h-6" />}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+              <MomentumTile icon={vt.dir === 'up' ? <TrendingUp className="w-3.5 h-3.5" /> : vt.dir === 'down' ? <TrendingDown className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />} label="Volume vs last wk" tone={vt.dir === 'up' ? 'up' : vt.dir === 'down' ? 'down' : 'flat'}>
+                {vt.deltaPct == null ? '—' : (<><span>{vt.deltaPct > 0 ? '+' : ''}<AnimatedNumber value={vt.deltaPct} />%</span></>)}
+              </MomentumTile>
+              <MomentumTile icon={<Activity className="w-3.5 h-3.5" />} label="Consistency" tone={adh.pct >= 80 ? 'up' : adh.pct < 50 ? 'down' : 'flat'}>
+                {adh.total > 0 ? <><AnimatedNumber value={adh.done} />/{adh.total} <span className="text-xs text-ink-subtle font-normal">days</span></> : '—'}
+              </MomentumTile>
+              <MomentumTile icon={<Scale className="w-3.5 h-3.5" />} label="Bodyweight/wk" tone={bwAligned ? 'up' : bwAligned === false ? 'down' : 'flat'}>
+                {bwPerWeek == null ? '—' : <>{bwPerWeek > 0 ? '+' : ''}{Math.round(bwPerWeek * 10) / 10} <span className="text-xs text-ink-subtle font-normal">{unit}</span></>}
+              </MomentumTile>
+              <MomentumTile icon={<Trophy className="w-3.5 h-3.5" />} label="PRs last workout" tone={recentPRs.length ? 'up' : 'flat'}>
+                <AnimatedNumber value={recentPRs.length} />
+              </MomentumTile>
+            </div>
+
+            {recentPRs.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {recentPRs.slice(0, 5).map((pr, i) => (
+                  <span key={i} className="chip text-[var(--accent)] border-accent/30 bg-accent/10">
+                    <Trophy className="w-3 h-3" /> {pr.lift} {pr.kind === 'weight' ? `${pr.value}${unit}` : `${pr.value} e1RM`}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.section>
+      )}
+
       {/* Bodyweight */}
       <section className="space-y-3">
         <h2 className="section-label flex items-center gap-1.5">

@@ -179,6 +179,82 @@ export function weeklyVolume(sessions: WorkoutSession[]): { weekStart: string; v
     .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
 }
 
+// ───────────────────────── Progress signals (derived) ─────────────────────────
+const epley = (w: number, r: number) => (w > 0 && r > 0 ? w * (1 + r / 30) : 0);
+
+export interface PRHit {
+  lift: string;
+  kind: 'weight' | 'e1rm';
+  value: number;
+  prev: number;
+}
+
+/** PRs a finished `session` set versus ALL earlier sessions — a new best top-set
+ *  weight, or (failing that) a new best estimated 1RM, per lift. Only counts when
+ *  there was a prior best to beat (so a lift's first-ever log isn't a "PR"). */
+export function detectPRs(history: WorkoutSession[], session: WorkoutSession): PRHit[] {
+  const when = session.completedAt ?? session.date;
+  const prior = history.filter((s) => s.id !== session.id && (s.completedAt ?? s.date) < when);
+  const bestOf = (list: WorkoutSession[], lift: string) => {
+    let w = 0;
+    let e = 0;
+    for (const s of list)
+      for (const en of s.entries)
+        if (en.name === lift)
+          for (const st of en.sets) {
+            const wt = parseFloat(st.weight);
+            const rp = parseInt(st.reps, 10);
+            if (!Number.isFinite(wt) || wt <= 0) continue;
+            if (wt > w) w = wt;
+            const ee = epley(wt, Number.isFinite(rp) ? rp : 0);
+            if (ee > e) e = ee;
+          }
+    return { w, e };
+  };
+  const lifts = new Set<string>();
+  for (const en of session.entries) if (en.sets.some((st) => parseFloat(st.weight) > 0)) lifts.add(en.name);
+  const hits: PRHit[] = [];
+  for (const lift of lifts) {
+    const cur = bestOf([session], lift);
+    const prev = bestOf(prior, lift);
+    if (prev.w > 0 && cur.w > prev.w) hits.push({ lift, kind: 'weight', value: Math.round(cur.w * 10) / 10, prev: Math.round(prev.w * 10) / 10 });
+    else if (prev.e > 0 && Math.round(cur.e) > Math.round(prev.e)) hits.push({ lift, kind: 'e1rm', value: Math.round(cur.e), prev: Math.round(prev.e) });
+  }
+  return hits;
+}
+
+export interface VolumeTrend {
+  thisWeek: number;
+  lastWeek: number;
+  deltaPct: number | null;
+  dir: 'up' | 'down' | 'flat' | 'na';
+}
+
+/** Latest training week's total volume vs the previous training week. */
+export function volumeTrend(sessions: WorkoutSession[]): VolumeTrend {
+  const wv = weeklyVolume(sessions);
+  const thisWeek = wv[wv.length - 1]?.volume ?? 0;
+  const lastWeek = wv[wv.length - 2]?.volume ?? 0;
+  if (wv.length < 2 || lastWeek === 0) return { thisWeek, lastWeek, deltaPct: null, dir: 'na' };
+  const deltaPct = Math.round(((thisWeek - lastWeek) / lastWeek) * 100);
+  return { thisWeek, lastWeek, deltaPct, dir: deltaPct > 2 ? 'up' : deltaPct < -2 ? 'down' : 'flat' };
+}
+
+export interface Adherence {
+  done: number;
+  total: number;
+  pct: number;
+}
+
+/** How many of the selected week's prescribed days have been logged. */
+export function weekAdherence(program: WorkoutProgram, sessions: WorkoutSession[], weekId: string): Adherence {
+  const week = program.weeks.find((w) => w.id === weekId);
+  if (!week || week.days.length === 0) return { done: 0, total: 0, pct: 0 };
+  const map = completionMap(sessions);
+  const done = week.days.filter((d) => map.has(dayCompletionKey(week.id, d.id))).length;
+  return { done, total: week.days.length, pct: Math.round((done / week.days.length) * 100) };
+}
+
 /** Greedy plates-per-side for a target total weight. */
 export function platesPerSide(target: number, bar: number, plates: number[]): { remaining: number; counts: { plate: number; n: number }[] } {
   let perSide = (target - bar) / 2;
