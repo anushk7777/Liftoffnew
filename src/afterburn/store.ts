@@ -8,7 +8,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { DEFAULT_PROGRAM } from './plan';
 import { DEFAULT_NUTRITION } from './nutrition';
 import type { NutritionProfile } from './nutrition';
-import type { AppMode, BodyEntry, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, WeekPlan, WorkoutProgram, WorkoutSession } from './types';
+import type { AppMode, BodyEntry, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, WeekPlan, WeightUnit, WorkoutProgram, WorkoutSession } from './types';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const blankSet = (): LoggedSet => ({ id: uid(), weight: '', reps: '', rpe: '', rating: 0, done: false });
@@ -221,6 +221,13 @@ export function detectPRs(history: WorkoutSession[], session: WorkoutSession): P
     else if (prev.e > 0 && Math.round(cur.e) > Math.round(prev.e)) hits.push({ lift, kind: 'e1rm', value: Math.round(cur.e), prev: Math.round(prev.e) });
   }
   return hits;
+}
+
+/** Format a training-volume load (Σ weight×reps, in the program's unit) for
+ *  display. Big loads overflow the screen, so ≥10,000 collapses to tonnes. */
+export function formatVolume(kgReps: number, unit: WeightUnit = 'kg'): string {
+  if (kgReps >= 10000) return `${(kgReps / 1000).toFixed(1)} t`;
+  return `${Math.round(kgReps).toLocaleString()} ${unit}·reps`;
 }
 
 export interface VolumeTrend {
