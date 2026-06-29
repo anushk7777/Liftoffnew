@@ -1,8 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
-import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid, TrendingUp, Timer, Calculator, ArrowRight, Search, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid, TrendingUp, Timer, Calculator, ArrowRight, Search, Sparkles, Dumbbell } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance, restToSeconds } from './store';
+import { pop, springSoft, pageVariants, fast, useReducedMotion } from '../lib/motion';
+import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance, restToSeconds, detectPRs } from './store';
+import WorkoutCelebration from './WorkoutCelebration';
+import type { PRHit } from './store';
 import ProgramLibrary from './ProgramLibrary';
 import Progress from './Progress';
 import Coach from './Coach';
@@ -216,6 +220,7 @@ function ProgramView({ onStart }: { onStart: () => void }) {
   const currentWeekId = useAfterburn((s) => s.currentWeekId);
   const setCurrentWeek = useAfterburn((s) => s.setCurrentWeek);
   const startDay = useAfterburn((s) => s.startDay);
+  const draft = useAfterburn((s) => s.draft);
   const addCustomDay = useAfterburn((s) => s.addCustomDay);
   const resetProgram = useAfterburn((s) => s.resetProgram);
   const [editDay, setEditDay] = useState<string | null>(null);
@@ -233,6 +238,16 @@ function ProgramView({ onStart }: { onStart: () => void }) {
   // Pinned "primary" workout floats to the top of its list.
   const sortPrimary = (days: ProgramDay[]) => [...days].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
 
+  // Begin/resume a day without clobbering an in-progress workout.
+  const begin = (dayId: string) => {
+    if (draft) {
+      if (draft.dayId === dayId) { onStart(); return; } // same day → just resume
+      if (!window.confirm('A workout is already in progress. Start this one instead? Your in-progress sets will be discarded.')) return;
+    }
+    startDay(dayId);
+    onStart();
+  };
+
   const renderDay = (day: ProgramDay, weekId?: string) => (
     <DayCard
       key={day.id}
@@ -240,10 +255,7 @@ function ProgramView({ onStart }: { onStart: () => void }) {
       lastDone={done.get(dayCompletionKey(weekId, day.id))}
       editing={editDay === day.id}
       onToggleEdit={() => setEditDay(editDay === day.id ? null : day.id)}
-      onStart={() => {
-        startDay(day.id);
-        onStart();
-      }}
+      onStart={() => begin(day.id)}
     />
   );
 
@@ -304,7 +316,7 @@ function ProgramView({ onStart }: { onStart: () => void }) {
           {/* Async-cycle hint: jump straight into the next un-logged day. */}
           {week && nextDay && weekDone < week.days.length && (
             <button
-              onClick={() => { startDay(nextDay.id); onStart(); }}
+              onClick={() => begin(nextDay.id)}
               className="w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-elevated px-3 py-2 text-sm hover:border-accent/40 transition-colors"
             >
               <span className="text-ink-subtle">Next in your cycle</span>
@@ -402,6 +414,7 @@ function DayCard({
   const removeDay = useAfterburn((s) => s.removeDay);
   const setPrimaryDay = useAfterburn((s) => s.setPrimaryDay);
   const [open, setOpen] = useState(false);
+  const rm = useReducedMotion();
 
   return (
     <div className={cn('card p-4', day.isPrimary && 'border-accent/50', !day.isPrimary && lastDone && 'border-success/40')}>
@@ -441,27 +454,37 @@ function DayCard({
         <button onClick={onStart} className="btn btn-primary !py-1.5 !px-3 text-sm">Start</button>
       </div>
 
-      {(open || editing) && (
-        <div className="mt-1">
-          {day.note && <p className="text-xs text-[var(--accent)] mt-2">{day.note}</p>}
-          {day.exercises.length > 0 ? (
-            <ExerciseTable exercises={day.exercises} editing={editing} onRemove={(exId) => removeExercise(day.id, exId)} />
-          ) : (
-            <p className="text-xs text-ink-subtle mt-3">No exercises yet — tap the pencil to add some.</p>
-          )}
+      <AnimatePresence initial={false}>
+        {(open || editing) && (
+          <motion.div
+            initial={rm ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={rm ? undefined : { height: 0, opacity: 0 }}
+            transition={fast}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="mt-1">
+              {day.note && <p className="text-xs text-[var(--accent)] mt-2">{day.note}</p>}
+              {day.exercises.length > 0 ? (
+                <ExerciseTable exercises={day.exercises} editing={editing} onRemove={(exId) => removeExercise(day.id, exId)} />
+              ) : (
+                <p className="text-xs text-ink-subtle mt-3">No exercises yet — tap the pencil to add some.</p>
+              )}
 
-          {editing && (
-            <div className="pt-3 space-y-3">
-              <AddExerciseForm dayId={day.id} />
-              {day.source === 'custom' && (
-                <button onClick={() => removeDay(day.id)} className="btn btn-danger w-full !py-1.5 text-sm">
-                  <Trash2 className="w-4 h-4" /> Delete this workout
-                </button>
+              {editing && (
+                <div className="pt-3 space-y-3">
+                  <AddExerciseForm dayId={day.id} />
+                  {day.source === 'custom' && (
+                    <button onClick={() => removeDay(day.id)} className="btn btn-danger w-full !py-1.5 text-sm">
+                      <Trash2 className="w-4 h-4" /> Delete this workout
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -530,17 +553,20 @@ function SetRow({
         <NumInput value={set.weight} onChange={(v) => u({ weight: v })} placeholder={unit} />
         <NumInput value={set.reps} onChange={(v) => u({ reps: v })} placeholder="reps" />
         <NumInput value={set.rpe} onChange={(v) => u({ rpe: v })} placeholder="RPE" />
-        <button
+        <motion.button
+          whileTap={{ scale: 0.86 }}
+          transition={pop}
           onClick={() => {
             const next = !set.done;
             u({ done: next });
+            haptics.tap();
             onDone(next);
           }}
           className={cn('shrink-0 w-8 h-8 rounded-md flex items-center justify-center border', set.done ? 'bg-success text-white border-success' : 'border-border text-ink-subtle hover:text-ink')}
           aria-label="Mark set done"
         >
           <Check className="w-4 h-4" />
-        </button>
+        </motion.button>
       </div>
       <div className="mt-1.5 pl-9">
         <Stars value={set.rating} onChange={(v) => u({ rating: v })} />
@@ -567,12 +593,11 @@ function RestBar({ secondsLeft, onAdd, onSkip }: { secondsLeft: number; onAdd: (
   );
 }
 
-function Logger({ onFinish }: { onFinish: () => void }) {
+function Logger({ onFinish, onBack }: { onFinish: () => void; onBack: () => void }) {
   const draft = useAfterburn((s) => s.draft)!;
   const unit = useAfterburn((s) => s.program.unit);
   const sessions = useAfterburn((s) => s.sessions);
   const cancelDraft = useAfterburn((s) => s.cancelDraft);
-  const finishDraft = useAfterburn((s) => s.finishDraft);
   const addSet = useAfterburn((s) => s.addSet);
   const removeSet = useAfterburn((s) => s.removeSet);
   const setExerciseNotes = useAfterburn((s) => s.setExerciseNotes);
@@ -617,10 +642,20 @@ function Logger({ onFinish }: { onFinish: () => void }) {
   return (
     <div className="space-y-4 pb-36">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          {draft.weekName && <p className="text-xs font-semibold text-[var(--accent)]">{draft.weekName}</p>}
-          <h1 className="font-display text-xl font-bold">{draft.dayName}</h1>
-          <p className="text-xs text-ink-subtle">{format(new Date(draft.date), 'EEEE, MMM d · h:mm a')}</p>
+        <div className="flex items-start gap-2 min-w-0">
+          <button
+            onClick={onBack}
+            className="mt-0.5 w-9 h-9 rounded-xl bg-elevated border border-border flex items-center justify-center text-ink-muted hover:text-ink shrink-0 transition-colors"
+            aria-label="Back — keep this workout and explore"
+            title="Back — your workout stays in progress"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <div className="min-w-0">
+            {draft.weekName && <p className="text-xs font-semibold text-[var(--accent)]">{draft.weekName}</p>}
+            <h1 className="font-display text-xl font-bold truncate">{draft.dayName}</h1>
+            <p className="text-xs text-ink-subtle">{format(new Date(draft.date), 'EEEE, MMM d · h:mm a')}</p>
+          </div>
         </div>
         <button onClick={() => setPlateOpen(true)} className="btn btn-secondary !py-1.5 !px-2.5 text-xs shrink-0">
           <Calculator className="w-4 h-4" /> Plates
@@ -782,7 +817,7 @@ function Logger({ onFinish }: { onFinish: () => void }) {
         )}
         <div className="mx-auto max-w-2xl flex gap-2">
           <button onClick={cancelDraft} className="btn btn-secondary flex-1">Cancel</button>
-          <button onClick={() => { finishDraft(); onFinish(); }} className="btn btn-primary flex-1">
+          <button onClick={onFinish} className="btn btn-primary flex-1">
             <Check className="w-4 h-4" /> Finish workout
           </button>
         </div>
@@ -878,10 +913,18 @@ type Tab = 'workout' | 'history' | 'progress' | 'coach' | 'programs';
 
 export default function Afterburn() {
   const draft = useAfterburn((s) => s.draft);
+  const sessions = useAfterburn((s) => s.sessions);
+  const cancelDraft = useAfterburn((s) => s.cancelDraft);
+  const finishDraft = useAfterburn((s) => s.finishDraft);
   const loadWorkouts = useAfterburn((s) => s.loadWorkouts);
+  const rm = useReducedMotion();
   // Start on "Programs" if there's no plan loaded yet, else on "Workout".
   const hasProgram = useAfterburn((s) => s.program.weeks.length > 0 || s.program.custom.length > 0);
   const [tab, setTab] = useState<Tab>(hasProgram ? 'workout' : 'programs');
+  // "Pause" the active workout to explore other tabs without losing the draft.
+  const [minimized, setMinimized] = useState(false);
+  // PRs to celebrate after finishing (null = no overlay).
+  const [celebrate, setCelebrate] = useState<PRHit[] | null>(null);
 
   // Pull cloud workout data when entering the app (recency-guarded in the store).
   useEffect(() => {
@@ -896,12 +939,25 @@ export default function Afterburn() {
     { id: 'programs', label: 'Programs', icon: LayoutGrid },
   ];
 
+  const showLogger = !!draft && !minimized;
+  const showTabs = !draft || minimized;
+  const loggedSets = draft ? draft.entries.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0) : 0;
+
+  const finishWorkout = () => {
+    // Detect PRs against history BEFORE the draft is committed.
+    const prs = draft ? detectPRs(sessions, draft) : [];
+    finishDraft();
+    setMinimized(false);
+    setTab('workout');
+    if (prs.length) setCelebrate(prs);
+  };
+
   return (
     <div className="min-h-screen bg-background text-ink relative">
       <div className="fixed inset-0 radial-atmosphere pointer-events-none z-0" />
       <div className="relative z-10">
         <Header />
-        {!draft && (
+        {showTabs && (
           <div className="mx-auto max-w-2xl px-4 pt-4 overflow-x-auto custom-scrollbar">
             <div className="flex bg-elevated p-0.5 rounded-lg border border-border w-max">
               {TABS.map((t) => (
@@ -916,22 +972,71 @@ export default function Afterburn() {
             </div>
           </div>
         )}
+
+        {/* Paused-workout banner: resume the in-progress draft from anywhere. */}
+        <AnimatePresence>
+          {draft && minimized && (
+            <motion.div
+              initial={rm ? false : { opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={rm ? undefined : { opacity: 0, y: -8 }}
+              transition={springSoft}
+              className="mx-auto max-w-2xl px-4 pt-3"
+            >
+              <div className="card !border-accent/40 p-3 flex items-center gap-3" style={{ background: 'var(--card-grad)' }}>
+                <span className="w-9 h-9 rounded-xl bg-accent-soft flex items-center justify-center shrink-0">
+                  <Dumbbell className="w-4 h-4 text-[var(--accent)]" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-ink truncate">Workout in progress</p>
+                  <p className="text-xs text-ink-subtle truncate">{draft.dayName} · {loggedSets} set{loggedSets === 1 ? '' : 's'} logged</p>
+                </div>
+                <button onClick={() => setMinimized(false)} className="btn btn-primary !py-1.5 !px-3 text-sm shrink-0">
+                  Resume <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => { if (window.confirm('Discard this in-progress workout? Logged sets will be lost.')) cancelDraft(); }}
+                  className="p-2 text-ink-subtle hover:text-danger shrink-0"
+                  aria-label="Discard workout"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <main className="mx-auto max-w-2xl px-4 py-4">
-          {draft ? (
-            <Logger onFinish={() => setTab('workout')} />
-          ) : tab === 'programs' ? (
-            <ProgramLibrary onPicked={() => setTab('workout')} />
-          ) : tab === 'history' ? (
-            <HistoryView />
-          ) : tab === 'progress' ? (
-            <Progress />
-          ) : tab === 'coach' ? (
-            <Coach />
+          {showLogger ? (
+            <Logger onFinish={finishWorkout} onBack={() => setMinimized(true)} />
           ) : (
-            <ProgramView onStart={() => undefined} />
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={tab}
+                initial={rm ? false : 'initial'}
+                animate="enter"
+                exit={rm ? undefined : 'exit'}
+                variants={pageVariants}
+                transition={{ duration: 0.22, ease: [0.21, 1, 0.4, 1] }}
+              >
+                {tab === 'programs' ? (
+                  <ProgramLibrary onPicked={() => setTab('workout')} />
+                ) : tab === 'history' ? (
+                  <HistoryView />
+                ) : tab === 'progress' ? (
+                  <Progress />
+                ) : tab === 'coach' ? (
+                  <Coach />
+                ) : (
+                  <ProgramView onStart={() => setMinimized(false)} />
+                )}
+              </motion.div>
+            </AnimatePresence>
           )}
         </main>
       </div>
+
+      <WorkoutCelebration prs={celebrate} onDone={() => setCelebrate(null)} />
     </div>
   );
 }
