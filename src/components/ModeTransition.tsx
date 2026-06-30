@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Flame } from 'lucide-react';
-import { useAppMode } from '../afterburn/store';
+import { useAppMode } from '../afterburn/mode';
 import { useReducedMotion } from '../lib/motion';
 
 // A cinematic full-screen wipe played whenever the user switches between the

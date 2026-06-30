@@ -18,10 +18,19 @@ function saveNotified(s: Set<string>) {
   }
 }
 
-// Allow a snoozed/edited task to fire again.
+// Allow a snoozed/edited task to fire again. The notified set is keyed by
+// `${taskId}:${scheduledAt}`, so clear every entry for this task id (also
+// matches a legacy id-only key).
 export function clearNotified(id: string) {
   const s = getNotified();
-  if (s.delete(id)) saveNotified(s);
+  let changed = false;
+  for (const key of [...s]) {
+    if (key === id || key.startsWith(`${id}:`)) {
+      s.delete(key);
+      changed = true;
+    }
+  }
+  if (changed) saveNotified(s);
 }
 
 export function notificationsSupported() {
@@ -44,17 +53,23 @@ export async function requestNotificationPermission(): Promise<boolean> {
 // (handled by AlarmOverlay) plus an OS notification if permission was granted.
 // The in-app alarm needs no permission, so reminders work out of the box.
 export function useReminders() {
-  const tasks = useStore((s) => s.tasks);
+  // One stable interval for the lifetime of the mount. We read tasks fresh from
+  // the store inside check() (via getState) rather than subscribing, so a task
+  // mutation no longer tears down and recreates the 15s interval — and there's
+  // no need to re-render this hook's host when tasks change.
   useEffect(() => {
     const check = () => {
       const now = Date.now();
       const notified = getNotified();
       let changed = false;
-      for (const t of tasks) {
+      for (const t of useStore.getState().tasks) {
         if (t.status === 'done' || !t.scheduledAt) continue;
         const ts = new Date(t.scheduledAt).getTime();
+        // De-dup by (taskId, scheduledAt) — mirrors the server Edge Function —
+        // so rescheduling a task re-alerts and a fresh device doesn't replay.
+        const key = `${t.id}:${t.scheduledAt}`;
         // Fire if due within the last 24 hours
-        if (ts <= now && now - ts < 24 * 60 * 60 * 1000 && !notified.has(t.id)) {
+        if (ts <= now && now - ts < 24 * 60 * 60 * 1000 && !notified.has(key)) {
           // In-app alarm (always)
           window.dispatchEvent(
             new CustomEvent('liftoff:alarm', { detail: { id: t.id, title: t.title } }),
@@ -67,25 +82,25 @@ export function useReminders() {
               /* ignore */
             }
           }
-          notified.add(t.id);
+          notified.add(key);
           changed = true;
         }
       }
       if (changed) saveNotified(notified);
     };
-    
+
     check();
     const id = setInterval(check, 15000);
-    
+
     // Check when user returns to the tab
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') check();
     };
     document.addEventListener('visibilitychange', handleVisibility);
-    
+
     return () => {
       clearInterval(id);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [tasks]);
+  }, []);
 }

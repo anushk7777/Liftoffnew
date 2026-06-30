@@ -21,7 +21,7 @@ function greeting() {
 export default function MobileToday() {
   const {
     tasks, cycleTaskStatus, streak, activityHistory, targetDate,
-    phases, focusSessions, ideas, pomodoro, habits, habitLog,
+    phases, focusSessions, ideas, pomodoro, habits, habitLog, journeyStart,
   } = useStore();
 
   const todayMs = startOfDay(new Date()).getTime();
@@ -42,9 +42,9 @@ export default function MobileToday() {
   );
 
   const suggestions = useMemo(() => {
-    const state: CoachState = { phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate };
+    const state: CoachState = { phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate, journeyStart };
     return getSuggestions(state, buildProfile(state));
-  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate]);
+  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate, journeyStart]);
 
   const done = todaysTasks.filter((t) => t.status === 'done').length;
   const total = todaysTasks.length;

@@ -21,6 +21,7 @@ export default function Coach() {
   const habits = useStore((s) => s.habits);
   const habitLog = useStore((s) => s.habitLog);
   const targetDate = useStore((s) => s.targetDate);
+  const journeyStart = useStore((s) => s.journeyStart);
 
   const onAct = useCoachActions();
 
@@ -36,10 +37,11 @@ export default function Coach() {
       habits,
       habitLog,
       targetDate,
+      journeyStart,
     };
     const profile = buildProfile(state);
     return { state, profile, suggestions: getSuggestions(state, profile), briefing: getBriefing(state) };
-  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate]);
+  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate, journeyStart]);
 
   const learning = profile.dataPoints < 8;
   const briefTone =

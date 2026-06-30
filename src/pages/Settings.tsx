@@ -18,7 +18,7 @@ import { requestNotificationPermission, notificationPermission, notificationsSup
 import { enablePush, disablePush, isPushSupported, isPushConfigured, pushPermission } from '../lib/push';
 import { getApiKey, setApiKey, getModel, setModel, AI_MODELS } from '../lib/aicoach';
 import type { AiModelId } from '../lib/aicoach';
-import { useAppMode } from '../afterburn/store';
+import { useAppMode } from '../afterburn/mode';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
 

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Map,
@@ -18,7 +18,8 @@ import { cn, safeSetItem } from '../lib/utils';
 import type { Phase, TaskType, Task } from '../store/data';
 import { parseRoadmap, countRoadmap } from '../lib/roadmap';
 import { PageHeader, ProgressBar, Modal } from '../components/ui';
-import RoadmapGraph from '../components/RoadmapGraph';
+// The graph view pulls in @xyflow/react + dagre — only loaded when shown.
+const RoadmapGraph = lazy(() => import('../components/RoadmapGraph'));
 
 export interface NodeRef {
   phaseId: string;
@@ -141,7 +142,9 @@ export default function Roadmap() {
           </div>
         </div>
       ) : view === 'graph' ? (
-        <RoadmapGraph phases={phases} onNodeClick={setSelected} addedKeys={addedKeys} />
+        <Suspense fallback={<div className="flex h-64 items-center justify-center text-ink-subtle animate-pulse">Loading graph…</div>}>
+          <RoadmapGraph phases={phases} onNodeClick={setSelected} addedKeys={addedKeys} />
+        </Suspense>
       ) : (
         <div className="space-y-3">
           {phases.map((phase, i) => (

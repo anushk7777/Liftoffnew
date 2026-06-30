@@ -44,6 +44,10 @@ interface AppState {
 
   // Settings
   targetDate: string;
+  // Explicit anchor for the coach's pace math — set once when the roadmap is
+  // first set up (or backfilled from the earliest signal for existing users),
+  // so "expected %" doesn't read 0 / lurch with the earliest inferred timestamp.
+  journeyStart?: string;
   theme: 'light' | 'dark';
   reduceMotion: boolean;
   setTargetDate: (date: string) => void;
@@ -113,6 +117,10 @@ interface AppState {
 
   toggleLogDay: (type: 'full' | 'minimum') => void;
   recalculateStreak: () => void;
+
+  // Soft-delete tombstones (`"collection:id" -> deletedAt ISO`) so a deletion
+  // survives the cross-device merge instead of being resurrected by a stale add.
+  tombstones: Record<string, string>;
 
   // Backup
   exportData: () => string;
@@ -200,6 +208,7 @@ export const useStore = create<AppState>()(
   // Default ~6 months out from first run (never a shared/stale hardcoded date).
   // Existing users keep their persisted targetDate.
   targetDate: format(addMonths(new Date(), 6), 'yyyy-MM-dd'),
+  journeyStart: undefined,
   theme: 'dark',
   reduceMotion: false,
   setTargetDate: (date) => set({ targetDate: date }),
@@ -243,10 +252,14 @@ export const useStore = create<AppState>()(
       );
       return { phases: newPhases, tasks };
     }),
-  replaceRoadmap: (phases) => set({ phases }),
-  appendRoadmap: (phases) => set((s) => ({ phases: [...s.phases, ...phases] })),
+  // Setting up a roadmap anchors the journey start (once) so the coach pace is
+  // measured from when the plan was created, not the earliest inferred signal.
+  replaceRoadmap: (phases) =>
+    set((s) => ({ phases, journeyStart: s.journeyStart ?? (phases.length ? nowISO() : undefined) })),
+  appendRoadmap: (phases) =>
+    set((s) => ({ phases: [...s.phases, ...phases], journeyStart: s.journeyStart ?? nowISO() })),
   resetRoadmap: () => set({ phases: [] }),
-  loadExampleRoadmap: () => set({ phases: initialRoadmap }),
+  loadExampleRoadmap: () => set((s) => ({ phases: initialRoadmap, journeyStart: s.journeyStart ?? nowISO() })),
 
   // ---- Tasks ----
   tasks: [],
@@ -274,7 +287,11 @@ export const useStore = create<AppState>()(
     set((state) => ({
       tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
     })),
-  deleteTask: (id) => set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
+  deleteTask: (id) =>
+    set((state) => ({
+      tasks: state.tasks.filter((t) => t.id !== id),
+      tombstones: { ...state.tombstones, [`tasks:${id}`]: nowISO() },
+    })),
   setTaskStatus: (id, status) =>
     set((state) => {
       const task = state.tasks.find((t) => t.id === id);
@@ -340,7 +357,11 @@ export const useStore = create<AppState>()(
     set((state) => ({
       ideas: state.ideas.map((i) => (i.id === id ? { ...i, text } : i)),
     })),
-  deleteIdea: (id) => set((state) => ({ ideas: state.ideas.filter((i) => i.id !== id) })),
+  deleteIdea: (id) =>
+    set((state) => ({
+      ideas: state.ideas.filter((i) => i.id !== id),
+      tombstones: { ...state.tombstones, [`ideas:${id}`]: nowISO() },
+    })),
   archiveIdea: (id, archived) =>
     set((state) => ({
       ideas: state.ideas.map((i) => (i.id === id ? { ...i, archived } : i)),
@@ -370,7 +391,11 @@ export const useStore = create<AppState>()(
         n.id === id ? { ...n, ...updates, updatedAt: nowISO() } : n,
       ),
     })),
-  deleteNote: (id) => set((state) => ({ notes: state.notes.filter((n) => n.id !== id) })),
+  deleteNote: (id) =>
+    set((state) => ({
+      notes: state.notes.filter((n) => n.id !== id),
+      tombstones: { ...state.tombstones, [`notes:${id}`]: nowISO() },
+    })),
   togglePinNote: (id) =>
     set((state) => ({
       notes: state.notes.map((n) => (n.id === id ? { ...n, pinned: !n.pinned } : n)),
@@ -403,6 +428,7 @@ export const useStore = create<AppState>()(
     set((state) => ({
       habits: state.habits.filter((h) => h.id !== id),
       habitLog: state.habitLog.filter((l) => l.habitId !== id),
+      tombstones: { ...state.tombstones, [`habits:${id}`]: nowISO() },
     })),
   toggleHabitToday: (id) =>
     set((state) => {
@@ -463,6 +489,8 @@ export const useStore = create<AppState>()(
     const { streak, freezeAvailable } = streakFromDays(days);
     set({ streak, longestStreak: Math.max(longestStreak, streak), freezeAvailable });
   },
+
+  tombstones: {},
 
   exportData: () => JSON.stringify(extractData(get()), null, 2),
 
@@ -562,6 +590,27 @@ function migrate(data: Record<string, unknown>): Record<string, unknown> {
   if (!Array.isArray(out.habits)) out.habits = [];
   if (!Array.isArray(out.habitLog)) out.habitLog = [];
   if (!out.pomodoro) out.pomodoro = defaultPomodoro;
+  if (!out.tombstones || typeof out.tombstones !== 'object') out.tombstones = {};
+
+  // Backfill the journey-start anchor for existing users from the earliest
+  // signal we have, so their pace verdict stays stable (computed once, frozen).
+  if (!out.journeyStart) {
+    let start = Infinity;
+    const scan = (arr: unknown, field: string) => {
+      if (!Array.isArray(arr)) return;
+      for (const x of arr) {
+        const v = (x as Record<string, unknown>)?.[field];
+        if (typeof v === 'string') {
+          const t = Date.parse(v);
+          if (isFinite(t)) start = Math.min(start, t);
+        }
+      }
+    };
+    scan(out.tasks, 'createdAt');
+    scan(out.activityHistory, 'date');
+    scan(out.focusSessions, 'date');
+    if (isFinite(start)) out.journeyStart = new Date(start).toISOString();
+  }
 
   return out;
 }
