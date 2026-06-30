@@ -6,6 +6,11 @@ on:
     - cron: '0 0 * * 0'
   workflow_dispatch:
 
+# Needed for the action to push a branch and open a PR.
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   maintenance:
     runs-on: ubuntu-latest
@@ -22,17 +27,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Update deps first, then gate the bump on typecheck + build + tests so a
+      # bad minor/patch can't reach the deployed branch unverified.
+      - name: Update dependencies
+        run: npm update
+
       - name: Typecheck and build
         run: npm run build
 
-      - name: Update dependencies automatically
-        run: |
-          npm update
-          if [[ `git status --porcelain` ]]; then
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git commit -am "chore: automated weekly dependency maintenance"
-            git push
-          else
-            echo "No updates needed."
-          fi
+      - name: Test
+        run: npm test
+
+      # Open a PR with the dependency changes instead of pushing straight to the
+      # deployed branch. No-op when `npm update` changed nothing.
+      - name: Open dependency-update PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: 'chore: automated weekly dependency maintenance'
+          branch: chore/automated-dependency-maintenance
+          delete-branch: true
+          title: 'chore: automated weekly dependency maintenance'
+          body: |
+            Automated weekly `npm update`. Typecheck, build, and tests passed in CI.
+            Review the lockfile/`package.json` diff before merging.

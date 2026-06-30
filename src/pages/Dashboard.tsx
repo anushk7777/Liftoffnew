@@ -107,21 +107,21 @@ function KpiCard({
 export default function Dashboard() {
   const {
     tasks, addTask, updateTask, cycleTaskStatus, streak, activityHistory, targetDate,
-    phases, focusSessions, ideas, pomodoro, habits, habitLog,
+    phases, focusSessions, ideas, pomodoro, habits, habitLog, journeyStart,
   } = useStore();
 
   const [quickTask, setQuickTask] = useState('');
   const onAct = useCoachActions();
 
   const { suggestions, briefing, plan } = useMemo(() => {
-    const state: CoachState = { phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate };
+    const state: CoachState = { phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate, journeyStart };
     const profile = buildProfile(state);
     return {
       suggestions: getSuggestions(state, profile),
       briefing: getBriefing(state),
       plan: buildDailyPlan(state, profile),
     };
-  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate]);
+  }, [phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate, journeyStart]);
 
   const todayStr = startOfDay(new Date()).toISOString();
 

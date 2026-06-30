@@ -11,8 +11,9 @@ import MobileShell from './mobile/MobileShell';
 import ModeTransition from './components/ModeTransition';
 import PWAPrompt from './components/PWAPrompt';
 import PanicButton from './components/PanicButton';
-import CommandPalette from './components/CommandPalette';
 import ErrorBoundary from './components/ErrorBoundary';
+// CommandPalette imports the heavy Afterburn store; lazy-load it (declared below)
+// so it stays out of the initial bundle until the palette is actually opened.
 import QuickAdd from './components/QuickAdd';
 import AlarmOverlay from './components/AlarmOverlay';
 import InstallPrompt from './components/InstallPrompt';
@@ -26,14 +27,18 @@ import Focus from './pages/Focus';
 import BrainDump from './pages/BrainDump';
 import Roadmap from './pages/Roadmap';
 const Stats = lazy(() => import('./pages/Stats'));
+// Code-split the heavy trees out of the initial bundle:
+//  - Afterburn pulls in afterburn/store + the ~900-line plan.ts data
+//  - CommandPalette pulls in the Afterburn store for its workout commands
+const Afterburn = lazy(() => import('./afterburn/Afterburn'));
+const CommandPalette = lazy(() => import('./components/CommandPalette'));
 import SettingsPage from './pages/Settings';
 import Schedule from './pages/Schedule';
 import Login from './pages/Login';
 import { EmptyState } from './components/ui';
 import { supabase } from './lib/supabase';
-import { useAppMode } from './afterburn/store';
+import { useAppMode } from './afterburn/mode';
 import ProfilePicker from './afterburn/ProfilePicker';
-import Afterburn from './afterburn/Afterburn';
 
 function NotFound() {
   return (
@@ -114,7 +119,11 @@ function Shell() {
       <PanicButton />
       <PWAPrompt />
       <InstallPrompt />
-      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      {paletteOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette onClose={() => setPaletteOpen(false)} />
+        </Suspense>
+      )}
       <AnimatePresence>
         {quickAddOpen && <QuickAdd key="quickadd" onClose={() => setQuickAddOpen(false)} />}
       </AnimatePresence>
@@ -140,7 +149,9 @@ function Shell() {
   if (appMode === 'afterburn')
     return (
       <>
-        <Afterburn />
+        <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center text-ink-subtle animate-pulse">Loading…</div>}>
+          <Afterburn />
+        </Suspense>
         {/* Global overlays that must reach Afterburn too — most importantly the
             PWA "Update available" prompt, so users who live in Afterburn on
             mobile actually receive new builds. Focus-only widgets (panic button,
@@ -148,7 +159,11 @@ function Shell() {
         <OfflineBanner />
         <PWAPrompt />
         <InstallPrompt />
-        {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+        {paletteOpen && (
+          <Suspense fallback={null}>
+            <CommandPalette onClose={() => setPaletteOpen(false)} />
+          </Suspense>
+        )}
         <AlarmOverlay />
       </>
     );

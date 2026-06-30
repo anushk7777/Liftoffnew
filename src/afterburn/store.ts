@@ -8,7 +8,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { DEFAULT_PROGRAM } from './plan';
 import { DEFAULT_NUTRITION } from './nutrition';
 import type { NutritionProfile } from './nutrition';
-import type { AppMode, BodyEntry, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, WeekPlan, WeightUnit, WorkoutProgram, WorkoutSession } from './types';
+import type { BodyEntry, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, WeekPlan, WeightUnit, WorkoutProgram, WorkoutSession } from './types';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const blankSet = (): LoggedSet => ({ id: uid(), weight: '', reps: '', rpe: '', rating: 0, done: false });
@@ -537,12 +537,6 @@ useAfterburn.subscribe((state) => {
   }, 1000);
 });
 
-interface ModeState {
-  mode: AppMode | null;
-  setMode: (m: AppMode | null) => void;
-}
-
-/** Which app is active. `null` => show the profile picker. */
-export const useAppMode = create<ModeState>()(
-  persist((set) => ({ mode: null, setMode: (mode) => set({ mode }) }), { name: 'liftoff-app-mode' }),
-);
+// `useAppMode` lives in ./mode so the eager app shell can import it without
+// pulling this heavy store (and plan.ts) into the initial bundle.
+export { useAppMode } from './mode';

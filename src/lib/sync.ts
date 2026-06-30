@@ -71,6 +71,31 @@ function unionBy(base: unknown[], other: unknown[], key: (x: unknown) => string)
   return out;
 }
 
+// Tombstones bound: drop deletion records older than this so the map can't grow
+// without limit. A re-add after this window could resurrect an item, but 90d is
+// far longer than any realistic offline gap.
+const TOMBSTONE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
+// Merge two tombstone maps (`"collection:id" -> deletedAt ISO`), keeping the
+// newest deletion per key and pruning anything past the TTL.
+export function mergeTombstones(
+  a: unknown,
+  b: unknown,
+  nowMs: number,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const src of [a, b]) {
+    if (!src || typeof src !== 'object') continue;
+    for (const [key, v] of Object.entries(src as Record<string, unknown>)) {
+      if (typeof v !== 'string' || !v) continue;
+      const t = new Date(v).getTime();
+      if (!isFinite(t) || nowMs - t > TOMBSTONE_TTL_MS) continue;
+      if (!out[key] || t > new Date(out[key]).getTime()) out[key] = v;
+    }
+  }
+  return out;
+}
+
 // Recency-guarded, non-destructive merge:
 //  - id-keyed collections (tasks / ideas / notes / habits) and the append-only
 //    logs are UNIONED by their natural key, so concurrent additions on either
@@ -78,9 +103,10 @@ function unionBy(base: unknown[], other: unknown[], key: (x: unknown) => string)
 //    conflicts, so the most recent edit of an item takes precedence.
 //  - scalar settings + the roadmap (theme, targetDate, pomodoro, streak,
 //    phases, …) take the recency winner via the `...base` spread.
-// Trade-off: without tombstones, deleting an item on one device can be undone by
-// an add still present on the other. For a personal app, preserving the user's
-// data is worth more than propagating every deletion instantly.
+//  - DELETIONS are honoured via a merged `tombstones` map: any unioned item
+//    whose `"collection:id"` is tombstoned is filtered out, so deleting on one
+//    device is no longer undone by a stale add on the other. Delete wins over a
+//    concurrent edit (acceptable for a personal app).
 export function mergeState(
   local: AnyState,
   cloud: AnyState,
@@ -94,14 +120,24 @@ export function mergeState(
   const byId = (field: string) => (x: unknown) => String(k(x)[field] ?? '');
   const union = (field: string, keyFn: (x: unknown) => string) =>
     unionBy(asArray(base, field), asArray(other, field), keyFn);
+
+  const tombstones = mergeTombstones(base.tombstones, other.tombstones, Date.now());
+  // Drop any unioned item that has been tombstoned.
+  const live = (field: string, items: unknown[], keyFn: (x: unknown) => string) =>
+    items.filter((it) => !tombstones[`${field}:${keyFn(it)}`]);
+
   return {
     ...base,
-    tasks: union('tasks', byId('id')),
-    ideas: union('ideas', byId('id')),
-    notes: union('notes', byId('id')),
-    habits: union('habits', byId('id')),
+    tombstones,
+    tasks: live('tasks', union('tasks', byId('id')), byId('id')),
+    ideas: live('ideas', union('ideas', byId('id')), byId('id')),
+    notes: live('notes', union('notes', byId('id')), byId('id')),
+    habits: live('habits', union('habits', byId('id')), byId('id')),
     focusSessions: union('focusSessions', byId('id')),
     activityHistory: union('activityHistory', (a) => String(k(a).date)),
-    habitLog: union('habitLog', (l) => `${k(l).habitId}:${k(l).date}`),
+    // Logs for a deleted habit shouldn't linger either.
+    habitLog: union('habitLog', (l) => `${k(l).habitId}:${k(l).date}`).filter(
+      (l) => !tombstones[`habits:${k(l).habitId}`],
+    ),
   };
 }

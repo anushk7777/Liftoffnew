@@ -14,7 +14,7 @@ import {
   Flame,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { useAppMode } from '../afterburn/store';
+import { useAppMode } from '../afterburn/mode';
 import { cn } from '../lib/utils';
 
 const NAV = [

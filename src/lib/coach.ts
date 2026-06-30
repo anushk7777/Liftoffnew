@@ -23,6 +23,8 @@ export interface CoachState {
   habits: Habit[];
   habitLog: HabitLog[];
   targetDate: string;
+  // Explicit start anchor for pace math; falls back to inference when absent.
+  journeyStart?: string;
 }
 
 // ---- Goal-drift / pace monitoring ---------------------------------------
@@ -56,11 +58,14 @@ export function getBriefing(state: CoachState, now = new Date()): Briefing {
     };
   }
 
-  // Infer the journey start from the earliest signal we have.
-  let start = Infinity;
-  for (const t of state.tasks) if (t.createdAt) start = Math.min(start, Date.parse(t.createdAt));
-  for (const a of state.activityHistory) start = Math.min(start, Date.parse(a.date));
-  for (const f of state.focusSessions) start = Math.min(start, Date.parse(f.date));
+  // Anchor the journey start to the explicit field when set; otherwise fall
+  // back to inferring it from the earliest signal we have.
+  let start = state.journeyStart ? Date.parse(state.journeyStart) : Infinity;
+  if (!isFinite(start)) {
+    for (const t of state.tasks) if (t.createdAt) start = Math.min(start, Date.parse(t.createdAt));
+    for (const a of state.activityHistory) start = Math.min(start, Date.parse(a.date));
+    for (const f of state.focusSessions) start = Math.min(start, Date.parse(f.date));
+  }
   if (!isFinite(start)) start = now.getTime();
 
   const total = target.getTime() - start;

@@ -1,5 +1,5 @@
 import { Rocket, Flame } from 'lucide-react';
-import { useAppMode } from './store';
+import { useAppMode } from './mode';
 
 // Shown right after login when no workspace is chosen yet.
 export default function ProfilePicker() {

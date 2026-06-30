@@ -5,7 +5,7 @@ import {
   Map, Sparkles, Repeat, Inbox, BarChart3, Settings as SettingsIcon, Moon, Sun, Flame,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { useAppMode } from '../afterburn/store';
+import { useAppMode } from '../afterburn/mode';
 import { cn } from '../lib/utils';
 import { haptics } from '../lib/haptics';
 import { BottomSheet } from './components/BottomSheet';
