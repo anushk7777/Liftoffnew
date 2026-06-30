@@ -4,6 +4,7 @@
 // call). Reuses the shared streamGemini helper + the same local Gemini key.
 import { streamGemini } from '../lib/aicoach';
 import { completionMap, dayCompletionKey, exerciseProgress, loggedExerciseNames } from './store';
+import { analyzeVolume, MUSCLE_LABEL } from './volume';
 import { computeTargets, computeCycling, weightTrendKgPerWeek, GOALS } from './nutrition';
 import type { NutritionProfile } from './nutrition';
 import type { BodyEntry, WorkoutProgram, WorkoutSession } from './types';
@@ -28,6 +29,11 @@ Macronutrient quality & ratio (Module 2 — use when relevant):
 - Protein: best in 25–40 g doses per meal to stimulate muscle protein synthesis (ceiling ~70 g); the post-workout anabolic window is wide (~24 h), so total daily protein matters more than timing. Protein has the highest thermic effect and is the most satiating macro.
 - Very low carb raises cortisol (→ muscle breakdown) and can lower thyroid output and energy; the body makes glucose from protein via gluconeogenesis but that is not a reason to under-eat carbs when training hard.
 - Fibre ~14 g/1000 kcal: prefer mixed sources; raw resistant starch (uncooked oats/potato) can bloat, while beta-glucan (oats/barley) helps lower cholesterol.
+
+Training volume (hard sets per muscle per week — the primary hypertrophy driver):
+- Judge each muscle against its volume landmarks: MEV (minimum effective volume — below it the muscle barely grows), MAV (the productive/adaptive sweet-spot range above MEV), and MRV (maximum recoverable — beyond it is junk volume that hurts recovery). These are population guidelines, not exact per-person numbers.
+- Below MEV → add sets to start growing. Inside MEV–MAV → progress by adding ~1–2 sets/week when recovery allows. Near MRV → hold and plan a deload. Over MRV → cut back; more isn't better once recovery is exceeded. A muscle trained at 0 sets isn't progressing at all.
+- The \`volume\` block in the data already classifies the user's lifts into muscles and grades each against these landmarks — cite its numbers (sets vs MEV/MAV/MRV) directly.
 
 Style: lead with one sentence on how training + nutrition are trending. Then give 3 prioritized, concrete actions, each tied to a specific number from the data (name the lift, the week, the kcal/macro, the weight trend). Be honest and specific. Plain text only — no markdown headers or asterisks; use "- " for lists. One-shot: don't ask questions or offer more unless the user asked one.`;
 
@@ -91,11 +97,30 @@ function buildContext(d: CoachData): string {
   const trend = weightTrendKgPerWeek(bodyweight);
   const goalLabel = GOALS.find((g) => g.id === nutrition.goal)?.label ?? nutrition.goal;
 
+  // Per-muscle weekly-set analysis vs MEV/MAV/MRV landmarks.
+  const v = analyzeVolume(sessions);
+  const volume = v.hasData
+    ? {
+        summary: v.headline,
+        byMuscle: v.trained.map((m) => ({
+          muscle: m.label,
+          sets: m.sets,
+          mev: m.landmark.mev,
+          mav: m.landmark.mav,
+          mrv: m.landmark.mrv,
+          status: m.status,
+          advice: m.recommendation,
+        })),
+        notTrainedThisWeek: v.neglected.map((mu) => MUSCLE_LABEL[mu]),
+      }
+    : null;
+
   const ctx = {
     program: program.name,
     adherence,
     recentSessions: recent,
     strengthTrend: trends,
+    volume,
     bodyweight: {
       latestKg: bodyweight[0]?.weight ?? null,
       weeklyTrendKg: trend != null ? Math.round(trend * 100) / 100 : null,

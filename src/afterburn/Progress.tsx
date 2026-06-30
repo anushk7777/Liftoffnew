@@ -1,9 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus, Sparkles, Gauge } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAfterburn, weeklyVolume, volumeTrend, weekAdherence, detectPRs, formatVolume } from './store';
+import { analyzeVolume, MUSCLE_LABEL } from './volume';
+import type { MuscleAnalysis, VolumeStatus } from './volume';
 import { GOALS, weightTrendKgPerWeek } from './nutrition';
 import { AnimatedNumber } from '../components/ui';
 import { useReducedMotion, springSoft } from '../lib/motion';
@@ -30,6 +32,48 @@ function MomentumTile({ icon, label, children, tone }: { icon: ReactNode; label:
   );
 }
 
+const VOL_STATUS: Record<VolumeStatus, { label: string; color: string; chip: string }> = {
+  below: { label: 'Below MEV', color: 'var(--warning)', chip: 'text-[var(--warning)] bg-[var(--accent-soft)]' },
+  untrained: { label: 'Untrained', color: 'var(--border)', chip: 'text-ink-subtle bg-elevated' },
+  optimal: { label: 'Optimal', color: 'var(--success)', chip: 'text-success bg-success/15' },
+  high: { label: 'Near MRV', color: 'var(--ember)', chip: 'text-ember bg-ember-soft' },
+  excessive: { label: 'Over MRV', color: 'var(--danger)', chip: 'text-danger bg-danger/15' },
+};
+
+/** A horizontal bar of weekly sets, with reference ticks at MEV / MAV / MRV. */
+function VolumeBar({ m }: { m: MuscleAnalysis }) {
+  const scaleMax = m.landmark.mrv * 1.15;
+  const pct = (v: number) => `${Math.min(100, (v / scaleMax) * 100)}%`;
+  return (
+    <div className="relative h-2.5 rounded-full bg-elevated overflow-hidden">
+      <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: pct(m.sets), backgroundColor: VOL_STATUS[m.status].color }} />
+      {[m.landmark.mev, m.landmark.mav, m.landmark.mrv].map((v, i) => (
+        <div key={i} className="absolute inset-y-0 w-px bg-ink/40" style={{ left: pct(v) }} title={`${['MEV', 'MAV', 'MRV'][i]} ${v}`} />
+      ))}
+    </div>
+  );
+}
+
+function VolumeRow({ m }: { m: MuscleAnalysis }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-ink flex items-center gap-1">
+          {m.label}
+          {m.dir === 'up' && <TrendingUp className="w-3 h-3 text-ember" />}
+          {m.dir === 'down' && <TrendingDown className="w-3 h-3 text-[var(--warning)]" />}
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="text-xs text-ink-subtle tabular-nums">{m.sets} sets</span>
+          <span className={cn('chip !px-1.5 !py-0.5 text-[10px] font-semibold border-0', VOL_STATUS[m.status].chip)}>{VOL_STATUS[m.status].label}</span>
+        </span>
+      </div>
+      <VolumeBar m={m} />
+      {m.status !== 'optimal' && <p className="text-[11px] text-ink-subtle">{m.recommendation}</p>}
+    </div>
+  );
+}
+
 export default function Progress() {
   const unit = useAfterburn((s) => s.program.unit);
   const bodyweight = useAfterburn((s) => s.bodyweight);
@@ -46,6 +90,9 @@ export default function Progress() {
   const volume = useMemo(() => weeklyVolume(sessions), [sessions]);
   const volPoints: ChartPoint[] = volume.map((v) => ({ date: v.weekStart, value: v.volume }));
   const latestWeek = volume[volume.length - 1];
+
+  // ---- "Volume IQ" — hard sets per muscle vs scientific landmarks ----
+  const vol = useMemo(() => analyzeVolume(sessions), [sessions]);
 
   // ---- "Momentum" progress signals ----
   const vt = useMemo(() => volumeTrend(sessions), [sessions]);
@@ -166,6 +213,51 @@ export default function Progress() {
             </p>
           </div>
         </section>
+      )}
+
+      {/* Volume IQ — hard sets per muscle vs MEV / MAV / MRV landmarks */}
+      {vol.hasData && vol.trained.length > 0 && (
+        <motion.section
+          initial={rm ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
+          className="space-y-3"
+        >
+          <h2 className="section-label flex items-center gap-1.5">
+            <Gauge className="w-3.5 h-3.5" /> Volume IQ
+          </h2>
+          <div className="neo-card p-5 space-y-4">
+            <div>
+              <p className="text-sm text-ink font-medium">{vol.headline}</p>
+              <p className="text-[11px] text-ink-subtle mt-1">
+                Hard sets per muscle this week vs your science-based landmarks — ticks mark MEV (start growing), MAV (sweet spot) and MRV (recovery ceiling).
+              </p>
+            </div>
+
+            <div className="space-y-3.5">
+              {vol.trained.map((m) => (
+                <VolumeRow key={m.muscle} m={m} />
+              ))}
+            </div>
+
+            {vol.neglected.length > 0 && (
+              <div className="pt-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-1.5">Not trained this week</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {vol.neglected.map((mu) => (
+                    <span key={mu} className="chip text-ink-subtle bg-elevated border-0 !text-[11px]">{MUSCLE_LABEL[mu]}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {vol.unclassified.length > 0 && (
+              <p className="text-[11px] text-ink-subtle border-t border-border pt-2">
+                Not counted (unrecognized lift): {vol.unclassified.join(', ')}. Rename it to a standard movement and it'll be tracked.
+              </p>
+            )}
+          </div>
+        </motion.section>
       )}
 
       {/* Bodyweight */}

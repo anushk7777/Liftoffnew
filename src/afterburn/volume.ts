@@ -1,0 +1,275 @@
+// Afterburn "Volume IQ" — a smart, evidence-based training-volume analyzer.
+//
+// Total tonnage (weight×reps) is a poor lens for "am I training each muscle
+// enough?" The unit that actually drives hypertrophy is HARD SETS PER MUSCLE PER
+// WEEK, judged against the volume LANDMARKS popularized by Dr. Mike Israetel /
+// Renaissance Periodization:
+//   MV  — maintenance volume (keep what you have)
+//   MEV — minimum effective volume (least that still grows the muscle)
+//   MAV — maximum *adaptive* volume (the productive sweet-spot ceiling)
+//   MRV — maximum *recoverable* volume (beyond this is junk / overreaching)
+//
+// Exercises are logged as free-text names with no muscle tag, so we classify
+// each lift to the muscle(s) it trains and credit a working set 1.0 to each
+// primary muscle and 0.5 to each secondary (the standard fractional-set method).
+// Everything here is pure + deterministic so it's unit-testable and runs
+// entirely on-device.
+import type { WorkoutSession } from './types';
+
+export type Muscle =
+  | 'chest'
+  | 'back'
+  | 'quads'
+  | 'hamstrings'
+  | 'glutes'
+  | 'shoulders'
+  | 'biceps'
+  | 'triceps'
+  | 'calves'
+  | 'abs'
+  | 'traps'
+  | 'forearms';
+
+export const MUSCLE_LABEL: Record<Muscle, string> = {
+  chest: 'Chest',
+  back: 'Back',
+  quads: 'Quads',
+  hamstrings: 'Hamstrings',
+  glutes: 'Glutes',
+  shoulders: 'Shoulders',
+  biceps: 'Biceps',
+  triceps: 'Triceps',
+  calves: 'Calves',
+  abs: 'Abs',
+  traps: 'Traps',
+  forearms: 'Forearms',
+};
+
+export interface Landmark {
+  mev: number; // minimum effective volume (sets/week)
+  mav: number; // top of the productive/adaptive range
+  mrv: number; // maximum recoverable volume
+}
+
+// Weekly-set landmarks per muscle. Mid-range published values (RP volume
+// landmarks); they are population guidelines, not per-person truth, so the UI
+// frames them as targets to steer by, not hard rules.
+export const LANDMARKS: Record<Muscle, Landmark> = {
+  chest: { mev: 10, mav: 18, mrv: 22 },
+  back: { mev: 10, mav: 18, mrv: 25 },
+  quads: { mev: 8, mav: 16, mrv: 20 },
+  hamstrings: { mev: 6, mav: 14, mrv: 20 },
+  glutes: { mev: 4, mav: 12, mrv: 16 },
+  shoulders: { mev: 8, mav: 18, mrv: 26 },
+  biceps: { mev: 8, mav: 16, mrv: 26 },
+  triceps: { mev: 6, mav: 14, mrv: 18 },
+  calves: { mev: 8, mav: 14, mrv: 20 },
+  abs: { mev: 6, mav: 16, mrv: 25 },
+  traps: { mev: 4, mav: 14, mrv: 26 },
+  forearms: { mev: 6, mav: 12, mrv: 25 },
+};
+
+export const ALL_MUSCLES = Object.keys(LANDMARKS) as Muscle[];
+
+interface Rule {
+  kw: string[]; // any of these substrings (lowercased) matches
+  primary: Muscle[];
+  secondary?: Muscle[];
+}
+
+// Ordered most-specific → most-general; the FIRST matching rule wins, so e.g.
+// "leg curl" is caught as hamstrings before the generic "curl" → biceps rule,
+// and "upright row" / "overhead press" are caught before plain "row" / a bench.
+const RULES: Rule[] = [
+  // Forearms first (so "reverse curl" / "wrist curl" don't fall to biceps).
+  { kw: ['wrist curl', 'reverse curl', 'forearm', 'wrist roller'], primary: ['forearms'] },
+  // Hamstring isolation before the generic "curl" and the squat group.
+  { kw: ['leg curl', 'lying curl', 'seated leg curl', 'hamstring curl', 'nordic'], primary: ['hamstrings'] },
+  { kw: ['romanian', 'rdl', 'stiff leg', 'stiff-leg', 'stiff legged', 'good morning'], primary: ['hamstrings'], secondary: ['glutes', 'back'] },
+  { kw: ['hip thrust', 'glute bridge', 'glute', 'hip-thrust'], primary: ['glutes'], secondary: ['hamstrings'] },
+  { kw: ['calf', 'calve', 'soleus'], primary: ['calves'] },
+  { kw: ['leg extension', 'quad extension', 'knee extension', 'sissy'], primary: ['quads'] },
+  { kw: ['squat', 'leg press', 'hack', 'lunge', 'split squat', 'bulgarian', 'step up', 'step-up', 'pendulum'], primary: ['quads'], secondary: ['glutes'] },
+  { kw: ['deadlift', 'dead lift'], primary: ['back'], secondary: ['hamstrings', 'glutes'] },
+  { kw: ['shrug'], primary: ['traps'] },
+  { kw: ['upright row'], primary: ['shoulders'], secondary: ['traps'] },
+  { kw: ['face pull', 'rear delt', 'reverse fly', 'rear fly', 'reverse pec', 'rear-delt'], primary: ['shoulders'], secondary: ['traps'] },
+  { kw: ['pullover'], primary: ['back'], secondary: ['chest'] },
+  { kw: ['pulldown', 'pull down', 'pull-down', 'pull up', 'pull-up', 'pullup', 'chin up', 'chin-up', 'chinup', 'lat pull'], primary: ['back'], secondary: ['biceps'] },
+  { kw: ['row'], primary: ['back'], secondary: ['biceps'] },
+  { kw: ['lateral raise', 'lat raise', 'side raise', 'side lateral', 'lateral'], primary: ['shoulders'] },
+  { kw: ['overhead press', 'shoulder press', 'military', 'arnold', 'push press', 'ohp', 'db press', 'z press'], primary: ['shoulders'], secondary: ['triceps'] },
+  // Triceps before chest so "close grip bench" / pressdowns aren't read as chest.
+  { kw: ['tricep', 'pushdown', 'pressdown', 'skull', 'kickback', 'jm press', 'close grip', 'close-grip', 'overhead extension', 'french press', 'dip machine'], primary: ['triceps'] },
+  { kw: ['fly', 'pec deck', 'pec fly', 'cable crossover', 'chest fly'], primary: ['chest'] },
+  { kw: ['incline'], primary: ['chest'], secondary: ['shoulders', 'triceps'] },
+  { kw: ['bench', 'chest press', 'chest', 'pec', 'dip', 'push up', 'push-up', 'pushup'], primary: ['chest'], secondary: ['triceps', 'shoulders'] },
+  // Biceps last among the arm rules (generic "curl" only reaches here once leg/
+  // wrist/reverse curls are excluded above).
+  { kw: ['bicep', 'preacher', 'hammer', 'concentration', 'curl'], primary: ['biceps'], secondary: ['forearms'] },
+  { kw: ['crunch', 'sit up', 'sit-up', 'situp', 'plank', 'leg raise', 'hanging', 'ab wheel', 'ab-wheel', 'woodchop', 'russian twist', 'oblique', 'toes to bar', 'knee raise', 'cable crunch'], primary: ['abs'] },
+];
+
+/** Classify a logged exercise name to the muscle(s) it trains, or null if we
+ *  can't recognize it (surfaced so the user knows what isn't being counted). */
+export function classifyExercise(name: string): { primary: Muscle[]; secondary: Muscle[] } | null {
+  const n = name.toLowerCase();
+  for (const r of RULES) {
+    if (r.kw.some((k) => n.includes(k))) return { primary: r.primary, secondary: r.secondary ?? [] };
+  }
+  return null;
+}
+
+/** A logged set counts as a "hard set" if it was actually performed — it has a
+ *  rep count, or was explicitly marked done (covers bodyweight work with no
+ *  weight, e.g. pull-ups / planks). */
+function isHardSet(reps: string, done: boolean): boolean {
+  const r = parseInt(reps, 10);
+  return (Number.isFinite(r) && r > 0) || done;
+}
+
+const mondayStartISO = (iso: string): string | null => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back up to Monday
+  return d.toISOString();
+};
+
+const emptySets = (): Record<Muscle, number> =>
+  ALL_MUSCLES.reduce((acc, m) => ((acc[m] = 0), acc), {} as Record<Muscle, number>);
+
+export interface MuscleWeek {
+  weekStart: string;
+  sets: Record<Muscle, number>;
+}
+
+/** Hard sets per muscle per calendar week (Monday-start), oldest→newest. Each
+ *  working set credits 1.0 to every primary muscle and 0.5 to every secondary. */
+export function muscleSetsByWeek(sessions: WorkoutSession[]): MuscleWeek[] {
+  const byWeek = new Map<string, Record<Muscle, number>>();
+  for (const s of sessions) {
+    const key = mondayStartISO(s.completedAt ?? s.date);
+    if (!key) continue;
+    let acc = byWeek.get(key);
+    if (!acc) {
+      acc = emptySets();
+      byWeek.set(key, acc);
+    }
+    for (const e of s.entries) {
+      const cls = classifyExercise(e.name);
+      if (!cls) continue;
+      const hard = e.sets.reduce((n, st) => n + (isHardSet(st.reps, st.done) ? 1 : 0), 0);
+      if (hard === 0) continue;
+      for (const m of cls.primary) acc[m] += hard;
+      for (const m of cls.secondary) acc[m] += hard * 0.5;
+    }
+  }
+  return [...byWeek.entries()]
+    .map(([weekStart, sets]) => ({ weekStart, sets }))
+    .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+}
+
+export type VolumeStatus = 'untrained' | 'below' | 'optimal' | 'high' | 'excessive';
+
+export interface MuscleAnalysis {
+  muscle: Muscle;
+  label: string;
+  sets: number; // this week's hard sets (rounded to 0.5)
+  prevSets: number; // previous week's hard sets
+  dir: 'up' | 'down' | 'flat';
+  landmark: Landmark;
+  status: VolumeStatus;
+  suggestedSets: number; // a smart target for next week
+  recommendation: string; // plain-language coaching
+}
+
+export interface VolumeReport {
+  hasData: boolean;
+  weekStart: string | null;
+  weeksLogged: number;
+  muscles: MuscleAnalysis[]; // sorted most-actionable first
+  trained: MuscleAnalysis[]; // muscles with sets > 0 this week (the bars to show)
+  neglected: Muscle[]; // landmark muscles with 0 sets this week
+  headline: string;
+  unclassified: string[]; // distinct logged names we couldn't map to a muscle
+}
+
+const round5 = (n: number) => Math.round(n * 2) / 2;
+
+// Ranking so the most useful advice floats to the top of the list/UI.
+const SEVERITY: Record<VolumeStatus, number> = { excessive: 0, below: 1, untrained: 2, high: 3, optimal: 4 };
+
+function judge(sets: number, lm: Landmark): { status: VolumeStatus; suggestedSets: number; recommendation: string } {
+  if (sets <= 0)
+    return {
+      status: 'untrained',
+      suggestedSets: lm.mev,
+      recommendation: `Not trained this week. If it's a target, start around ${lm.mev} sets/wk (its minimum effective volume).`,
+    };
+  if (sets < lm.mev) {
+    const add = Math.max(1, Math.round(lm.mev - sets));
+    return {
+      status: 'below',
+      suggestedSets: lm.mev,
+      recommendation: `Below MEV (${lm.mev}). Add ~${add} set${add > 1 ? 's' : ''}/wk to actually drive growth.`,
+    };
+  }
+  if (sets <= lm.mav) {
+    const target = Math.min(lm.mav, round5(sets + 2));
+    return {
+      status: 'optimal',
+      suggestedSets: target,
+      recommendation: `In the productive zone (${lm.mev}–${lm.mav}). If recovery's good, push toward ${target} sets next week.`,
+    };
+  }
+  if (sets <= lm.mrv)
+    return {
+      status: 'high',
+      suggestedSets: round5(sets),
+      recommendation: `Near your max recoverable (${lm.mrv}). Hold here, watch recovery, and plan a deload soon.`,
+    };
+  return {
+    status: 'excessive',
+    suggestedSets: lm.mav,
+    recommendation: `Over MRV (${lm.mrv}) — likely junk volume / overreaching. Cut back to ~${lm.mav} sets.`,
+  };
+}
+
+/** Analyze the most recent logged training week against the volume landmarks
+ *  and produce per-muscle status + concrete recommendations. */
+export function analyzeVolume(sessions: WorkoutSession[]): VolumeReport {
+  const weeks = muscleSetsByWeek(sessions);
+  if (weeks.length === 0) {
+    return { hasData: false, weekStart: null, weeksLogged: 0, muscles: [], trained: [], neglected: [], headline: 'Log a workout to see your per-muscle volume.', unclassified: [] };
+  }
+  const latest = weeks[weeks.length - 1];
+  const prev = weeks[weeks.length - 2];
+
+  const muscles: MuscleAnalysis[] = ALL_MUSCLES.map((m) => {
+    const sets = round5(latest.sets[m] ?? 0);
+    const prevSets = round5(prev?.sets[m] ?? 0);
+    const lm = LANDMARKS[m];
+    const { status, suggestedSets, recommendation } = judge(sets, lm);
+    const dir: MuscleAnalysis['dir'] = !prev ? 'flat' : sets > prevSets + 0.5 ? 'up' : sets < prevSets - 0.5 ? 'down' : 'flat';
+    return { muscle: m, label: MUSCLE_LABEL[m], sets, prevSets, dir, landmark: lm, status, suggestedSets, recommendation };
+  });
+
+  const sorted = [...muscles].sort((a, b) => SEVERITY[a.status] - SEVERITY[b.status] || b.sets - a.sets || a.label.localeCompare(b.label));
+  const trained = sorted.filter((m) => m.sets > 0);
+  const neglected = muscles.filter((m) => m.sets === 0).map((m) => m.muscle);
+
+  // Distinct unrecognized exercise names (so under-counting is transparent).
+  const unclassified = [...new Set(sessions.flatMap((s) => s.entries.filter((e) => !classifyExercise(e.name) && e.sets.some((st) => isHardSet(st.reps, st.done))).map((e) => e.name)))].sort();
+
+  const under = muscles.filter((m) => m.status === 'below' || m.status === 'untrained').length;
+  const over = muscles.filter((m) => m.status === 'excessive').length;
+  const dialed = muscles.filter((m) => m.status === 'optimal' || m.status === 'high').length;
+  const parts: string[] = [];
+  if (over) parts.push(`${over} over your recoverable limit`);
+  if (under) parts.push(`${under} under-trained`);
+  if (dialed) parts.push(`${dialed} dialed in`);
+  const headline = parts.length ? `This week: ${parts.join(', ')}.` : 'Log a full training week to read your volume.';
+
+  return { hasData: true, weekStart: latest.weekStart, weeksLogged: weeks.length, muscles: sorted, trained, neglected, headline, unclassified };
+}
