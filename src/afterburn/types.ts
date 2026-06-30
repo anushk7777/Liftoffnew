@@ -92,6 +92,8 @@ export interface WorkoutSession {
   weekName?: string; // denormalized label, e.g. "Week 3" — survives a program swap
   date: string; // ISO — when started
   completedAt?: string; // ISO — when finished
+  endedEarly?: boolean; // user cut the session short (e.g. didn't feel recovered)
+  endNote?: string; // why it was ended early
   entries: LoggedExercise[];
 }
 
@@ -100,5 +102,14 @@ export interface BodyEntry {
   id: string;
   date: string; // ISO
   weight: number;
+  note?: string;
+}
+
+/** A daily CO2 tolerance test score (controlled-exhale seconds) — a proxy for
+ *  autonomic recovery / readiness, per Andrew Huberman / Brian Mackenzie. */
+export interface RecoveryEntry {
+  id: string;
+  date: string; // ISO
+  co2Score: number; // seconds of slow controlled exhale after a full inhale
   note?: string;
 }

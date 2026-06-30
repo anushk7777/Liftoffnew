@@ -1,11 +1,13 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus, Sparkles, Gauge } from 'lucide-react';
+import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus, Sparkles, Gauge, Wind, Play, Square } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAfterburn, weeklyVolume, volumeTrend, weekAdherence, detectPRs, formatVolume } from './store';
 import { analyzeVolume, MUSCLE_LABEL } from './volume';
 import type { MuscleAnalysis, VolumeStatus } from './volume';
+import { recoveryReadiness, co2Band } from './recovery';
+import type { ReadinessVerdict } from './recovery';
 import { GOALS, weightTrendKgPerWeek } from './nutrition';
 import { AnimatedNumber } from '../components/ui';
 import { useReducedMotion, springSoft } from '../lib/motion';
@@ -74,6 +76,77 @@ function VolumeRow({ m }: { m: MuscleAnalysis }) {
   );
 }
 
+const READINESS: Record<ReadinessVerdict, { label: string; color: string; bg: string }> = {
+  recovered: { label: 'Recovered', color: 'text-success', bg: 'var(--success)' },
+  moderate: { label: 'Moderate', color: 'text-ember', bg: 'var(--ember)' },
+  under: { label: 'Under-recovered', color: 'text-[var(--warning)]', bg: 'var(--warning)' },
+  na: { label: 'No data yet', color: 'text-ink-subtle', bg: 'var(--border)' },
+};
+
+/** The CO2 tolerance test: a guided exhale timer + a manual seconds entry. */
+function CO2Test({ onLog }: { onLog: (score: number) => void }) {
+  const [running, setRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef(0);
+  const [manual, setManual] = useState('');
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setElapsed((Date.now() - startRef.current) / 1000), 100);
+    return () => clearInterval(id);
+  }, [running]);
+
+  const start = () => {
+    startRef.current = Date.now();
+    setElapsed(0);
+    setRunning(true);
+  };
+  const stop = () => {
+    setRunning(false);
+    const s = Math.round((Date.now() - startRef.current) / 1000);
+    if (s > 0) onLog(s);
+  };
+  const logManual = () => {
+    const s = Math.round(parseFloat(manual));
+    if (Number.isFinite(s) && s > 0) {
+      onLog(s);
+      setManual('');
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {running ? (
+        <button onClick={stop} className="w-full rounded-xl border border-ember bg-ember-soft py-4 flex flex-col items-center">
+          <span className="font-mono-data text-4xl font-bold text-ink tabular-nums">{elapsed.toFixed(1)}s</span>
+          <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-ember"><Square className="w-3.5 h-3.5" /> Exhale slowly… tap to stop &amp; log</span>
+        </button>
+      ) : (
+        <button onClick={start} className="btn btn-primary w-full">
+          <Play className="w-4 h-4" /> Start CO2 test
+        </button>
+      )}
+      <div className="flex gap-2">
+        <input
+          type="number"
+          inputMode="decimal"
+          value={manual}
+          onChange={(e) => setManual(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && logManual()}
+          placeholder="…or enter seconds manually"
+          className="input flex-1"
+        />
+        <button onClick={logManual} disabled={!manual.trim()} className="btn btn-secondary disabled:opacity-50">
+          <Plus className="w-4 h-4" /> Log
+        </button>
+      </div>
+      <p className="text-[11px] text-ink-subtle">
+        A few easy breaths, then one full inhale — then exhale as slowly and controlled as you can. The timer measures your exhale; longer = better recovery.
+      </p>
+    </div>
+  );
+}
+
 export default function Progress() {
   const unit = useAfterburn((s) => s.program.unit);
   const bodyweight = useAfterburn((s) => s.bodyweight);
@@ -83,6 +156,9 @@ export default function Progress() {
   const nutrition = useAfterburn((s) => s.nutrition);
   const addBodyweight = useAfterburn((s) => s.addBodyweight);
   const deleteBodyweight = useAfterburn((s) => s.deleteBodyweight);
+  const recovery = useAfterburn((s) => s.recovery);
+  const addRecovery = useAfterburn((s) => s.addRecovery);
+  const deleteRecovery = useAfterburn((s) => s.deleteRecovery);
   const rm = useReducedMotion();
 
   const [w, setW] = useState('');
@@ -93,6 +169,13 @@ export default function Progress() {
 
   // ---- "Volume IQ" — hard sets per muscle vs scientific landmarks ----
   const vol = useMemo(() => analyzeVolume(sessions), [sessions]);
+
+  // ---- Recovery — CO2 tolerance test readiness ----
+  const readiness = useMemo(() => recoveryReadiness(recovery), [recovery]);
+  const recoveryPoints: ChartPoint[] = useMemo(
+    () => [...recovery].sort((a, b) => a.date.localeCompare(b.date)).map((r) => ({ date: r.date, value: r.co2Score })),
+    [recovery],
+  );
 
   // ---- "Momentum" progress signals ----
   const vt = useMemo(() => volumeTrend(sessions), [sessions]);
@@ -259,6 +342,52 @@ export default function Progress() {
           </div>
         </motion.section>
       )}
+
+      {/* Recovery — CO2 tolerance test */}
+      <section className="space-y-3">
+        <h2 className="section-label flex items-center gap-1.5">
+          <Wind className="w-3.5 h-3.5" /> Recovery — CO2 tolerance test
+        </h2>
+        <div className="card p-4 space-y-4">
+          {readiness.verdict !== 'na' && (
+            <div className="neo-card p-4 flex items-center justify-between gap-3">
+              <div>
+                <p className={cn('font-display text-xl font-bold', READINESS[readiness.verdict].color)}>{READINESS[readiness.verdict].label}</p>
+                <p className="text-[11px] text-ink-subtle mt-0.5 max-w-[20rem]">{readiness.advice}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-display text-2xl font-bold text-ink tabular-nums">{readiness.latest}s</p>
+                <p className="text-[11px] text-ink-subtle">
+                  {readiness.band ? co2Band(readiness.latest!).label : ''}
+                  {readiness.baseline != null && (
+                    <> · {readiness.deltaPct != null && readiness.deltaPct > 0 ? '+' : ''}{readiness.deltaPct}% vs {readiness.baseline}s</>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <CO2Test onLog={(s) => addRecovery(s)} />
+
+          {recoveryPoints.length > 1 && <Chart points={recoveryPoints} unit="s" accent="var(--ember)" />}
+        </div>
+
+        {recovery.length > 0 && (
+          <div className="space-y-1.5">
+            {recovery.slice(0, 8).map((r) => (
+              <div key={r.id} className="flex items-center justify-between text-sm card !py-2 px-3">
+                <span className="text-ink font-medium tabular-nums">
+                  {r.co2Score}s <span className="text-xs text-ink-subtle font-normal">· {co2Band(r.co2Score).label}</span>
+                </span>
+                <span className="text-xs text-ink-subtle">{format(new Date(r.date), 'EEE, MMM d')}</span>
+                <button onClick={() => deleteRecovery(r.id)} className="p-1 text-ink-subtle hover:text-danger" aria-label="Delete entry">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Bodyweight */}
       <section className="space-y-3">

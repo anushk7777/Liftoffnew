@@ -8,7 +8,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { DEFAULT_PROGRAM } from './plan';
 import { DEFAULT_NUTRITION } from './nutrition';
 import type { NutritionProfile } from './nutrition';
-import type { BodyEntry, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, WeekPlan, WeightUnit, WorkoutProgram, WorkoutSession } from './types';
+import type { BodyEntry, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, RecoveryEntry, WeekPlan, WeightUnit, WorkoutProgram, WorkoutSession } from './types';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const blankSet = (): LoggedSet => ({ id: uid(), weight: '', reps: '', rpe: '', rating: 0, done: false });
@@ -58,6 +58,18 @@ function draftFromDay(day: ProgramDay, week?: WeekPlan): WorkoutSession {
       notes: '',
     })),
   };
+}
+
+/** A set was actually performed if it has a weight, reps, or was marked done. */
+const wasPerformed = (st: LoggedSet): boolean => !!(st.weight?.trim() || st.reps?.trim() || st.done);
+
+/** Drop unperformed (blank, undone) sets and any exercise left with none — so a
+ *  finished session records only what was really done. Critical when a workout
+ *  is cut short, and keeps blank sets out of history on every finish. */
+export function performedEntries(entries: LoggedExercise[]): LoggedExercise[] {
+  return entries
+    .map((e) => ({ ...e, sets: e.sets.filter(wasPerformed) }))
+    .filter((e) => e.sets.length > 0);
 }
 
 /** Apply `fn` to the day with `dayId`, wherever it lives (a week or custom). */
@@ -288,7 +300,7 @@ interface AfterburnState {
   loadProgram: (program: WorkoutProgram) => void;
   startDay: (dayId: string) => void;
   cancelDraft: () => void;
-  finishDraft: () => void;
+  finishDraft: (opts?: { endedEarly?: boolean; note?: string }) => void;
   updateSet: (exIdx: number, setIdx: number, patch: Partial<LoggedSet>) => void;
   addSet: (exIdx: number) => void;
   removeSet: (exIdx: number) => void;
@@ -305,6 +317,9 @@ interface AfterburnState {
   bodyweight: BodyEntry[];
   addBodyweight: (weight: number, note?: string) => void;
   deleteBodyweight: (id: string) => void;
+  recovery: RecoveryEntry[];
+  addRecovery: (co2Score: number, note?: string) => void;
+  deleteRecovery: (id: string) => void;
   nutrition: NutritionProfile;
   setNutrition: (patch: Partial<NutritionProfile>) => void;
 }
@@ -315,6 +330,7 @@ export const useAfterburn = create<AfterburnState>()(
       program: DEFAULT_PROGRAM,
       sessions: [],
       bodyweight: [],
+      recovery: [],
       nutrition: DEFAULT_NUTRITION,
       draft: null,
       currentWeekId: '',
@@ -347,6 +363,7 @@ export const useAfterburn = create<AfterburnState>()(
               program?: WorkoutProgram;
               sessions?: WorkoutSession[];
               bodyweight?: BodyEntry[];
+              recovery?: RecoveryEntry[];
               nutrition?: NutritionProfile;
             };
             // Ignore an old-shape cloud program (pre-weeks) so it can't break the UI.
@@ -355,6 +372,7 @@ export const useAfterburn = create<AfterburnState>()(
               program: validProgram ?? get().program,
               sessions: d.sessions ?? get().sessions,
               bodyweight: Array.isArray(d.bodyweight) ? d.bodyweight : get().bodyweight,
+              recovery: Array.isArray(d.recovery) ? d.recovery : get().recovery,
               nutrition: d.nutrition ? { ...get().nutrition, ...d.nutrition } : get().nutrition,
             });
             setMarker(cloudTs || new Date().toISOString());
@@ -386,10 +404,17 @@ export const useAfterburn = create<AfterburnState>()(
         if (day) set({ draft: draftFromDay(day, week) });
       },
       cancelDraft: () => set({ draft: null }),
-      finishDraft: () => {
+      finishDraft: (opts) => {
         const d = get().draft;
         if (!d) return;
-        set({ sessions: [{ ...d, completedAt: new Date().toISOString() }, ...get().sessions], draft: null });
+        const session: WorkoutSession = {
+          ...d,
+          completedAt: new Date().toISOString(),
+          entries: performedEntries(d.entries),
+          endedEarly: opts?.endedEarly || undefined,
+          endNote: opts?.endedEarly ? opts?.note?.trim() || undefined : undefined,
+        };
+        set({ sessions: [session, ...get().sessions], draft: null });
       },
 
       updateSet: (exIdx, setIdx, patch) =>
@@ -474,22 +499,30 @@ export const useAfterburn = create<AfterburnState>()(
           bodyweight: [{ id: uid(), date: new Date().toISOString(), weight, note: note?.trim() || undefined }, ...s.bodyweight],
         })),
       deleteBodyweight: (id) => set((s) => ({ bodyweight: s.bodyweight.filter((b) => b.id !== id) })),
+
+      addRecovery: (co2Score, note) =>
+        set((s) => ({
+          recovery: [{ id: uid(), date: new Date().toISOString(), co2Score, note: note?.trim() || undefined }, ...s.recovery],
+        })),
+      deleteRecovery: (id) => set((s) => ({ recovery: s.recovery.filter((r) => r.id !== id) })),
       setNutrition: (patch) => set((s) => ({ nutrition: { ...s.nutrition, ...patch } })),
     }),
     {
       name: 'liftoff-afterburn',
-      version: 2,
+      version: 3,
       // v1 stored a single-week `program.days`. Reset the program to the new
       // multi-week default if the persisted shape predates `weeks` (keep sessions).
+      // v3 added the `recovery` collection — backfill it so old persists load.
       migrate: (persisted: unknown) => {
         const p = (persisted ?? {}) as Record<string, unknown>;
+        if (!Array.isArray(p.recovery)) p.recovery = [];
         const prog = p.program as { weeks?: unknown } | undefined;
         if (!prog || !Array.isArray(prog.weeks)) {
           return { ...p, program: DEFAULT_PROGRAM, currentWeekId: '' };
         }
         return p;
       },
-      partialize: (s) => ({ program: s.program, sessions: s.sessions, bodyweight: s.bodyweight, nutrition: s.nutrition, draft: s.draft, currentWeekId: s.currentWeekId }),
+      partialize: (s) => ({ program: s.program, sessions: s.sessions, bodyweight: s.bodyweight, recovery: s.recovery, nutrition: s.nutrition, draft: s.draft, currentWeekId: s.currentWeekId }),
     },
   ),
 );
@@ -499,6 +532,7 @@ export const useAfterburn = create<AfterburnState>()(
 let lastProgram = useAfterburn.getState().program;
 let lastSessions = useAfterburn.getState().sessions;
 let lastBodyweight = useAfterburn.getState().bodyweight;
+let lastRecovery = useAfterburn.getState().recovery;
 let lastNutrition = useAfterburn.getState().nutrition;
 let syncTimer: ReturnType<typeof setTimeout>;
 useAfterburn.subscribe((state) => {
@@ -507,12 +541,14 @@ useAfterburn.subscribe((state) => {
     state.program === lastProgram &&
     state.sessions === lastSessions &&
     state.bodyweight === lastBodyweight &&
+    state.recovery === lastRecovery &&
     state.nutrition === lastNutrition
   )
     return;
   lastProgram = state.program;
   lastSessions = state.sessions;
   lastBodyweight = state.bodyweight;
+  lastRecovery = state.recovery;
   lastNutrition = state.nutrition;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
@@ -523,7 +559,7 @@ useAfterburn.subscribe((state) => {
       if (!session) return;
       const ts = new Date().toISOString();
       const { error } = await supabase.from('workout_data').upsert(
-        { id: session.user.id, data: { program: state.program, sessions: state.sessions, bodyweight: state.bodyweight, nutrition: state.nutrition }, updated_at: ts },
+        { id: session.user.id, data: { program: state.program, sessions: state.sessions, bodyweight: state.bodyweight, recovery: state.recovery, nutrition: state.nutrition }, updated_at: ts },
         { onConflict: 'id' },
       );
       if (error) {

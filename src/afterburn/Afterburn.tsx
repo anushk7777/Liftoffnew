@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid, TrendingUp, Timer, Calculator, ArrowRight, Search, Sparkles, Dumbbell } from 'lucide-react';
+import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid, TrendingUp, Timer, Calculator, ArrowRight, Search, Sparkles, Dumbbell, Wind } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { pop, springSoft, pageVariants, fast, useReducedMotion } from '../lib/motion';
 import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance, restToSeconds, detectPRs } from './store';
+import { recoveryReadiness } from './recovery';
 import WorkoutCelebration from './WorkoutCelebration';
 import type { PRHit } from './store';
 import ProgramLibrary from './ProgramLibrary';
@@ -625,10 +626,13 @@ function RestBar({ secondsLeft, total, onAdd, onSkip }: { secondsLeft: number; t
   );
 }
 
-function Logger({ onFinish, onBack }: { onFinish: () => void; onBack: () => void }) {
+const END_REASONS = ["Didn't feel recovered", 'Out of time', 'Pain / niggle', 'Other'];
+
+function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean; note?: string }) => void; onBack: () => void }) {
   const draft = useAfterburn((s) => s.draft)!;
   const unit = useAfterburn((s) => s.program.unit);
   const sessions = useAfterburn((s) => s.sessions);
+  const recovery = useAfterburn((s) => s.recovery);
   const cancelDraft = useAfterburn((s) => s.cancelDraft);
   const addSet = useAfterburn((s) => s.addSet);
   const removeSet = useAfterburn((s) => s.removeSet);
@@ -637,6 +641,13 @@ function Logger({ onFinish, onBack }: { onFinish: () => void; onBack: () => void
   const updateSet = useAfterburn((s) => s.updateSet);
   const weakPoints = useAfterburn((s) => s.program.weakPoints) ?? [];
   const [plateOpen, setPlateOpen] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
+  const [mountedAt] = useState(() => Date.now());
+
+  // Recovery-aware autoregulation: warn if today's CO2 tolerance test was low.
+  const readiness = useMemo(() => recoveryReadiness(recovery), [recovery]);
+  const recentlyTested = readiness.latestDate != null && mountedAt - new Date(readiness.latestDate).getTime() < 36 * 3_600_000;
+  const showRecoveryWarning = readiness.verdict === 'under' && recentlyTested;
 
   // Rest timer: counts down from an endsAt timestamp; alerts once at zero.
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
@@ -696,6 +707,16 @@ function Logger({ onFinish, onBack }: { onFinish: () => void; onBack: () => void
         </button>
       </div>
       <PlateCalc open={plateOpen} onClose={() => setPlateOpen(false)} unit={unit} />
+
+      {showRecoveryWarning && (
+        <div className="rounded-xl border border-[var(--warning)]/40 bg-[var(--accent-soft)] px-3 py-2.5 flex items-start gap-2">
+          <Wind className="w-4 h-4 text-[var(--warning)] mt-0.5 shrink-0" />
+          <p className="text-xs text-ink">
+            <span className="font-semibold text-[var(--warning)]">Recovery low today</span> (CO2 test {readiness.latest}s
+            {readiness.deltaPct != null ? `, ${readiness.deltaPct}% vs baseline` : ''}). Autoregulate — trim sets/RPE, rest longer, and stop a lift when speed or form drops. It's fine to end early.
+          </p>
+        </div>
+      )}
 
       {draft.entries.map((ex, exIdx) => {
         const restSec = restToSeconds(ex.target.rest);
@@ -850,10 +871,30 @@ function Logger({ onFinish, onBack }: { onFinish: () => void; onBack: () => void
             onSkip={() => setRestEndsAt(null)}
           />
         )}
+        {endOpen && (
+          <div className="mx-auto max-w-2xl mb-2 rounded-lg border border-border bg-elevated p-3">
+            <p className="text-xs font-semibold text-ink mb-2">End here — why are you stopping?</p>
+            <div className="flex flex-wrap gap-1.5">
+              {END_REASONS.map((reason) => (
+                <button
+                  key={reason}
+                  onClick={() => { setEndOpen(false); onFinish({ endedEarly: true, note: reason }); }}
+                  className="chip bg-surface border border-border text-ink hover:border-ember !text-xs"
+                >
+                  {reason}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-ink-subtle mt-2">Only the sets you actually did get saved.</p>
+          </div>
+        )}
         <div className="mx-auto max-w-2xl flex gap-2">
-          <button onClick={cancelDraft} className="btn btn-secondary flex-1">Cancel</button>
-          <button onClick={onFinish} className="btn btn-primary flex-1">
-            <Check className="w-4 h-4" /> Finish workout
+          <button onClick={cancelDraft} className="btn btn-secondary !px-3">Cancel</button>
+          <button onClick={() => setEndOpen((o) => !o)} className={cn('btn btn-secondary !px-3', endOpen && 'border-ember text-ember')}>
+            End early
+          </button>
+          <button onClick={() => onFinish()} className="btn btn-primary flex-1">
+            <Check className="w-4 h-4" /> Finish
           </button>
         </div>
       </div>
@@ -874,11 +915,17 @@ function SessionCard({ session }: { session: WorkoutSession }) {
     <div className="card p-4">
       <div className="flex items-center gap-2">
         <button onClick={() => setOpen((o) => !o)} className="flex-1 text-left min-w-0">
-          <p className="font-semibold text-ink truncate">
-            {session.weekName ? `${session.weekName} · ${session.dayName}` : session.dayName}
+          <p className="font-semibold text-ink truncate flex items-center gap-1.5">
+            <span className="truncate">{session.weekName ? `${session.weekName} · ${session.dayName}` : session.dayName}</span>
+            {session.endedEarly && (
+              <span className="chip !px-1.5 !py-0.5 text-[10px] font-semibold border-0 text-[var(--warning)] bg-[var(--accent-soft)] shrink-0" title={session.endNote || 'Ended early'}>
+                Ended early
+              </span>
+            )}
           </p>
           <p className="text-xs text-ink-subtle">
             {format(new Date(session.completedAt ?? session.date), 'MMM d, yyyy · h:mm a')} · {doneSets} sets logged
+            {session.endedEarly && session.endNote ? ` · ${session.endNote}` : ''}
           </p>
         </button>
         <button onClick={() => deleteSession(session.id)} className="p-2 text-ink-subtle hover:text-danger" aria-label="Delete session">
@@ -958,8 +1005,8 @@ export default function Afterburn() {
   const [tab, setTab] = useState<Tab>(hasProgram ? 'workout' : 'programs');
   // "Pause" the active workout to explore other tabs without losing the draft.
   const [minimized, setMinimized] = useState(false);
-  // PRs to celebrate after finishing (null = no overlay).
-  const [celebrate, setCelebrate] = useState<PRHit[] | null>(null);
+  // Post-finish overlay (null = hidden): PRs to celebrate + whether ended early.
+  const [celebrate, setCelebrate] = useState<{ prs: PRHit[]; endedEarly: boolean } | null>(null);
 
   // Pull cloud workout data when entering the app (recency-guarded in the store).
   useEffect(() => {
@@ -978,13 +1025,14 @@ export default function Afterburn() {
   const showTabs = !draft || minimized;
   const loggedSets = draft ? draft.entries.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0) : 0;
 
-  const finishWorkout = () => {
+  const finishWorkout = (opts?: { endedEarly?: boolean; note?: string }) => {
     // Detect PRs against history BEFORE the draft is committed.
     const prs = draft ? detectPRs(sessions, draft) : [];
-    finishDraft();
+    finishDraft(opts);
     setMinimized(false);
     setTab('workout');
-    if (prs.length) setCelebrate(prs);
+    const endedEarly = !!opts?.endedEarly;
+    if (prs.length || endedEarly) setCelebrate({ prs, endedEarly });
   };
 
   return (
@@ -1071,7 +1119,7 @@ export default function Afterburn() {
         </main>
       </div>
 
-      <WorkoutCelebration prs={celebrate} onDone={() => setCelebrate(null)} />
+      <WorkoutCelebration prs={celebrate ? celebrate.prs : null} endedEarly={celebrate?.endedEarly} onDone={() => setCelebrate(null)} />
     </div>
   );
 }

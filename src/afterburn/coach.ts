@@ -5,9 +5,10 @@
 import { streamGemini } from '../lib/aicoach';
 import { completionMap, dayCompletionKey, exerciseProgress, loggedExerciseNames } from './store';
 import { analyzeVolume, MUSCLE_LABEL } from './volume';
+import { recoveryReadiness } from './recovery';
 import { computeTargets, computeCycling, weightTrendKgPerWeek, GOALS } from './nutrition';
 import type { NutritionProfile } from './nutrition';
-import type { BodyEntry, WorkoutProgram, WorkoutSession } from './types';
+import type { BodyEntry, RecoveryEntry, WorkoutProgram, WorkoutSession } from './types';
 
 const SYSTEM_PROMPT = `You are the strength & nutrition coach inside "Afterburn". You are given the user's REAL logged training, bodyweight and computed nutrition targets as JSON. Coach with evidence, grounded ONLY in that data + the methodology below.
 
@@ -35,6 +36,11 @@ Training volume (hard sets per muscle per week — the primary hypertrophy drive
 - Below MEV → add sets to start growing. Inside MEV–MAV → progress by adding ~1–2 sets/week when recovery allows. Near MRV → hold and plan a deload. Over MRV → cut back; more isn't better once recovery is exceeded. A muscle trained at 0 sets isn't progressing at all.
 - The \`volume\` block in the data already classifies the user's lifts into muscles and grades each against these landmarks — cite its numbers (sets vs MEV/MAV/MRV) directly.
 
+Recovery (CO2 tolerance test — a daily controlled-exhale time, in seconds, that proxies autonomic recovery):
+- A longer exhale = better CO2 tolerance = a more parasympathetic, better-recovered state. Judge the latest score against the user's OWN baseline, not just absolute bands.
+- When recovery is low or well below baseline (the \`recovery\` block reads "under"), advise autoregulation: trim sets/RPE, rest longer, stop a lift when speed or form drops, and prioritise sleep/stress — don't grind. When it's good, green-light the planned session. It complements — never replaces — the bodyweight and strength trends.
+- If recent sessions were ended early (\`endedEarly\`), treat that as smart autoregulation, not failure; reference it supportively.
+
 Style: lead with one sentence on how training + nutrition are trending. Then give 3 prioritized, concrete actions, each tied to a specific number from the data (name the lift, the week, the kcal/macro, the weight trend). Be honest and specific. Plain text only — no markdown headers or asterisks; use "- " for lists. One-shot: don't ask questions or offer more unless the user asked one.`;
 
 export interface CoachData {
@@ -42,6 +48,7 @@ export interface CoachData {
   sessions: WorkoutSession[];
   currentWeekId: string;
   bodyweight: BodyEntry[];
+  recovery: RecoveryEntry[];
   nutrition: NutritionProfile;
 }
 
@@ -51,7 +58,7 @@ function num(s: string): number | null {
 }
 
 function buildContext(d: CoachData): string {
-  const { program, sessions, currentWeekId, bodyweight, nutrition } = d;
+  const { program, sessions, currentWeekId, bodyweight, recovery, nutrition } = d;
 
   // Recent sessions (most recent 6) condensed to top set per exercise.
   const recent = sessions.slice(0, 6).map((s) => ({
@@ -97,6 +104,20 @@ function buildContext(d: CoachData): string {
   const trend = weightTrendKgPerWeek(bodyweight);
   const goalLabel = GOALS.find((g) => g.id === nutrition.goal)?.label ?? nutrition.goal;
 
+  // Recovery readiness from the CO2 tolerance test + recent early-ended sessions.
+  const r = recoveryReadiness(recovery);
+  const recovBlock =
+    r.verdict !== 'na'
+      ? {
+          latestCo2Seconds: r.latest,
+          baselineSeconds: r.baseline,
+          band: r.band,
+          vsBaselinePct: r.deltaPct,
+          verdict: r.verdict,
+          endedEarlyRecently: sessions.slice(0, 6).filter((s) => s.endedEarly).map((s) => ({ day: s.dayName, why: s.endNote ?? null })),
+        }
+      : null;
+
   // Per-muscle weekly-set analysis vs MEV/MAV/MRV landmarks.
   const v = analyzeVolume(sessions);
   const volume = v.hasData
@@ -120,6 +141,7 @@ function buildContext(d: CoachData): string {
     adherence,
     recentSessions: recent,
     strengthTrend: trends,
+    recovery: recovBlock,
     volume,
     bodyweight: {
       latestKg: bodyweight[0]?.weight ?? null,
