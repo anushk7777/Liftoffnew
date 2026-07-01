@@ -14,6 +14,7 @@ export default function Coach() {
   const sessions = useAfterburn((s) => s.sessions);
   const currentWeekId = useAfterburn((s) => s.currentWeekId);
   const bodyweight = useAfterburn((s) => s.bodyweight);
+  const recovery = useAfterburn((s) => s.recovery);
   const nutrition = useAfterburn((s) => s.nutrition);
 
   const [view, setView] = useState<View>('ask');
@@ -24,7 +25,7 @@ export default function Coach() {
   const [keyInput, setKeyInput] = useState(() => getApiKey());
   const [keySaved, setKeySaved] = useState(hasApiKey());
 
-  const data: CoachData = { program, sessions, currentWeekId, bodyweight, nutrition };
+  const data: CoachData = { program, sessions, currentWeekId, bodyweight, recovery, nutrition };
 
   const run = async (q?: string) => {
     setError('');

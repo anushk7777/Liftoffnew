@@ -10,7 +10,7 @@ import { haptics } from '../lib/haptics';
 // Brief, friendly post-workout overlay. Shows when a finished session set PRs
 // (or just confirms the log). Auto-dismisses; tap anywhere to close early.
 // Colors come entirely from the theme tokens — no new palette.
-export default function WorkoutCelebration({ prs, onDone }: { prs: PRHit[] | null; onDone: () => void }) {
+export default function WorkoutCelebration({ prs, onDone, endedEarly }: { prs: PRHit[] | null; onDone: () => void; endedEarly?: boolean }) {
   const rm = useReducedMotion();
   const unit = useAfterburn((s) => s.program.unit);
   const open = prs !== null;
@@ -57,7 +57,7 @@ export default function WorkoutCelebration({ prs, onDone }: { prs: PRHit[] | nul
             </motion.div>
 
             <h2 className="font-display text-2xl font-bold text-ink mt-4">
-              {prs && prs.length ? 'New personal record!' : 'Workout logged 💪'}
+              {prs && prs.length ? 'New personal record!' : endedEarly ? 'Session logged' : 'Workout logged 💪'}
             </h2>
 
             {prs && prs.length > 0 ? (
@@ -74,7 +74,7 @@ export default function WorkoutCelebration({ prs, onDone }: { prs: PRHit[] | nul
                 {prs.length > 4 && <p className="text-xs text-ink-subtle">+{prs.length - 4} more</p>}
               </div>
             ) : (
-              <p className="text-sm text-ink-subtle mt-2">Nice work — it's in your history and your trends.</p>
+              <p className="text-sm text-ink-subtle mt-2">{endedEarly ? "Logged what you did — backing off when you're not recovered is smart training." : "Nice work — it's in your history and your trends."}</p>
             )}
           </motion.div>
         </motion.div>
