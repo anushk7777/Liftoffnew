@@ -31,6 +31,28 @@ const setMarker = (ts: string): void => {
   }
 };
 
+/** A fresh, unlogged draft entry for one prescribed exercise (blank sets). */
+function entryFromExercise(ex: ProgramExercise): LoggedExercise {
+  return {
+    exerciseId: ex.id,
+    name: ex.name,
+    target: {
+      reps: ex.reps,
+      rpe: ex.rpe,
+      percent1RM: ex.percent1RM,
+      tempo: ex.tempo,
+      rest: ex.rest,
+      lastSetRpe: ex.lastSetRpe,
+      lastSetTechnique: ex.lastSetTechnique,
+      substitutions: ex.substitutions,
+      weakPointSlot: ex.weakPointSlot,
+      baseName: ex.name,
+    },
+    sets: Array.from({ length: Math.max(1, Number(ex.workingSets) || 1) }, blankSet),
+    notes: '',
+  };
+}
+
 function draftFromDay(day: ProgramDay, week?: WeekPlan): WorkoutSession {
   return {
     id: uid(),
@@ -39,25 +61,17 @@ function draftFromDay(day: ProgramDay, week?: WeekPlan): WorkoutSession {
     weekId: week?.id,
     weekName: week?.name,
     date: new Date().toISOString(),
-    entries: day.exercises.map((ex) => ({
-      exerciseId: ex.id,
-      name: ex.name,
-      target: {
-        reps: ex.reps,
-        rpe: ex.rpe,
-        percent1RM: ex.percent1RM,
-        tempo: ex.tempo,
-        rest: ex.rest,
-        lastSetRpe: ex.lastSetRpe,
-        lastSetTechnique: ex.lastSetTechnique,
-        substitutions: ex.substitutions,
-        weakPointSlot: ex.weakPointSlot,
-        baseName: ex.name,
-      },
-      sets: Array.from({ length: Math.max(1, Number(ex.workingSets) || 1) }, blankSet),
-      notes: '',
-    })),
+    entries: day.exercises.map(entryFromExercise),
   };
+}
+
+/** Find a program day by id, wherever it lives (a week or the custom list). */
+function findDay(p: WorkoutProgram, dayId: string): ProgramDay | undefined {
+  for (const w of p.weeks) {
+    const d = w.days.find((x) => x.id === dayId);
+    if (d) return d;
+  }
+  return p.custom.find((x) => x.id === dayId);
 }
 
 /** A set was actually performed if it has a weight, reps, or was marked done. */
@@ -419,12 +433,24 @@ export const useAfterburn = create<AfterburnState>()(
       },
       // Pull a finished session back into an editable draft (e.g. an accidental
       // finish, or to fix a logged set). Keeps the original id/date so
-      // re-finishing updates the same entry instead of duplicating it.
+      // re-finishing updates the same entry instead of duplicating it. Rebuilds
+      // the FULL prescribed exercise list from the program day so exercises you
+      // skipped (pruned away on finish) reappear as blank rows to fill in;
+      // whatever you logged is overlaid, matched by exerciseId.
       reopenSession: (id) =>
         set((s) => {
           const session = s.sessions.find((x) => x.id === id);
           if (!session) return s;
-          return { draft: { ...session, completedAt: undefined }, sessions: s.sessions.filter((x) => x.id !== id) };
+          const day = findDay(s.program, session.dayId);
+          let entries = session.entries;
+          if (day) {
+            const logged = new Map(session.entries.map((e) => [e.exerciseId, e]));
+            const dayIds = new Set(day.exercises.map((e) => e.id));
+            const fromDay = day.exercises.map((ex) => logged.get(ex.id) ?? entryFromExercise(ex));
+            const extras = session.entries.filter((e) => !dayIds.has(e.exerciseId)); // ad-hoc / custom additions
+            entries = [...fromDay, ...extras];
+          }
+          return { draft: { ...session, completedAt: undefined, entries }, sessions: s.sessions.filter((x) => x.id !== id) };
         }),
 
       updateSet: (exIdx, setIdx, patch) =>
