@@ -301,6 +301,7 @@ interface AfterburnState {
   startDay: (dayId: string) => void;
   cancelDraft: () => void;
   finishDraft: (opts?: { endedEarly?: boolean; note?: string }) => void;
+  reopenSession: (id: string) => void;
   updateSet: (exIdx: number, setIdx: number, patch: Partial<LoggedSet>) => void;
   addSet: (exIdx: number) => void;
   removeSet: (exIdx: number) => void;
@@ -416,6 +417,15 @@ export const useAfterburn = create<AfterburnState>()(
         };
         set({ sessions: [session, ...get().sessions], draft: null });
       },
+      // Pull a finished session back into an editable draft (e.g. an accidental
+      // finish, or to fix a logged set). Keeps the original id/date so
+      // re-finishing updates the same entry instead of duplicating it.
+      reopenSession: (id) =>
+        set((s) => {
+          const session = s.sessions.find((x) => x.id === id);
+          if (!session) return s;
+          return { draft: { ...session, completedAt: undefined }, sessions: s.sessions.filter((x) => x.id !== id) };
+        }),
 
       updateSet: (exIdx, setIdx, patch) =>
         set((s) => {

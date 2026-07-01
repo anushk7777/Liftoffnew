@@ -10,7 +10,7 @@ import { haptics } from '../lib/haptics';
 // Brief, friendly post-workout overlay. Shows when a finished session set PRs
 // (or just confirms the log). Auto-dismisses; tap anywhere to close early.
 // Colors come entirely from the theme tokens — no new palette.
-export default function WorkoutCelebration({ prs, onDone, endedEarly }: { prs: PRHit[] | null; onDone: () => void; endedEarly?: boolean }) {
+export default function WorkoutCelebration({ prs, onDone, endedEarly, onUndo }: { prs: PRHit[] | null; onDone: () => void; endedEarly?: boolean; onUndo?: () => void }) {
   const rm = useReducedMotion();
   const unit = useAfterburn((s) => s.program.unit);
   const open = prs !== null;
@@ -19,7 +19,8 @@ export default function WorkoutCelebration({ prs, onDone, endedEarly }: { prs: P
     if (!open) return;
     haptics.success();
     beep(780);
-    const t = setTimeout(onDone, prs && prs.length ? 3200 : 2000);
+    // Give a little longer to catch the Undo when there are no PRs to read.
+    const t = setTimeout(onDone, prs && prs.length ? 3600 : 4500);
     return () => clearTimeout(t);
   }, [open, prs, onDone]);
 
@@ -75,6 +76,12 @@ export default function WorkoutCelebration({ prs, onDone, endedEarly }: { prs: P
               </div>
             ) : (
               <p className="text-sm text-ink-subtle mt-2">{endedEarly ? "Logged what you did — backing off when you're not recovered is smart training." : "Nice work — it's in your history and your trends."}</p>
+            )}
+
+            {onUndo && (
+              <button onClick={onUndo} className="btn btn-secondary w-full !py-2 text-sm mt-4">
+                Finished by mistake? Undo — edit
+              </button>
             )}
           </motion.div>
         </motion.div>

@@ -31,11 +31,19 @@ function NumInput({ value, onChange, placeholder }: { value: string; onChange: (
   );
 }
 
-function Stars({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+function Stars({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled?: boolean }) {
   return (
-    <div className="flex items-center gap-0.5">
+    <div className={cn('flex items-center gap-0.5', disabled && 'opacity-40')}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <button key={i} type="button" onClick={() => onChange(value === i ? 0 : i)} className="p-0.5" aria-label={`Rate ${i} of 5`}>
+        <button
+          key={i}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(value === i ? 0 : i)}
+          className={cn('p-0.5', disabled ? 'cursor-default' : '')}
+          aria-label={`Rate ${i} of 5`}
+          aria-disabled={disabled}
+        >
           <Star className={cn('w-4 h-4', i <= value ? 'text-[var(--accent)] fill-[var(--accent)]' : 'text-ink-subtle')} />
         </button>
       ))}
@@ -561,6 +569,8 @@ function SetRow({
 }) {
   const updateSet = useAfterburn((s) => s.updateSet);
   const u = (patch: Partial<LoggedSet>) => updateSet(exIdx, setIdx, patch);
+  // A set is "logged" (and thus rateable) once it has weight, reps, or is done.
+  const logged = !!(set.weight.trim() || set.reps.trim() || set.done);
   return (
     <div className={cn('rounded-lg border p-2', set.done ? 'border-success/50 bg-success/5' : 'border-border bg-elevated')}>
       <div className="flex items-center gap-1.5">
@@ -583,8 +593,9 @@ function SetRow({
           <Check className="w-4 h-4" />
         </motion.button>
       </div>
-      <div className="mt-1.5 pl-9">
-        <Stars value={set.rating} onChange={(v) => u({ rating: v })} />
+      <div className="mt-1.5 pl-9 flex items-center gap-2">
+        <Stars value={set.rating} onChange={(v) => u({ rating: v })} disabled={!logged} />
+        {!logged && <span className="text-[11px] text-ink-subtle">Log the set to rate it</span>}
       </div>
     </div>
   );
@@ -903,7 +914,7 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
 }
 
 // ---------- history ----------
-function SessionCard({ session }: { session: WorkoutSession }) {
+function SessionCard({ session, onEdit }: { session: WorkoutSession; onEdit: (id: string) => void }) {
   const deleteSession = useAfterburn((s) => s.deleteSession);
   const setSessionWeek = useAfterburn((s) => s.setSessionWeek);
   const weeks = useAfterburn((s) => s.program.weeks);
@@ -927,6 +938,14 @@ function SessionCard({ session }: { session: WorkoutSession }) {
             {format(new Date(session.completedAt ?? session.date), 'MMM d, yyyy · h:mm a')} · {doneSets} sets logged
             {session.endedEarly && session.endNote ? ` · ${session.endNote}` : ''}
           </p>
+        </button>
+        <button
+          onClick={() => { if (window.confirm('Reopen this workout to edit? It moves back to in-progress.')) onEdit(session.id); }}
+          className="p-2 text-ink-subtle hover:text-ink"
+          aria-label="Edit session"
+          title="Reopen to edit"
+        >
+          <Pencil className="w-4 h-4" />
         </button>
         <button onClick={() => deleteSession(session.id)} className="p-2 text-ink-subtle hover:text-danger" aria-label="Delete session">
           <Trash2 className="w-4 h-4" />
@@ -976,7 +995,7 @@ function SessionCard({ session }: { session: WorkoutSession }) {
   );
 }
 
-function HistoryView() {
+function HistoryView({ onEdit }: { onEdit: (id: string) => void }) {
   const sessions = useAfterburn((s) => s.sessions);
   if (sessions.length === 0) {
     return <p className="text-sm text-ink-subtle text-center py-12">No workouts logged yet. Start a day from the Program tab.</p>;
@@ -984,7 +1003,7 @@ function HistoryView() {
   return (
     <div className="space-y-3">
       {sessions.map((s) => (
-        <SessionCard key={s.id} session={s} />
+        <SessionCard key={s.id} session={s} onEdit={onEdit} />
       ))}
     </div>
   );
@@ -998,6 +1017,7 @@ export default function Afterburn() {
   const sessions = useAfterburn((s) => s.sessions);
   const cancelDraft = useAfterburn((s) => s.cancelDraft);
   const finishDraft = useAfterburn((s) => s.finishDraft);
+  const reopenSession = useAfterburn((s) => s.reopenSession);
   const loadWorkouts = useAfterburn((s) => s.loadWorkouts);
   const rm = useReducedMotion();
   // Start on "Programs" if there's no plan loaded yet, else on "Workout".
@@ -1005,8 +1025,9 @@ export default function Afterburn() {
   const [tab, setTab] = useState<Tab>(hasProgram ? 'workout' : 'programs');
   // "Pause" the active workout to explore other tabs without losing the draft.
   const [minimized, setMinimized] = useState(false);
-  // Post-finish overlay (null = hidden): PRs to celebrate + whether ended early.
-  const [celebrate, setCelebrate] = useState<{ prs: PRHit[]; endedEarly: boolean } | null>(null);
+  // Post-finish overlay (null = hidden): PRs to celebrate + whether ended early
+  // + the finished session id (so "Undo — edit" can reopen it).
+  const [celebrate, setCelebrate] = useState<{ prs: PRHit[]; endedEarly: boolean; sessionId?: string } | null>(null);
 
   // Pull cloud workout data when entering the app (recency-guarded in the store).
   useEffect(() => {
@@ -1026,13 +1047,27 @@ export default function Afterburn() {
   const loggedSets = draft ? draft.entries.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0) : 0;
 
   const finishWorkout = (opts?: { endedEarly?: boolean; note?: string }) => {
-    // Detect PRs against history BEFORE the draft is committed.
+    // Detect PRs against history BEFORE the draft is committed. Keep the draft
+    // id so an accidental finish can be undone (finishDraft keeps the same id).
     const prs = draft ? detectPRs(sessions, draft) : [];
+    const sessionId = draft?.id;
     finishDraft(opts);
     setMinimized(false);
     setTab('workout');
-    const endedEarly = !!opts?.endedEarly;
-    if (prs.length || endedEarly) setCelebrate({ prs, endedEarly });
+    setCelebrate({ prs, endedEarly: !!opts?.endedEarly, sessionId });
+  };
+
+  // Reopen a finished session into the logger to edit it. Won't clobber a
+  // workout already in progress.
+  const reopenAndEdit = (id: string) => {
+    if (draft) {
+      window.alert('Finish or discard your in-progress workout first, then edit this one.');
+      return;
+    }
+    reopenSession(id);
+    setCelebrate(null);
+    setMinimized(false);
+    setTab('workout');
   };
 
   return (
@@ -1105,7 +1140,7 @@ export default function Afterburn() {
                 {tab === 'programs' ? (
                   <ProgramLibrary onPicked={() => setTab('workout')} />
                 ) : tab === 'history' ? (
-                  <HistoryView />
+                  <HistoryView onEdit={reopenAndEdit} />
                 ) : tab === 'progress' ? (
                   <Progress />
                 ) : tab === 'coach' ? (
@@ -1119,7 +1154,12 @@ export default function Afterburn() {
         </main>
       </div>
 
-      <WorkoutCelebration prs={celebrate ? celebrate.prs : null} endedEarly={celebrate?.endedEarly} onDone={() => setCelebrate(null)} />
+      <WorkoutCelebration
+        prs={celebrate ? celebrate.prs : null}
+        endedEarly={celebrate?.endedEarly}
+        onUndo={celebrate?.sessionId ? () => reopenAndEdit(celebrate.sessionId!) : undefined}
+        onDone={() => setCelebrate(null)}
+      />
     </div>
   );
 }
