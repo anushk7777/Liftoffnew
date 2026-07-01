@@ -175,8 +175,8 @@ export type VolumeStatus = 'untrained' | 'below' | 'optimal' | 'high' | 'excessi
 export interface MuscleAnalysis {
   muscle: Muscle;
   label: string;
-  sets: number; // this week's hard sets (rounded to 0.5)
-  prevSets: number; // previous week's hard sets
+  sets: number; // hard sets in the last 7 days (rounded to 0.5)
+  prevSets: number; // hard sets in the prior 7-day window
   dir: 'up' | 'down' | 'flat';
   landmark: Landmark;
   status: VolumeStatus;
@@ -189,8 +189,8 @@ export interface VolumeReport {
   weekStart: string | null;
   weeksLogged: number;
   muscles: MuscleAnalysis[]; // sorted most-actionable first
-  trained: MuscleAnalysis[]; // muscles with sets > 0 this week (the bars to show)
-  neglected: Muscle[]; // landmark muscles with 0 sets this week
+  trained: MuscleAnalysis[]; // muscles with sets > 0 in the last 7 days (the bars to show)
+  neglected: Muscle[]; // landmark muscles with 0 sets in the last 7 days
   headline: string;
   unclassified: string[]; // distinct logged names we couldn't map to a muscle
 }
@@ -236,22 +236,46 @@ function judge(sets: number, lm: Landmark): { status: VolumeStatus; suggestedSet
   };
 }
 
-/** Analyze the most recent logged training week against the volume landmarks
- *  and produce per-muscle status + concrete recommendations. */
+const DAY_MS = 86_400_000;
+
+/** Hard sets per muscle for sessions in the (startMs, endMs] window. */
+function setsInRange(sessions: WorkoutSession[], startMs: number, endMs: number): Record<Muscle, number> {
+  const acc = emptySets();
+  for (const s of sessions) {
+    const t = Date.parse(s.completedAt ?? s.date);
+    if (Number.isNaN(t) || t <= startMs || t > endMs) continue;
+    for (const e of s.entries) {
+      const cls = classifyExercise(e.name);
+      if (!cls) continue;
+      const hard = e.sets.reduce((n, st) => n + (isHardSet(st.reps, st.done) ? 1 : 0), 0);
+      if (hard === 0) continue;
+      for (const m of cls.primary) acc[m] += hard;
+      for (const m of cls.secondary) acc[m] += hard * 0.5;
+    }
+  }
+  return acc;
+}
+
+/** Analyze the most recent 7 days of training against the volume landmarks and
+ *  produce per-muscle status + concrete recommendations. Uses a TRAILING 7-day
+ *  window anchored to the latest logged session (not the calendar week), so it's
+ *  never a half-finished week and works with any training split / async cycle. */
 export function analyzeVolume(sessions: WorkoutSession[]): VolumeReport {
-  const weeks = muscleSetsByWeek(sessions);
-  if (weeks.length === 0) {
+  const times = sessions.map((s) => Date.parse(s.completedAt ?? s.date)).filter((t) => !Number.isNaN(t));
+  if (times.length === 0) {
     return { hasData: false, weekStart: null, weeksLogged: 0, muscles: [], trained: [], neglected: [], headline: 'Log a workout to see your per-muscle volume.', unclassified: [] };
   }
-  const latest = weeks[weeks.length - 1];
-  const prev = weeks[weeks.length - 2];
+  const anchor = times.reduce((a, b) => Math.max(a, b), -Infinity); // latest session
+  const curr = setsInRange(sessions, anchor - 7 * DAY_MS, anchor);
+  const prevW = setsInRange(sessions, anchor - 14 * DAY_MS, anchor - 7 * DAY_MS);
+  const prevHasData = times.some((t) => t > anchor - 14 * DAY_MS && t <= anchor - 7 * DAY_MS);
 
   const muscles: MuscleAnalysis[] = ALL_MUSCLES.map((m) => {
-    const sets = round5(latest.sets[m] ?? 0);
-    const prevSets = round5(prev?.sets[m] ?? 0);
+    const sets = round5(curr[m] ?? 0);
+    const prevSets = round5(prevW[m] ?? 0);
     const lm = LANDMARKS[m];
     const { status, suggestedSets, recommendation } = judge(sets, lm);
-    const dir: MuscleAnalysis['dir'] = !prev ? 'flat' : sets > prevSets + 0.5 ? 'up' : sets < prevSets - 0.5 ? 'down' : 'flat';
+    const dir: MuscleAnalysis['dir'] = !prevHasData ? 'flat' : sets > prevSets + 0.5 ? 'up' : sets < prevSets - 0.5 ? 'down' : 'flat';
     return { muscle: m, label: MUSCLE_LABEL[m], sets, prevSets, dir, landmark: lm, status, suggestedSets, recommendation };
   });
 
@@ -269,7 +293,7 @@ export function analyzeVolume(sessions: WorkoutSession[]): VolumeReport {
   if (over) parts.push(`${over} over your recoverable limit`);
   if (under) parts.push(`${under} under-trained`);
   if (dialed) parts.push(`${dialed} dialed in`);
-  const headline = parts.length ? `This week: ${parts.join(', ')}.` : 'Log a full training week to read your volume.';
+  const headline = parts.length ? `Last 7 days: ${parts.join(', ')}.` : 'Log a full training week to read your volume.';
 
-  return { hasData: true, weekStart: latest.weekStart, weeksLogged: weeks.length, muscles: sorted, trained, neglected, headline, unclassified };
+  return { hasData: true, weekStart: new Date(anchor - 7 * DAY_MS).toISOString(), weeksLogged: muscleSetsByWeek(sessions).length, muscles: sorted, trained, neglected, headline, unclassified };
 }

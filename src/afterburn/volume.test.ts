@@ -110,4 +110,24 @@ describe('analyzeVolume', () => {
   it('handles no data', () => {
     expect(analyzeVolume([]).hasData).toBe(false);
   });
+
+  it('uses a trailing 7-day window, aggregating across a calendar-week boundary', () => {
+    // Sun then the following Wed (4 days apart) fall in different Monday buckets,
+    // but a rolling 7-day window ending at the latest session captures both.
+    const r = analyzeVolume([
+      sess('a', '2026-03-15T10:00:00.000Z', [['Cable Fly', 4]]), // Sunday
+      sess('b', '2026-03-18T10:00:00.000Z', [['Cable Fly', 4]]), // Wednesday
+    ]);
+    const chest = r.muscles.find((m) => m.muscle === 'chest')!;
+    expect(chest.sets).toBe(8); // both sessions counted, not split into two weeks
+  });
+
+  it('excludes sessions older than 7 days from the current window', () => {
+    const r = analyzeVolume([
+      sess('old', '2026-03-01T10:00:00.000Z', [['Cable Fly', 10]]), // >7d before anchor
+      sess('now', '2026-03-18T10:00:00.000Z', [['Cable Fly', 3]]),
+    ]);
+    const chest = r.muscles.find((m) => m.muscle === 'chest')!;
+    expect(chest.sets).toBe(3); // only the recent session
+  });
 });

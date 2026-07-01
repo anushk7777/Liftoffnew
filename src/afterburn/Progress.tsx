@@ -313,7 +313,7 @@ export default function Progress() {
             <div>
               <p className="text-sm text-ink font-medium">{vol.headline}</p>
               <p className="text-[11px] text-ink-subtle mt-1">
-                Hard sets per muscle this week vs your science-based landmarks — ticks mark MEV (start growing), MAV (sweet spot) and MRV (recovery ceiling).
+                Hard sets per muscle over your last 7 training days vs your science-based landmarks — ticks mark MEV (start growing), MAV (sweet spot) and MRV (recovery ceiling).
               </p>
             </div>
 
@@ -325,7 +325,7 @@ export default function Progress() {
 
             {vol.neglected.length > 0 && (
               <div className="pt-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-1.5">Not trained this week</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-1.5">Not trained (last 7 days)</p>
                 <div className="flex flex-wrap gap-1.5">
                   {vol.neglected.map((mu) => (
                     <span key={mu} className="chip text-ink-subtle bg-elevated border-0 !text-[11px]">{MUSCLE_LABEL[mu]}</span>
