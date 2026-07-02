@@ -12,7 +12,9 @@ import {
   FileText,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
+import { fast, useReducedMotion } from '../lib/motion';
 import { cn } from '../lib/utils';
 import { PageHeader, Modal, EmptyState } from '../components/ui';
 import type { Note } from '../store/data';
@@ -21,6 +23,7 @@ type Tab = 'inbox' | 'notes';
 
 export default function BrainDump() {
   const [tab, setTab] = useState<Tab>('inbox');
+  const rm = useReducedMotion();
 
   return (
     <div className="animate-rise">
@@ -39,7 +42,17 @@ export default function BrainDump() {
         </TabBtn>
       </div>
 
-      {tab === 'inbox' ? <Inbox /> : <Notes />}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={tab}
+          initial={rm ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={rm ? undefined : { opacity: 0, y: -6 }}
+          transition={fast}
+        >
+          {tab === 'inbox' ? <Inbox /> : <Notes />}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

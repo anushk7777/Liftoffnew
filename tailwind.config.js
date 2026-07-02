@@ -87,14 +87,13 @@ export default {
         "unit": "4px",
         "margin-desktop": "48px"
       },
+      // Mirrors the CSS-var type system in index.css (the source of truth).
+      // NOTE: no "mono-data" here — index.css owns .font-mono-data (JetBrains).
       fontFamily: {
-        "body-lg": ["Inter", "sans-serif"],
-        "label-caps": ["Inter", "sans-serif"],
-        "display-lg": ["Inter", "sans-serif"],
-        "display-lg-mobile": ["Inter", "sans-serif"],
-        "body-sm": ["Inter", "sans-serif"],
-        "mono-data": ["Inter", "monospace"],
-        "headline-md": ["Inter", "sans-serif"]
+        sans: ["Inter", "system-ui", "sans-serif"],
+        display: ["Instrument Serif", "Georgia", "serif"],
+        serif: ["Instrument Serif", "Georgia", "serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "monospace"]
       },
       fontSize: {
         "body-lg": ["16px", {"lineHeight": "1.6", "letterSpacing": "0", "fontWeight": "400"}],

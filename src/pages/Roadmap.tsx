@@ -13,7 +13,9 @@ import {
   ListPlus,
   Timer,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
+import { useReducedMotion } from '../lib/motion';
 import { cn, safeSetItem } from '../lib/utils';
 import type { Phase, TaskType, Task } from '../store/data';
 import { parseRoadmap, countRoadmap } from '../lib/roadmap';
@@ -305,6 +307,7 @@ function PhaseCard({
   onToggle: (p: string, w: string, t: string) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const rm = useReducedMotion();
   const stats = useMemo(() => countRoadmap([phase]), [phase]);
   const done = stats.percent === 100 && stats.total > 0;
 
@@ -336,9 +339,17 @@ function PhaseCard({
         </div>
       </button>
 
-      {open && (
-        <div className="px-4 pb-4 pt-1 border-t border-border space-y-5">
-          {phase.weeks.map((week) => (
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={rm ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={rm ? undefined : { height: 0, opacity: 0 }}
+            transition={{ duration: 0.32, ease: [0.21, 1, 0.4, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 pt-1 border-t border-border space-y-5">
+              {phase.weeks.map((week) => (
             <div key={week.id} className="pt-3">
               <h4 className="section-label mb-2">{week.title}</h4>
               <div className="space-y-0.5">
@@ -392,8 +403,10 @@ function PhaseCard({
               </div>
             </div>
           ))}
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

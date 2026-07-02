@@ -1,8 +1,9 @@
 import { useId } from 'react';
+import { useReducedMotion } from '../lib/motion';
 
 // Tiny, dependency-free charts (replace recharts). Pure inline SVG — they scale
 // to the container, respect the theme via currentColor/CSS vars, and add almost
-// nothing to the bundle.
+// nothing to the bundle. Entrances are CSS keyframes gated on reduce-motion.
 
 // Smooth area sparkline for a single series.
 export function Sparkline({
@@ -15,6 +16,7 @@ export function Sparkline({
   className?: string;
 }) {
   const id = useId();
+  const rm = useReducedMotion();
   const w = 100;
   const h = 100;
   const max = Math.max(1, ...data);
@@ -40,7 +42,7 @@ export function Sparkline({
           <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
         </linearGradient>
       </defs>
-      <path d={area} fill={`url(#sl-${id})`} />
+      <path d={area} fill={`url(#sl-${id})`} className={rm ? undefined : 'chart-area-in'} />
       <path
         d={line}
         fill="none"
@@ -49,6 +51,8 @@ export function Sparkline({
         strokeLinecap="round"
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
+        pathLength={1}
+        className={rm ? undefined : 'chart-line-draw'}
       />
     </svg>
   );
@@ -64,6 +68,7 @@ export function MiniBars({
   height?: number;
   labelEvery?: number;
 }) {
+  const rm = useReducedMotion();
   const max = Math.max(1, ...data.map((d) => d.value));
   return (
     <div className="flex flex-col" style={{ height }}>
@@ -71,8 +76,8 @@ export function MiniBars({
         {data.map((d, i) => (
           <div key={i} className="flex-1 flex flex-col justify-end" title={`${d.label}: ${d.value}`}>
             <div
-              className="rounded-t-md bg-accent/85 hover:bg-accent transition-colors"
-              style={{ height: `${Math.max(2, (d.value / max) * 100)}%` }}
+              className={`rounded-t-md bg-accent/85 hover:bg-accent transition-colors origin-bottom ${rm ? '' : 'chart-bar-grow'}`}
+              style={{ height: `${Math.max(2, (d.value / max) * 100)}%`, animationDelay: rm ? undefined : `${i * 35}ms` }}
             />
           </div>
         ))}

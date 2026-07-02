@@ -57,7 +57,7 @@ export default function WorkoutCelebration({ prs, onDone, endedEarly, onUndo }: 
               )}
             </motion.div>
 
-            <h2 className="font-display text-2xl font-bold text-ink mt-4">
+            <h2 className="font-display-italic text-3xl text-ink mt-4">
               {prs && prs.length ? 'New personal record!' : endedEarly ? 'Session logged' : 'Workout logged 💪'}
             </h2>
 

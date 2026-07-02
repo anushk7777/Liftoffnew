@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { subDays, format, startOfDay, isToday, isThisWeek } from 'date-fns';
+import { subDays, format, startOfDay, isThisWeek } from 'date-fns';
 import {
   BarChart3,
   Plus,
@@ -12,14 +12,17 @@ import {
   Target,
   ChevronDown,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useStore } from '../store/useStore';
-import { cn } from '../lib/utils';
+import { stagger, rise, useReducedMotion } from '../lib/motion';
 import { countRoadmap } from '../lib/roadmap';
 import { getEvidenceStats } from '../lib/metrics';
 import { PageHeader, StatCard } from '../components/ui';
 import { Sparkline, MiniBars } from '../components/charts';
+import { ConsistencyGraph } from '../components/ConsistencyGraph';
 
 export default function Stats() {
+  const rm = useReducedMotion();
   const {
     streak,
     longestStreak,
@@ -81,18 +84,8 @@ export default function Stats() {
     return data;
   }, [focusSessions]);
 
-  const heatmap = useMemo(() => {
-    const data = [];
-    for (let i = 181; i >= 0; i--) {
-      const dateStr = startOfDay(subDays(new Date(), i)).toISOString();
-      const log = activityHistory.find((l) => l.date === dateStr);
-      data.push({ date: dateStr, type: log ? log.type : null });
-    }
-    return data;
-  }, [activityHistory]);
-
   return (
-    <div className="animate-rise">
+    <motion.div variants={stagger} initial={rm ? false : 'hidden'} animate="show">
       <PageHeader
         title="Stats"
         subtitle="Proof you're showing up. Measure the climb."
@@ -100,7 +93,7 @@ export default function Stats() {
       />
 
       {/* Headline stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+      <motion.div variants={rise} className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         <StatCard label="Current streak" value={`${streak}d`} icon={<Flame className="w-4 h-4" />} accent />
         <StatCard label="Longest streak" value={`${longestStreak}d`} icon={<Trophy className="w-4 h-4" />} />
         <StatCard label="Roadmap" value={`${roadmap.percent}%`} icon={<Target className="w-4 h-4" />} />
@@ -109,18 +102,18 @@ export default function Stats() {
           value={`${Math.floor(focusTotal / 60)}h ${focusTotal % 60}m`}
           icon={<Timer className="w-4 h-4" />}
         />
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+      </motion.div>
+      <motion.div variants={rise} className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
         <StatCard label="Problems solved" value={evidence.problems} icon={<Code className="w-4 h-4" />} />
         <StatCard label="Sections completed" value={evidence.sections} icon={<BookOpen className="w-4 h-4" />} />
         <StatCard label="Projects shipped" value={evidence.projects} icon={<Trophy className="w-4 h-4" />} />
         <StatCard label="Tasks done" value={evidence.tasksDone} icon={<Code className="w-4 h-4" />} />
         <StatCard label="Days active" value={evidence.activeDays} icon={<Flame className="w-4 h-4" />} />
         <StatCard label="Focus this week" value={`${focusWeek}m`} icon={<Timer className="w-4 h-4" />} />
-      </div>
+      </motion.div>
 
       {/* Manual log tucked away — the headline numbers above are evidence-based. */}
-      <details className="card p-4 mb-8">
+      <motion.details variants={rise} className="card p-4 mb-8">
         <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-medium text-ink">
           <span>Log reps done outside Liftoff</span>
           <ChevronDown className="w-4 h-4 text-ink-subtle" />
@@ -145,10 +138,10 @@ export default function Stats() {
             onDec={() => incrementSections(-1)}
           />
         </div>
-      </details>
+      </motion.details>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <motion.div variants={rise} className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div className="card p-5">
           <h3 className="section-label mb-4">30-day momentum</h3>
           <Sparkline data={momentum} height={176} />
@@ -158,51 +151,14 @@ export default function Stats() {
           <h3 className="section-label mb-4">Focus — last 14 days (min)</h3>
           <MiniBars data={focusByDay} height={176} />
         </div>
-      </div>
+      </motion.div>
 
-      {/* Heatmap */}
-      <div className="card p-5 overflow-hidden">
+      {/* Consistency */}
+      <motion.div variants={rise} className="card p-5 overflow-hidden">
         <h3 className="section-label mb-4">Consistency — last 6 months</h3>
-        <div className="flex gap-1 overflow-x-auto pb-2" dir="rtl">
-          {Array.from({ length: 26 }).map((_, col) => (
-            <div key={col} className="flex flex-col gap-1">
-              {Array.from({ length: 7 }).map((_, row) => {
-                const index = col * 7 + row;
-                if (index >= heatmap.length) return <div key={row} className="w-3 h-3" />;
-                const d = heatmap[heatmap.length - 1 - index];
-                return (
-                  <div
-                    key={row}
-                    title={format(new Date(d.date), 'MMM d, yyyy')}
-                    className={cn(
-                      'w-3 h-3 rounded-[3px] transition-colors',
-                      d.type === 'full'
-                        ? 'bg-accent'
-                        : d.type === 'minimum'
-                          ? 'bg-warning'
-                          : isToday(new Date(d.date))
-                            ? 'bg-elevated ring-1 ring-accent'
-                            : 'bg-elevated',
-                    )}
-                  />
-                );
-              })}
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-4 mt-3 text-[11px] text-ink-subtle">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-[3px] bg-accent" /> Full day
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-[3px] bg-warning" /> Minimum
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-[3px] bg-elevated" /> No activity
-          </span>
-        </div>
-      </div>
-    </div>
+        <ConsistencyGraph history={activityHistory} days={182} streak={streak} />
+      </motion.div>
+    </motion.div>
   );
 }
 

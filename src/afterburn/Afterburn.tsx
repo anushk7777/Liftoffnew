@@ -997,15 +997,32 @@ function SessionCard({ session, onEdit }: { session: WorkoutSession; onEdit: (id
 
 function HistoryView({ onEdit }: { onEdit: (id: string) => void }) {
   const sessions = useAfterburn((s) => s.sessions);
+  const rm = useReducedMotion();
   if (sessions.length === 0) {
     return <p className="text-sm text-ink-subtle text-center py-12">No workouts logged yet. Start a day from the Program tab.</p>;
   }
   return (
-    <div className="space-y-3">
-      {sessions.map((s) => (
-        <SessionCard key={s.id} session={s} onEdit={onEdit} />
+    <motion.div
+      className="space-y-3"
+      initial={rm ? false : 'hidden'}
+      animate="show"
+      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05 } } }}
+    >
+      {sessions.slice(0, 30).map((s) => (
+        <motion.div key={s.id} variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.21, 1, 0.4, 1] } } }}>
+          <SessionCard session={s} onEdit={onEdit} />
+        </motion.div>
       ))}
-    </div>
+      {sessions.length > 30 && (
+        <div className="pt-1">
+          {sessions.slice(30).map((s) => (
+            <div key={s.id} className="mb-3">
+              <SessionCard session={s} onEdit={onEdit} />
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -1082,9 +1099,16 @@ export default function Afterburn() {
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={cn('flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors', tab === t.id ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted')}
+                  className={cn('relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors', tab === t.id ? 'text-ink' : 'text-ink-muted')}
                 >
-                  <t.icon className="w-3.5 h-3.5" /> {t.label}
+                  {tab === t.id && (
+                    <motion.span
+                      layoutId="afterburn-tab-pill"
+                      transition={rm ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 34 }}
+                      className="absolute inset-0 rounded-md bg-surface shadow-sm"
+                    />
+                  )}
+                  <t.icon className="relative z-10 w-3.5 h-3.5" /> <span className="relative z-10">{t.label}</span>
                 </button>
               ))}
             </div>
