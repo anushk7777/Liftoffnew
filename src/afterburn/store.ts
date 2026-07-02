@@ -263,12 +263,31 @@ export interface VolumeTrend {
   dir: 'up' | 'down' | 'flat' | 'na';
 }
 
-/** Latest training week's total volume vs the previous training week. */
+/** Training volume in the trailing 7 days vs the 7 days before that, anchored
+ *  to the most recent session. (Calendar-week buckets would compare a partial
+ *  current week against a full prior one and read as a false drop.) */
 export function volumeTrend(sessions: WorkoutSession[]): VolumeTrend {
-  const wv = weeklyVolume(sessions);
-  const thisWeek = wv[wv.length - 1]?.volume ?? 0;
-  const lastWeek = wv[wv.length - 2]?.volume ?? 0;
-  if (wv.length < 2 || lastWeek === 0) return { thisWeek, lastWeek, deltaPct: null, dir: 'na' };
+  const DAY = 86_400_000;
+  const times = sessions.map((s) => Date.parse(s.completedAt ?? s.date)).filter((t) => !Number.isNaN(t));
+  if (times.length === 0) return { thisWeek: 0, lastWeek: 0, deltaPct: null, dir: 'na' };
+  const anchor = times.reduce((a, b) => Math.max(a, b), -Infinity);
+  const volIn = (startMs: number, endMs: number): number => {
+    let sum = 0;
+    for (const s of sessions) {
+      const t = Date.parse(s.completedAt ?? s.date);
+      if (Number.isNaN(t) || t <= startMs || t > endMs) continue;
+      for (const e of s.entries)
+        for (const st of e.sets) {
+          const w = parseFloat(st.weight);
+          const r = parseInt(st.reps, 10);
+          if (Number.isFinite(w) && w > 0 && Number.isFinite(r) && r > 0) sum += w * r;
+        }
+    }
+    return Math.round(sum);
+  };
+  const thisWeek = volIn(anchor - 7 * DAY, anchor);
+  const lastWeek = volIn(anchor - 14 * DAY, anchor - 7 * DAY);
+  if (lastWeek === 0) return { thisWeek, lastWeek, deltaPct: null, dir: 'na' };
   const deltaPct = Math.round(((thisWeek - lastWeek) / lastWeek) * 100);
   return { thisWeek, lastWeek, deltaPct, dir: deltaPct > 2 ? 'up' : deltaPct < -2 ? 'down' : 'flat' };
 }
