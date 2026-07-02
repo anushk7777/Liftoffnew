@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw, SkipForward, Timer, Coffee, Brain } from 'lucide-react';
 import { isToday } from 'date-fns';
+import { motion } from 'framer-motion';
 import { useStore } from '../store/useStore';
 import { cn, safeSetItem } from '../lib/utils';
 import { beep } from '../lib/sound';
+import { stagger, rise, useReducedMotion } from '../lib/motion';
 import { PageHeader, StatCard } from '../components/ui';
 
 type Mode = 'focus' | 'shortBreak' | 'longBreak';
@@ -34,6 +36,7 @@ function readSavedFocus(): SavedFocus | null {
 }
 
 export default function Focus() {
+  const rm = useReducedMotion();
   const { pomodoro, focusSessions, logFocusSession, tasks, focusTaskId, setFocusTaskId } = useStore();
 
   const [saved] = useState<SavedFocus | null>(() => readSavedFocus());
@@ -182,7 +185,7 @@ export default function Focus() {
   const C = 2 * Math.PI * R;
 
   return (
-    <div className="animate-rise">
+    <motion.div variants={stagger} initial={rm ? false : 'hidden'} animate="show">
       <PageHeader
         title="Focus"
         subtitle="Deep work in focused intervals. No distractions."
@@ -190,7 +193,7 @@ export default function Focus() {
       />
 
       {/* Mode switch */}
-      <div className="flex items-center justify-center gap-1 mb-8 p-1 rounded-lg bg-elevated border border-border w-fit mx-auto">
+      <motion.div variants={rise} className="flex items-center justify-center gap-1 mb-8 p-1 rounded-lg bg-elevated border border-border w-fit mx-auto">
         {(Object.keys(MODE_META) as Mode[]).map((m) => (
           <button
             key={m}
@@ -204,10 +207,10 @@ export default function Focus() {
             {MODE_META[m].label}
           </button>
         ))}
-      </div>
+      </motion.div>
 
       {/* Timer ring */}
-      <div className="flex flex-col items-center">
+      <motion.div variants={rise} className="flex flex-col items-center">
         <div className="relative w-80 h-80 flex items-center justify-center mb-10 neo-dial mx-auto">
           <div className="absolute inset-4 neo-dial-inner flex items-center justify-center">
             <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 300 300">
@@ -226,7 +229,7 @@ export default function Focus() {
               />
             </svg>
             <div className="flex flex-col items-center z-10">
-              <p className="font-display text-7xl font-extrabold tabular-nums tracking-tight">
+              <p className="font-mono-data text-6xl font-bold tabular-nums tracking-tight">
                 {mm}<span className="opacity-50">:</span>{ss}
               </p>
               <p className="text-sm text-[var(--accent)] font-bold mt-2 flex items-center gap-1.5 uppercase tracking-widest">
@@ -286,10 +289,10 @@ export default function Focus() {
             {taskId && <p className="text-[11px] text-accent text-center">Linked to a task · time logs against it</p>}
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 mt-12 max-w-2xl mx-auto">
+      <motion.div variants={rise} className="grid grid-cols-3 gap-3 mt-12 max-w-2xl mx-auto">
         <StatCard label="Focus today" value={`${focusToday}m`} icon={<Timer className="w-4 h-4" />} />
         <StatCard label="Sessions today" value={sessionsToday} icon={<Brain className="w-4 h-4" />} />
         <StatCard
@@ -297,7 +300,7 @@ export default function Focus() {
           value={`${Math.floor(totalFocus / 60)}h ${totalFocus % 60}m`}
           icon={<Timer className="w-4 h-4" />}
         />
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

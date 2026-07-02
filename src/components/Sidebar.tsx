@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
   CheckSquare,
@@ -36,6 +37,7 @@ export default function Sidebar({
 }) {
   const { theme, toggleTheme } = useStore();
   const setAppMode = useAppMode((s) => s.setMode);
+  const { pathname } = useLocation();
 
   return (
     <nav className="flex flex-col h-full py-6 px-4 w-64 bg-[var(--bg)] border-r border-white/5 z-50 transition-colors duration-300">
@@ -47,28 +49,36 @@ export default function Sidebar({
         <span className="text-[28px] leading-none" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>Liftoff</span>
       </div>
 
-      {/* Navigation Tabs */}
+      {/* Navigation Tabs — the ink pill glides between routes via layoutId. */}
       <ul className="flex-1 space-y-3">
-        {NAV.map(({ to, label, icon: Icon, end }) => (
-          <li key={to}>
-            <NavLink
-              to={to}
-              end={end}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-all duration-200 active:scale-95',
-                  isActive 
-                    ? 'bg-[var(--accent)] text-[var(--accent-text)] font-semibold' 
-                    : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:neo-button'
-                )
-              }
-            >
-              <Icon className="w-5 h-5 shrink-0" style={{ fontVariationSettings: "'FILL' 1" }} />
-              <span className="font-body text-sm">{label}</span>
-            </NavLink>
-          </li>
-        ))}
+        {NAV.map(({ to, label, icon: Icon, end }) => {
+          const isActive = end ? pathname === to : pathname.startsWith(to);
+          return (
+            <li key={to}>
+              <NavLink
+                to={to}
+                end={end}
+                onClick={onNavigate}
+                className={cn(
+                  'relative flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-colors duration-200 active:scale-95',
+                  isActive
+                    ? 'text-[var(--accent-text)] font-semibold'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:neo-button',
+                )}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="sidebar-pill"
+                    transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                    className="absolute inset-0 rounded-xl bg-[var(--accent)]"
+                  />
+                )}
+                <Icon className="relative z-10 w-5 h-5 shrink-0" style={{ fontVariationSettings: "'FILL' 1" }} />
+                <span className="relative z-10 font-body text-sm">{label}</span>
+              </NavLink>
+            </li>
+          );
+        })}
       </ul>
 
       {/* Footer Tabs */}

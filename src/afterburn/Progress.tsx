@@ -44,11 +44,18 @@ const VOL_STATUS: Record<VolumeStatus, { label: string; color: string; chip: str
 
 /** A horizontal bar of weekly sets, with reference ticks at MEV / MAV / MRV. */
 function VolumeBar({ m }: { m: MuscleAnalysis }) {
+  const rm = useReducedMotion();
   const scaleMax = m.landmark.mrv * 1.15;
   const pct = (v: number) => `${Math.min(100, (v / scaleMax) * 100)}%`;
   return (
     <div className="relative h-2.5 rounded-full bg-elevated overflow-hidden">
-      <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: pct(m.sets), backgroundColor: VOL_STATUS[m.status].color }} />
+      <motion.div
+        className="absolute inset-y-0 left-0 rounded-full"
+        style={{ backgroundColor: VOL_STATUS[m.status].color }}
+        initial={rm ? { width: pct(m.sets) } : { width: 0 }}
+        animate={{ width: pct(m.sets) }}
+        transition={{ duration: 0.7, ease: [0.21, 1, 0.4, 1], delay: 0.1 }}
+      />
       {[m.landmark.mev, m.landmark.mav, m.landmark.mrv].map((v, i) => (
         <div key={i} className="absolute inset-y-0 w-px bg-ink/40" style={{ left: pct(v) }} title={`${['MEV', 'MAV', 'MRV'][i]} ${v}`} />
       ))}
@@ -85,6 +92,7 @@ const READINESS: Record<ReadinessVerdict, { label: string; color: string; bg: st
 
 /** The CO2 tolerance test: a guided exhale timer + a manual seconds entry. */
 function CO2Test({ onLog }: { onLog: (score: number) => void }) {
+  const rm = useReducedMotion();
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const startRef = useRef(0);
@@ -117,10 +125,15 @@ function CO2Test({ onLog }: { onLog: (score: number) => void }) {
   return (
     <div className="space-y-3">
       {running ? (
-        <button onClick={stop} className="w-full rounded-xl border border-ember bg-ember-soft py-4 flex flex-col items-center">
+        <motion.button
+          onClick={stop}
+          className="w-full rounded-xl border border-ember bg-ember-soft py-4 flex flex-col items-center"
+          animate={rm ? undefined : { scale: [1, 1.02, 1] }}
+          transition={rm ? undefined : { duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+        >
           <span className="font-mono-data text-4xl font-bold text-ink tabular-nums">{elapsed.toFixed(1)}s</span>
           <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-ember"><Square className="w-3.5 h-3.5" /> Exhale slowly… tap to stop &amp; log</span>
-        </button>
+        </motion.button>
       ) : (
         <button onClick={start} className="btn btn-primary w-full">
           <Play className="w-4 h-4" /> Start CO2 test
@@ -233,7 +246,7 @@ export default function Progress() {
           <div className="neo-card p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="font-display text-2xl font-bold text-ink">{verdict}</p>
+                <p className="font-display-italic text-3xl text-ink">{verdict}</p>
                 <p className="text-xs text-ink-subtle mt-0.5 max-w-[22rem]">{verdictHint}</p>
               </div>
               <span
@@ -344,7 +357,12 @@ export default function Progress() {
       )}
 
       {/* Recovery — CO2 tolerance test */}
-      <section className="space-y-3">
+      <motion.section
+        initial={rm ? false : { opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1], delay: 0.08 }}
+        className="space-y-3"
+      >
         <h2 className="section-label flex items-center gap-1.5">
           <Wind className="w-3.5 h-3.5" /> Recovery — CO2 tolerance test
         </h2>
@@ -387,7 +405,7 @@ export default function Progress() {
             ))}
           </div>
         )}
-      </section>
+      </motion.section>
 
       {/* Bodyweight */}
       <section className="space-y-3">

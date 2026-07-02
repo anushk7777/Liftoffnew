@@ -48,9 +48,12 @@
     --shadow-lg: 0 18px 50px rgba(20, 20, 25, 0.1);
     --shadow-hover: 0 24px 60px rgba(20, 20, 25, 0.14);
 
-    --radius: 14px;
+    --radius: 16px;
     --font-body: 'Inter', system-ui, sans-serif;
-    --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    /* Editorial pairing: a high-contrast serif carries headlines & hero numbers,
+       Inter does the quiet UI work. Instrument Serif ships one weight (400) —
+       hierarchy comes from size, never faux bold. */
+    --font-display: 'Instrument Serif', Georgia, serif;
     --font-serif: 'Instrument Serif', Georgia, serif;
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
@@ -117,6 +120,7 @@
     background-repeat: no-repeat;
     color: var(--text);
     font-family: var(--font-body);
+    letter-spacing: -0.011em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -272,9 +276,24 @@
 @layer utilities {
   .font-display {
     font-family: var(--font-display);
+    /* Instrument Serif has no bold — refuse synthesized weights so `font-bold`
+       callers degrade to the true 400 cut instead of a smeared faux-bold. */
+    font-weight: 400 !important;
+    font-synthesis: none;
+    letter-spacing: 0.005em;
+    line-height: 1.12;
+  }
+  .font-display-italic {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400 !important;
+    font-synthesis: none;
+    letter-spacing: 0.005em;
+    line-height: 1.12;
   }
   .font-body {
     font-family: var(--font-body);
+    letter-spacing: -0.011em;
   }
   .font-serif {
     font-family: var(--font-serif);
@@ -286,6 +305,51 @@
   }
   .animate-rise {
     animation: rise 0.45s cubic-bezier(0.21, 1, 0.4, 1) both;
+  }
+  /* Chart entrances: line draws on, area fades, bars grow from the baseline. */
+  .chart-line-draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: chartDraw 0.9s cubic-bezier(0.4, 0, 0.2, 1) 0.15s forwards;
+  }
+  .chart-area-in {
+    opacity: 0;
+    animation: chartFade 0.6s ease-out 0.5s forwards;
+  }
+  .chart-bar-grow {
+    animation: chartGrow 0.55s cubic-bezier(0.21, 1, 0.4, 1) both;
+  }
+  @keyframes chartDraw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes chartFade {
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes chartGrow {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+  /* ConsistencyGraph cells sweep in diagonally (per-cell animation-delay). */
+  .consistency-cell {
+    animation: cellIn 0.35s cubic-bezier(0.21, 1, 0.4, 1) both;
+  }
+  @keyframes cellIn {
+    from {
+      opacity: 0;
+      transform: scale(0.6);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;

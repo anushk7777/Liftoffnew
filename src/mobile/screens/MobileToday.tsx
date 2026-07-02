@@ -7,7 +7,7 @@ import { cn } from '../../lib/utils';
 import { haptics } from '../../lib/haptics';
 import { buildProfile, getSuggestions } from '../../lib/coach';
 import type { CoachState } from '../../lib/coach';
-import { Heatmap } from '../../components/Heatmap';
+import { ConsistencyGraph } from '../../components/ConsistencyGraph';
 
 function greeting() {
   const h = new Date().getHours();
@@ -117,12 +117,10 @@ export default function MobileToday() {
 
       {/* Streak */}
       <section className="card p-5">
-        <h2 className="font-display text-base font-semibold text-ink mb-3 flex items-center gap-2">
+        <h2 className="font-display text-lg text-ink mb-3 flex items-center gap-2">
           <Flame className="w-4 h-4 text-warning" /> {streak}-day streak
         </h2>
-        <div className="overflow-x-auto custom-scrollbar -mx-1 px-1">
-          <Heatmap history={activityHistory} />
-        </div>
+        <ConsistencyGraph history={activityHistory} days={91} streak={streak} showStats={false} />
       </section>
     </div>
   );

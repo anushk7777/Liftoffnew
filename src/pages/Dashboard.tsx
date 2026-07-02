@@ -9,7 +9,7 @@ import { buildProfile, getSuggestions, getBriefing, buildDailyPlan, formatHour }
 import type { CoachState } from '../lib/coach';
 import { SuggestionRow } from '../components/Coach';
 import { useCoachActions } from '../components/useCoachActions';
-import { Heatmap } from '../components/Heatmap';
+import { ConsistencyGraph } from '../components/ConsistencyGraph';
 import { AnimatedNumber } from '../components/ui';
 import { Sparkline } from '../components/charts';
 import type { TodoTask } from '../store/data';
@@ -310,6 +310,7 @@ export default function Dashboard() {
           <div className="relative w-52 h-52 my-3 dial-ring rounded-full flex items-center justify-center">
             <svg className="absolute inset-3 w-[calc(100%-1.5rem)] h-[calc(100%-1.5rem)] -rotate-90" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="44" fill="none" stroke="var(--border-strong)" strokeWidth="4" />
+              {/* Ring fills with today's real focus minutes (vs a soft 2h target). */}
               <circle
                 cx="50"
                 cy="50"
@@ -319,8 +320,8 @@ export default function Dashboard() {
                 strokeWidth="4"
                 strokeLinecap="round"
                 strokeDasharray="276"
-                strokeDashoffset="166"
-                style={{ filter: 'drop-shadow(0 0 5px var(--accent-soft))' }}
+                strokeDashoffset={276 * (1 - Math.min(focusToday / 120, 1))}
+                style={{ filter: 'drop-shadow(0 0 5px var(--accent-soft))', transition: 'stroke-dashoffset 0.8s cubic-bezier(0.21, 1, 0.4, 1)' }}
               />
             </svg>
             <div className="text-center z-10">
@@ -328,7 +329,9 @@ export default function Dashboard() {
                 {pomodoro.focusMins}
                 <span className="opacity-40">:</span>00
               </p>
-              <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-[var(--text-muted)] mt-2">Ready</p>
+              <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-[var(--text-muted)] mt-2">
+                {focusToday > 0 ? `${focusToday}m today` : 'Ready'}
+              </p>
             </div>
           </div>
           <Link
@@ -435,18 +438,16 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Consistency heatmap */}
-      <div className="neo-card p-6 relative z-20">
-        <h3 className="font-display text-lg font-semibold text-[var(--text)] mb-5 flex items-center gap-3">
+      {/* Consistency */}
+      <motion.div variants={rise} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} className="neo-card p-6 relative z-20">
+        <h3 className="font-display text-xl text-[var(--text)] mb-5 flex items-center gap-3">
           <span className="w-9 h-9 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
             <Flame className="w-[18px] h-[18px] text-[var(--accent)]" />
           </span>
-          Consistency Streak <span className="text-[var(--text-muted)] font-normal text-sm">({streak} days)</span>
+          Consistency
         </h3>
-        <div className="bg-[var(--bg)] p-4 rounded-2xl border border-[var(--border)]">
-          <Heatmap history={activityHistory} />
-        </div>
-      </div>
+        <ConsistencyGraph history={activityHistory} days={91} streak={streak} />
+      </motion.div>
 
       {/* Quick Add FAB */}
       <button

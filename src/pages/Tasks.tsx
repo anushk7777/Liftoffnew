@@ -211,7 +211,7 @@ export default function Tasks() {
             {hours.map((h) => {
               const items = scheduled.filter((t) => new Date(t.scheduledAt!).getHours() === h);
               return (
-                <div key={h} className="flex gap-3 group/hour">
+                <div key={h} className="flex gap-3 group/hour animate-rise" style={{ animationDelay: `${(h - hours[0]) * 22}ms` }}>
                   <div className="w-14 shrink-0 text-right pt-2 font-mono-data text-[11px] text-on-surface-variant/60">
                     {hourLabel(h)}
                   </div>
