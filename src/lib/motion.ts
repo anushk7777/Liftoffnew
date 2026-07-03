@@ -8,9 +8,20 @@ export const fast: Transition = { duration: 0.18, ease: [0.21, 1, 0.4, 1] };
 
 // Page transition variants (subtle fade + lift).
 export const pageVariants: Variants = {
-  initial: { opacity: 0, y: 8 },
+  initial: { opacity: 0, y: 14 },
   enter: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -6 },
+  exit: { opacity: 0, y: -8 },
+};
+
+// Shared entrance choreography: a parent `stagger` container drips its `rise`
+// children in. Use with initial="hidden" animate="show" (or whileInView).
+export const stagger: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
+};
+export const rise: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.2, 0.7, 0.2, 1] } },
 };
 
 // Shared entrance choreography: a parent `stagger` container drips its `rise`

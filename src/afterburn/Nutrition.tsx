@@ -286,7 +286,9 @@ function CycleCard({ title, d }: { title: string; d: { kcal: number; proteinG: n
 }
 
 function MacroRow({ label, grams, kcal, total, perKg, color }: { label: string; grams: number; kcal: number; total: number; perKg?: number; color: string }) {
-  const pct = total > 0 ? Math.round((kcal / total) * 100) : 0;
+  // Clamp: at the fat floor on very low calories the macros can exceed the
+  // kcal target, which would overflow the bar row.
+  const pct = total > 0 ? Math.min(100, Math.round((kcal / total) * 100)) : 0;
   return (
     <div>
       <div className="flex justify-between text-xs mb-0.5">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dayKey, streakFromDays, isMilestone } from './streak';
+import { dayKey, streakFromDays, longestRunFromDays, isMilestone } from './streak';
 
 // Build a yyyy-MM-dd key N days before today using the same helper under test.
 const keyDaysAgo = (n: number) => {
@@ -37,6 +37,24 @@ describe('streakFromDays', () => {
     const { streak, freezeAvailable } = streakFromDays(days);
     expect(streak).toBe(3);
     expect(freezeAvailable).toBe(false);
+  });
+});
+
+describe('longestRunFromDays', () => {
+  it('finds the best historical run, not just the current one', () => {
+    // A 3-day run months ago beats a lone recent day.
+    const days = new Set(['2026-01-01', '2026-01-02', '2026-01-03', '2026-03-10']);
+    expect(longestRunFromDays(days)).toBe(3);
+  });
+
+  it('breaks runs on gaps and handles single/empty sets', () => {
+    expect(longestRunFromDays(new Set(['2026-01-01', '2026-01-03']))).toBe(1);
+    expect(longestRunFromDays(new Set(['2026-01-01']))).toBe(1);
+    expect(longestRunFromDays(new Set())).toBe(0);
+  });
+
+  it('counts across a month boundary', () => {
+    expect(longestRunFromDays(new Set(['2026-01-31', '2026-02-01', '2026-02-02']))).toBe(3);
   });
 });
 

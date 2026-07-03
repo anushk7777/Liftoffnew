@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weeklyVolume, detectPRs, formatVolume } from './store';
+import { weeklyVolume, volumeTrend, detectPRs, formatVolume } from './store';
 import type { WorkoutSession } from './types';
 
 // Minimal session builder — only the fields weeklyVolume/detectPRs read.
@@ -44,5 +44,30 @@ describe('formatVolume', () => {
   it('collapses big loads to tonnes and keeps small ones in unit·reps', () => {
     expect(formatVolume(33205)).toBe('33.2 t');
     expect(formatVolume(8823, 'kg')).toBe('8,823 kg·reps');
+  });
+});
+
+describe('volumeTrend', () => {
+  it('uses trailing 7-day windows, not partial calendar weeks', () => {
+    // Sun + following Wed are different Monday buckets but both inside the
+    // trailing week — must NOT read as a drop.
+    const t = volumeTrend([
+      sess('a', '2026-03-15T10:00:00.000Z', 'Bench', [[100, 5]]), // Sunday
+      sess('b', '2026-03-18T10:00:00.000Z', 'Bench', [[100, 5]]), // Wednesday
+    ]);
+    expect(t.thisWeek).toBe(1000);
+    expect(t.dir).toBe('na'); // no prior-window data → no fake -50%
+  });
+
+  it('compares against the prior 7-day window', () => {
+    const t = volumeTrend([
+      sess('a', '2026-03-08T10:00:00.000Z', 'Bench', [[100, 10]]), // prior window: 1000
+      sess('b', '2026-03-14T10:00:00.000Z', 'Bench', [[100, 6]]), // current: 600
+      sess('c', '2026-03-15T10:00:00.000Z', 'Bench', [[100, 6]]), // current: +600
+    ]);
+    expect(t.lastWeek).toBe(1000);
+    expect(t.thisWeek).toBe(1200);
+    expect(t.deltaPct).toBe(20);
+    expect(t.dir).toBe('up');
   });
 });

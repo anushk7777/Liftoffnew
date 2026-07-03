@@ -175,6 +175,7 @@ export default function Progress() {
   const rm = useReducedMotion();
 
   const [w, setW] = useState('');
+  const [mountedAt] = useState(() => Date.now());
 
   const volume = useMemo(() => weeklyVolume(sessions), [sessions]);
   const volPoints: ChartPoint[] = volume.map((v) => ({ date: v.weekStart, value: v.volume }));
@@ -465,7 +466,10 @@ export default function Progress() {
             <p className="text-[11px] text-ink-subtle">
               Total load = weight × reps across <span className="text-ink">all</span> lifts, bucketed by week (in {unit}).
               {latestWeek && (
-                <> Latest week: <span className="text-ink font-medium">{formatVolume(latestWeek.volume, unit)}</span> over {latestWeek.sets} sets.</>
+                <>
+                  {' '}Latest week: <span className="text-ink font-medium">{formatVolume(latestWeek.volume, unit)}</span> over {latestWeek.sets} sets
+                  {new Date(latestWeek.weekStart).getTime() > mountedAt - 7 * 86_400_000 ? ' · current week still in progress' : ''}.
+                </>
               )}
             </p>
           </div>

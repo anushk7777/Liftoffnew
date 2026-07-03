@@ -28,6 +28,8 @@ export interface WeakPointGroup {
   muscle: string;
   exercise1: string[];
   exercise2: string[];
+  /** Matching volume.ts Muscle id, so the picker can flag lagging groups. */
+  volumeKey?: string;
 }
 
 export interface ProgramDay {

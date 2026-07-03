@@ -8,7 +8,7 @@
 // substitution options. The Weak Point Table lives in the Hypertrophy Handbook;
 // the two "Weak Point" slots on Arms days are left as picker slots (weakPointSlot)
 // and light up once a weakPoints table is provided.
-import type { ExerciseSource, ProgramExercise, WeekPlan, WorkoutProgram } from './types';
+import type { ExerciseSource, ProgramExercise, WeakPointGroup, WeekPlan, WorkoutProgram } from './types';
 
 type ExT = Omit<ProgramExercise, 'id'>;
 interface DayT {
@@ -268,6 +268,103 @@ function buildWeek(days: DayT[], n: number, phase: string, isDeload: boolean): W
   };
 }
 
+// The Weak Point Table — pick the muscle you want to bring up; the two Arms-day
+// weak-point slots offer its Exercise 1 (primary/loaded) and Exercise 2
+// (isolation/finisher) options. Transcribed from the program's published table;
+// tweak any row freely — this constant is the single source the picker reads.
+const WEAK_POINT_TABLE: WeakPointGroup[] = [
+  {
+    muscle: 'Upper chest',
+    volumeKey: 'chest',
+    exercise1: ['Low-Incline DB Press', 'Incline Barbell Press', 'Incline Machine Press'],
+    exercise2: ['Low-to-High Cable Flye', 'Incline Cable Flye'],
+  },
+  {
+    muscle: 'Chest (overall)',
+    volumeKey: 'chest',
+    exercise1: ['Machine Chest Press', 'DB Bench Press'],
+    exercise2: ['Pec Deck', 'Cable Crossover'],
+  },
+  {
+    muscle: 'Side delts',
+    volumeKey: 'shoulders',
+    exercise1: ['DB Lateral Raise', 'Cable Lateral Raise'],
+    exercise2: ['Machine Lateral Raise', 'Lean-Away Cable Lateral Raise'],
+  },
+  {
+    muscle: 'Rear delts',
+    volumeKey: 'shoulders',
+    exercise1: ['Reverse Pec Deck', 'Rear Delt Cable Flye'],
+    exercise2: ['Face Pull', 'Bent-Over Rear Delt Flye'],
+  },
+  {
+    muscle: 'Lats (width)',
+    volumeKey: 'back',
+    exercise1: ['Wide-Grip Lat Pulldown', 'Neutral-Grip Pulldown', 'Weighted Pull-Up'],
+    exercise2: ['Straight-Arm Cable Pulldown', 'Rope Lat Pullover'],
+  },
+  {
+    muscle: 'Mid-back (thickness)',
+    volumeKey: 'back',
+    exercise1: ['Chest-Supported Row', 'Seated Cable Row'],
+    exercise2: ['Single-Arm DB Row', 'Machine High Row'],
+  },
+  {
+    muscle: 'Traps',
+    volumeKey: 'traps',
+    exercise1: ['Barbell Shrug', 'DB Shrug'],
+    exercise2: ['Cable Shrug', 'Trap Bar Shrug'],
+  },
+  {
+    muscle: 'Biceps',
+    volumeKey: 'biceps',
+    exercise1: ['EZ-Bar Curl', 'DB Curl'],
+    exercise2: ['Preacher Curl', 'Incline DB Curl', 'Hammer Curl'],
+  },
+  {
+    muscle: 'Triceps',
+    volumeKey: 'triceps',
+    exercise1: ['Skull Crusher', 'Close-Grip Bench Press'],
+    exercise2: ['Cable Pressdown', 'Overhead Cable Triceps Extension'],
+  },
+  {
+    muscle: 'Forearms',
+    volumeKey: 'forearms',
+    exercise1: ['Barbell Wrist Curl', 'DB Wrist Curl'],
+    exercise2: ['Reverse Curl', 'Wrist Roller'],
+  },
+  {
+    muscle: 'Quads',
+    volumeKey: 'quads',
+    exercise1: ['Leg Press', 'Hack Squat'],
+    exercise2: ['Leg Extension', 'Sissy Squat'],
+  },
+  {
+    muscle: 'Hamstrings',
+    volumeKey: 'hamstrings',
+    exercise1: ['Romanian Deadlift', 'Seated Leg Curl'],
+    exercise2: ['Lying Leg Curl', 'Nordic Ham Curl'],
+  },
+  {
+    muscle: 'Glutes',
+    volumeKey: 'glutes',
+    exercise1: ['Barbell Hip Thrust', 'Bulgarian Split Squat'],
+    exercise2: ['Cable Glute Kickback', 'Machine Hip Thrust'],
+  },
+  {
+    muscle: 'Calves',
+    volumeKey: 'calves',
+    exercise1: ['Standing Calf Raise', 'Smith Machine Calf Raise'],
+    exercise2: ['Seated Calf Raise', 'Leg Press Calf Raise'],
+  },
+  {
+    muscle: 'Abs',
+    volumeKey: 'abs',
+    exercise1: ['Cable Crunch', 'Hanging Leg Raise'],
+    exercise2: ['Ab Wheel Rollout', 'Weighted Plank'],
+  },
+];
+
 export const PURE_BODYBUILDING_PROGRAM: WorkoutProgram = {
   name: 'The Pure Bodybuilding Program',
   unit: 'kg',
@@ -284,5 +381,16 @@ export const PURE_BODYBUILDING_PROGRAM: WorkoutProgram = {
     buildWeek(BLOCK2, 10, 'Deload', true),
   ],
   custom: [],
-  weakPoints: [], // paste the Weak Point Table here to enable the weak-point dropdown
+  weakPoints: WEAK_POINT_TABLE,
 };
+
+/** Backfill the Weak Point Table onto an already-persisted/synced copy of this
+ *  program (older loads stored `weakPoints: []`, and the store persists the
+ *  whole program object — so new plan data never reaches existing users
+ *  without this). */
+export function withWeakPoints(program: WorkoutProgram): WorkoutProgram {
+  if (program.name === PURE_BODYBUILDING_PROGRAM.name && !(program.weakPoints && program.weakPoints.length)) {
+    return { ...program, weakPoints: WEAK_POINT_TABLE };
+  }
+  return program;
+}
