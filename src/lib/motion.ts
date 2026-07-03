@@ -24,17 +24,6 @@ export const rise: Variants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.2, 0.7, 0.2, 1] } },
 };
 
-// Shared entrance choreography: a parent `stagger` container drips its `rise`
-// children in. Use with initial="hidden" animate="show" (or whileInView).
-export const stagger: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
-};
-export const rise: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.2, 0.7, 0.2, 1] } },
-};
-
 // Read the user's reduce-motion preference so callers can opt out of animation.
 export function useReducedMotion(): boolean {
   return useStore((s) => s.reduceMotion);
