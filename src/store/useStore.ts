@@ -15,7 +15,7 @@ import type {
 } from './data';
 import { initialRoadmap, defaultPomodoro } from './data';
 import { startOfDay, addMonths, format } from 'date-fns';
-import { dayKey, streakFromDays } from '../lib/streak';
+import { dayKey, streakFromDays, longestRunFromDays } from '../lib/streak';
 import {
   getDeviceId,
   getLocalUpdatedAt,
@@ -487,7 +487,9 @@ export const useStore = create<AppState>()(
     const { activityHistory, longestStreak } = get();
     const days = new Set(activityHistory.map((l) => dayKey(l.date)));
     const { streak, freezeAvailable } = streakFromDays(days);
-    set({ streak, longestStreak: Math.max(longestStreak, streak), freezeAvailable });
+    // Longest = best of the stored value, the full-history best run, and the
+    // (grace-aware) current streak — so imports/merges can't under-report it.
+    set({ streak, longestStreak: Math.max(longestStreak, longestRunFromDays(days), streak), freezeAvailable });
   },
 
   tombstones: {},

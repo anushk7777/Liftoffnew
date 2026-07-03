@@ -140,7 +140,12 @@ export default function Dashboard() {
 
   const doneCount = todaysTasks.filter((t) => t.status === 'done').length;
   const totalCount = todaysTasks.length;
-  const progressPercent = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+  // "Daily Objective" measures today's actual slate — tasks with a due date
+  // (today/overdue) or completed today. The undated backlog still shows in the
+  // list but no longer drags the percentage toward zero.
+  const dated = todaysTasks.filter((t) => t.dueDate || t.status === 'done');
+  const progressScope = dated.length > 0 ? dated : todaysTasks;
+  const progressPercent = progressScope.length > 0 ? Math.round((progressScope.filter((t) => t.status === 'done').length / progressScope.length) * 100) : 0;
 
   // Focus minutes today + a 14-day focus series for the momentum/performance charts.
   const focusToday = useMemo(
@@ -319,8 +324,8 @@ export default function Dashboard() {
                 stroke="var(--accent)"
                 strokeWidth="4"
                 strokeLinecap="round"
-                strokeDasharray="276"
-                strokeDashoffset={276 * (1 - Math.min(focusToday / 120, 1))}
+                strokeDasharray={2 * Math.PI * 44}
+                strokeDashoffset={2 * Math.PI * 44 * (1 - Math.min(focusToday / 120, 1))}
                 style={{ filter: 'drop-shadow(0 0 5px var(--accent-soft))', transition: 'stroke-dashoffset 0.8s cubic-bezier(0.21, 1, 0.4, 1)' }}
               />
             </svg>

@@ -28,5 +28,26 @@ export function streakFromDays(days: Set<string>): { streak: number; freezeAvail
   return { streak, freezeAvailable: freeze };
 }
 
+// Longest strictly-consecutive run anywhere in history (not just the current
+// one) — so "longest streak" survives imports, merges and gaps instead of only
+// ever being raised to a streak the app happened to witness live.
+export function longestRunFromDays(days: Set<string>): number {
+  if (days.size === 0) return 0;
+  const sorted = [...days].sort();
+  let best = 1;
+  let run = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = new Date(`${sorted[i - 1]}T00:00:00`);
+    prev.setDate(prev.getDate() + 1);
+    if (dayKey(prev) === sorted[i]) {
+      run += 1;
+      if (run > best) best = run;
+    } else {
+      run = 1;
+    }
+  }
+  return best;
+}
+
 export const STREAK_MILESTONES = [7, 14, 30, 50, 100, 200, 365];
 export const isMilestone = (n: number) => STREAK_MILESTONES.includes(n);

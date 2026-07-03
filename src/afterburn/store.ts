@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { DEFAULT_PROGRAM } from './plan';
+import { withWeakPoints } from './pureBodybuilding';
 import { DEFAULT_NUTRITION } from './nutrition';
 import type { NutritionProfile } from './nutrition';
 import type { BodyEntry, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, RecoveryEntry, WeekPlan, WeightUnit, WorkoutProgram, WorkoutSession } from './types';
@@ -403,7 +404,7 @@ export const useAfterburn = create<AfterburnState>()(
             // Ignore an old-shape cloud program (pre-weeks) so it can't break the UI.
             const validProgram = d.program && Array.isArray(d.program.weeks) ? d.program : undefined;
             set({
-              program: validProgram ?? get().program,
+              program: withWeakPoints(validProgram ?? get().program),
               sessions: d.sessions ?? get().sessions,
               bodyweight: Array.isArray(d.bodyweight) ? d.bodyweight : get().bodyweight,
               recovery: Array.isArray(d.recovery) ? d.recovery : get().recovery,
@@ -564,17 +565,19 @@ export const useAfterburn = create<AfterburnState>()(
     }),
     {
       name: 'liftoff-afterburn',
-      version: 3,
+      version: 4,
       // v1 stored a single-week `program.days`. Reset the program to the new
       // multi-week default if the persisted shape predates `weeks` (keep sessions).
       // v3 added the `recovery` collection — backfill it so old persists load.
+      // v4 backfills the Weak Point Table onto persisted Pure Bodybuilding copies.
       migrate: (persisted: unknown) => {
         const p = (persisted ?? {}) as Record<string, unknown>;
         if (!Array.isArray(p.recovery)) p.recovery = [];
-        const prog = p.program as { weeks?: unknown } | undefined;
+        const prog = p.program as WorkoutProgram | undefined;
         if (!prog || !Array.isArray(prog.weeks)) {
           return { ...p, program: DEFAULT_PROGRAM, currentWeekId: '' };
         }
+        p.program = withWeakPoints(prog);
         return p;
       },
       partialize: (s) => ({ program: s.program, sessions: s.sessions, bodyweight: s.bodyweight, recovery: s.recovery, nutrition: s.nutrition, draft: s.draft, currentWeekId: s.currentWeekId }),

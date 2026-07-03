@@ -8,9 +8,9 @@ export const fast: Transition = { duration: 0.18, ease: [0.21, 1, 0.4, 1] };
 
 // Page transition variants (subtle fade + lift).
 export const pageVariants: Variants = {
-  initial: { opacity: 0, y: 8 },
+  initial: { opacity: 0, y: 14 },
   enter: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -6 },
+  exit: { opacity: 0, y: -8 },
 };
 
 // Shared entrance choreography: a parent `stagger` container drips its `rise`

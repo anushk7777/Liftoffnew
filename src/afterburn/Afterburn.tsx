@@ -3,9 +3,10 @@ import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid, TrendingUp, Timer, Calculator, ArrowRight, Search, Sparkles, Dumbbell, Wind } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { pop, springSoft, pageVariants, fast, useReducedMotion } from '../lib/motion';
+import { pop, springSoft, fast, useReducedMotion } from '../lib/motion';
 import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance, restToSeconds, detectPRs } from './store';
 import { recoveryReadiness } from './recovery';
+import { analyzeVolume } from './volume';
 import WorkoutCelebration from './WorkoutCelebration';
 import type { PRHit } from './store';
 import ProgramLibrary from './ProgramLibrary';
@@ -193,6 +194,7 @@ function Field({ label, value }: { label: string; value: string }) {
 // ---------- header ----------
 function Header() {
   const setMode = useAppMode((s) => s.setMode);
+  const rm = useReducedMotion();
   return (
     <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-2xl px-4 h-16 flex items-center justify-between">
@@ -205,13 +207,24 @@ function Header() {
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <div
+          <motion.div
             className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
             style={{ background: 'linear-gradient(150deg,#ff8a3d,#ff3d2e)', boxShadow: '0 6px 18px rgba(255,80,30,0.4)' }}
+            initial={rm ? false : { scale: 0, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={pop}
           >
             <Flame className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-[26px] leading-none text-[var(--text)]" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>Afterburn</span>
+          </motion.div>
+          <motion.span
+            className="text-[26px] leading-none text-[var(--text)]"
+            style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}
+            initial={rm ? false : { opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1], delay: 0.08 }}
+          >
+            Afterburn
+          </motion.span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -638,6 +651,7 @@ function RestBar({ secondsLeft, total, onAdd, onSkip }: { secondsLeft: number; t
 }
 
 const END_REASONS = ["Didn't feel recovered", 'Out of time', 'Pain / niggle', 'Other'];
+const NO_WEAK_POINTS: never[] = []; // stable identity so selectors/useMemo don't churn
 
 function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean; note?: string }) => void; onBack: () => void }) {
   const draft = useAfterburn((s) => s.draft)!;
@@ -650,9 +664,23 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
   const setExerciseNotes = useAfterburn((s) => s.setExerciseNotes);
   const swapDraftExercise = useAfterburn((s) => s.swapDraftExercise);
   const updateSet = useAfterburn((s) => s.updateSet);
-  const weakPoints = useAfterburn((s) => s.program.weakPoints) ?? [];
+  const weakPoints = useAfterburn((s) => s.program.weakPoints ?? NO_WEAK_POINTS);
   const [plateOpen, setPlateOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
+
+  // Auto-suggest weak points: muscles reading below MEV / untrained in the last
+  // 7 days float to the top of the picker, tagged so the pick is obvious.
+  const laggingMuscles = useMemo(() => {
+    const r = analyzeVolume(sessions);
+    return new Set(r.muscles.filter((m) => m.status === 'below' || m.status === 'untrained').map((m) => m.muscle as string));
+  }, [sessions]);
+  const weakPointsSorted = useMemo(
+    () =>
+      [...weakPoints].sort(
+        (a, b) => Number(laggingMuscles.has(b.volumeKey ?? '')) - Number(laggingMuscles.has(a.volumeKey ?? '')),
+      ),
+    [weakPoints, laggingMuscles],
+  );
   const [mountedAt] = useState(() => Date.now());
 
   // Recovery-aware autoregulation: warn if today's CO2 tolerance test was low.
@@ -749,9 +777,9 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
                 onChange={(e) => swapDraftExercise(exIdx, e.target.value)}
                 className="input !py-1.5 text-sm font-semibold w-full"
               >
-                <option value={ex.target.baseName}>{ex.target.baseName} — pick one ↓</option>
-                {weakPoints.map((g) => (
-                  <optgroup key={g.muscle} label={g.muscle}>
+                <option value={ex.target.baseName}>{ex.target.baseName} — pick a muscle ↓</option>
+                {weakPointsSorted.map((g) => (
+                  <optgroup key={g.muscle} label={laggingMuscles.has(g.volumeKey ?? '') ? `${g.muscle} ⚑ lagging — good pick` : g.muscle}>
                     {(ex.target.weakPointSlot === 1 ? g.exercise1 : g.exercise2).map((n) => (
                       <option key={g.muscle + n} value={n}>{n}</option>
                     ))}
@@ -904,9 +932,9 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
           <button onClick={() => setEndOpen((o) => !o)} className={cn('btn btn-secondary !px-3', endOpen && 'border-ember text-ember')}>
             End early
           </button>
-          <button onClick={() => onFinish()} className="btn btn-primary flex-1">
+          <motion.button whileTap={{ scale: 0.95 }} transition={pop} onClick={() => onFinish()} className="btn btn-primary flex-1">
             <Check className="w-4 h-4" /> Finish
-          </button>
+          </motion.button>
         </div>
       </div>
     </div>
@@ -1133,9 +1161,9 @@ export default function Afterburn() {
                   <p className="text-sm font-semibold text-ink truncate">Workout in progress</p>
                   <p className="text-xs text-ink-subtle truncate">{draft.dayName} · {loggedSets} set{loggedSets === 1 ? '' : 's'} logged</p>
                 </div>
-                <button onClick={() => setMinimized(false)} className="btn btn-primary !py-1.5 !px-3 text-sm shrink-0">
+                <motion.button whileTap={{ scale: 0.93 }} transition={pop} onClick={() => setMinimized(false)} className="btn btn-primary !py-1.5 !px-3 text-sm shrink-0">
                   Resume <ArrowRight className="w-4 h-4" />
-                </button>
+                </motion.button>
                 <button
                   onClick={() => { if (window.confirm('Discard this in-progress workout? Logged sets will be lost.')) cancelDraft(); }}
                   className="p-2 text-ink-subtle hover:text-danger shrink-0"
@@ -1155,11 +1183,9 @@ export default function Afterburn() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={tab}
-                initial={rm ? false : 'initial'}
-                animate="enter"
-                exit={rm ? undefined : 'exit'}
-                variants={pageVariants}
-                transition={{ duration: 0.22, ease: [0.21, 1, 0.4, 1] }}
+                initial={rm ? false : { opacity: 0, y: 22, scale: 0.985 }}
+                animate={{ opacity: 1, y: 0, scale: 1, transition: springSoft }}
+                exit={rm ? undefined : { opacity: 0, y: -10, transition: { duration: 0.14 } }}
               >
                 {tab === 'programs' ? (
                   <ProgramLibrary onPicked={() => setTab('workout')} />

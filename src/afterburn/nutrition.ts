@@ -170,7 +170,7 @@ export function rateFlagFor(pctBWPerWeek: number, goal: Goal): RateFlag {
   }
   if (g.pct > 0) {
     if (pctBWPerWeek > 0.5) return 'aggressive';
-    if (pctBWPerWeek < 0.1) return 'slow';
+    if (pctBWPerWeek < 0.25) return 'slow';
     return 'ideal';
   }
   return 'none';
