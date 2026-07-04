@@ -117,7 +117,7 @@ export default function Settings() {
               </ThemeBtn>
             </div>
           </Row>
-          <Row label="Reduce motion" desc="Minimise animations.">
+          <Row label="Disable animations" desc="Turns off all motion everywhere — Liftoff and Afterburn.">
             <Toggle checked={reduceMotion} onChange={setReduceMotion} />
           </Row>
         </Section>
