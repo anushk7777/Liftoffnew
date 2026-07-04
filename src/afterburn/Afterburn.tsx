@@ -8,6 +8,8 @@ import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerforma
 import { recoveryReadiness } from './recovery';
 import { analyzeVolume } from './volume';
 import WorkoutCelebration from './WorkoutCelebration';
+import WorkoutIgnition from './WorkoutIgnition';
+import { randomIgnitionPhrase } from './ignition';
 import type { PRHit } from './store';
 import ProgramLibrary from './ProgramLibrary';
 import Progress from './Progress';
@@ -49,6 +51,28 @@ function Stars({ value, onChange, disabled }: { value: number; onChange: (v: num
         </button>
       ))}
     </div>
+  );
+}
+
+// "Don't know this exercise?" — opens a Google search in a new tab.
+function LookupButton({ name, subtle }: { name: string; subtle?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(`${name} exercise how to`)}`, '_blank', 'noopener');
+      }}
+      className={
+        subtle
+          ? 'inline-flex items-center justify-center w-5 h-5 rounded text-ink-subtle hover:text-ink align-middle'
+          : 'shrink-0 w-8 h-8 rounded-md border border-border bg-elevated flex items-center justify-center text-ink-subtle hover:text-ink'
+      }
+      aria-label={`Look up ${name} on Google`}
+      title="Don't know this one? Look it up on Google"
+    >
+      <Search className={subtle ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+    </button>
   );
 }
 
@@ -118,7 +142,7 @@ function ExerciseTable({
             {exercises.map((ex) => (
               <tr key={ex.id} className="border-b border-border/60 align-top">
                 <td className="py-2 pr-2 font-medium text-ink">
-                  {ex.name}
+                  {ex.name} <LookupButton name={ex.name} subtle />
                   {ex.lastSetTechnique && (
                     <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[10px] font-semibold align-middle">{ex.lastSetTechnique}</span>
                   )}
@@ -152,7 +176,7 @@ function ExerciseTable({
             <div className="flex items-start gap-2">
               <div className="flex-1">
                 <p className="font-medium text-ink text-sm">
-                  {ex.name}
+                  {ex.name} <LookupButton name={ex.name} subtle />
                   {ex.lastSetTechnique && (
                     <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[10px] font-semibold align-middle">{ex.lastSetTechnique}</span>
                   )}
@@ -244,7 +268,7 @@ function Header() {
 }
 
 // ---------- program view ----------
-function ProgramView({ onStart }: { onStart: () => void }) {
+function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
   const program = useAfterburn((s) => s.program);
   const sessions = useAfterburn((s) => s.sessions);
   const currentWeekId = useAfterburn((s) => s.currentWeekId);
@@ -271,11 +295,11 @@ function ProgramView({ onStart }: { onStart: () => void }) {
   // Begin/resume a day without clobbering an in-progress workout.
   const begin = (dayId: string) => {
     if (draft) {
-      if (draft.dayId === dayId) { onStart(); return; } // same day → just resume
+      if (draft.dayId === dayId) { onStart(false); return; } // same day → just resume, no ignition
       if (!window.confirm('A workout is already in progress. Start this one instead? Your in-progress sets will be discarded.')) return;
     }
     startDay(dayId);
-    onStart();
+    onStart(true); // fresh start → ignition
   };
 
   const renderDay = (day: ProgramDay, weekId?: string) => (
@@ -770,6 +794,8 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
         return (
         <div key={ex.exerciseId} className="card p-4">
           {/* NAME — a picker when the exercise has substitutions or is a weak-point slot */}
+          <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
           {ex.target.weakPointSlot ? (
             weakPoints.length > 0 ? (
               <select
@@ -811,6 +837,9 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
           ) : (
             <p className="font-semibold text-ink">{ex.name}</p>
           )}
+          </div>
+          <LookupButton name={ex.name} />
+          </div>
 
           {/* TARGET (prescribed) */}
           <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
@@ -1073,6 +1102,8 @@ export default function Afterburn() {
   // Post-finish overlay (null = hidden): PRs to celebrate + whether ended early
   // + the finished session id (so "Undo — edit" can reopen it).
   const [celebrate, setCelebrate] = useState<{ prs: PRHit[]; endedEarly: boolean; sessionId?: string } | null>(null);
+  // Sapphire ignition overlay (the phrase to show), lit when a fresh workout starts.
+  const [igniting, setIgniting] = useState<string | null>(null);
 
   // Pull cloud workout data when entering the app (recency-guarded in the store).
   useEffect(() => {
@@ -1196,7 +1227,7 @@ export default function Afterburn() {
                 ) : tab === 'coach' ? (
                   <Coach />
                 ) : (
-                  <ProgramView onStart={() => setMinimized(false)} />
+                  <ProgramView onStart={(fresh) => { setMinimized(false); if (fresh) setIgniting(randomIgnitionPhrase()); }} />
                 )}
               </motion.div>
             </AnimatePresence>
@@ -1204,6 +1235,7 @@ export default function Afterburn() {
         </main>
       </div>
 
+      <WorkoutIgnition phrase={igniting} onDone={() => setIgniting(null)} />
       <WorkoutCelebration
         prs={celebrate ? celebrate.prs : null}
         endedEarly={celebrate?.endedEarly}

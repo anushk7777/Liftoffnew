@@ -1,18 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Liftoff">
+  <!-- Liftoff — "the ascent": ink tile, twilight glow, rising delta with an ember exhaust. -->
   <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#171130" />
-      <stop offset="1" stop-color="#3a2b6e" />
+    <radialGradient id="lo-glow" cx="50%" cy="115%" r="85%">
+      <stop offset="0" stop-color="#ff7a3d" stop-opacity="0.30" />
+      <stop offset="0.45" stop-color="#ff5a2e" stop-opacity="0.10" />
+      <stop offset="1" stop-color="#ff5a2e" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="lo-mark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" />
+      <stop offset="1" stop-color="#d9d5ce" />
     </linearGradient>
-    <mask id="crescent">
-      <rect width="512" height="512" fill="black" />
-      <circle cx="222" cy="256" r="150" fill="white" />
-      <circle cx="292" cy="222" r="132" fill="black" />
-    </mask>
+    <linearGradient id="lo-exhaust" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff8a3d" stop-opacity="0.95" />
+      <stop offset="0.6" stop-color="#ff3d2e" stop-opacity="0.45" />
+      <stop offset="1" stop-color="#ff3d2e" stop-opacity="0" />
+    </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#sky)" />
-  <rect width="512" height="512" fill="#cfc4ff" mask="url(#crescent)" />
-  <circle cx="360" cy="150" r="7" fill="#e7e1ff" />
-  <circle cx="388" cy="205" r="4.5" fill="#9b8cff" />
-  <circle cx="330" cy="96" r="4" fill="#9b8cff" />
+
+  <rect width="512" height="512" rx="115" fill="#0a0a0b" />
+  <rect width="512" height="512" rx="115" fill="url(#lo-glow)" />
+
+  <!-- Ember exhaust, tapering away beneath the ship -->
+  <path d="M256 306 L269 330 L256 432 L243 330 Z" fill="url(#lo-exhaust)" />
+
+  <!-- The ascent mark (same delta as the in-app wordmark) -->
+  <path d="M256 76 L368 342 L256 279 L144 342 Z" fill="url(#lo-mark)" />
+
+  <!-- A star to aim for -->
+  <path d="M362 104 l5.5 14 14 5.5 -14 5.5 -5.5 14 -5.5 -14 -14 -5.5 14 -5.5 Z" fill="#f4f3f1" opacity="0.9" />
+  <circle cx="150" cy="132" r="4" fill="#f4f3f1" opacity="0.45" />
 </svg>
