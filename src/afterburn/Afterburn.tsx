@@ -61,7 +61,16 @@ function LookupButton({ name, subtle }: { name: string; subtle?: boolean }) {
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        window.open(`https://www.google.com/search?q=${encodeURIComponent(`${name} exercise how to`)}`, '_blank', 'noopener');
+        // Google Images for the exact exercise name. On Android, an intent://
+        // link forces the real Chrome browser (a plain google.com URL gets
+        // hijacked by the Google app); everywhere else, a normal new tab.
+        const q = encodeURIComponent(name);
+        const url = `https://www.google.com/search?q=${q}&udm=2`;
+        if (/android/i.test(navigator.userAgent)) {
+          window.location.href = `intent://www.google.com/search?q=${q}&udm=2#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+        } else {
+          window.open(url, '_blank', 'noopener');
+        }
       }}
       className={
         subtle
