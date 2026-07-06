@@ -193,6 +193,7 @@ export interface VolumeReport {
   neglected: Muscle[]; // landmark muscles with 0 sets in the last 7 days
   headline: string;
   unclassified: string[]; // distinct logged names we couldn't map to a muscle
+  windowLabel: string; // "Week 2 · Build" (program week) or "last 7 days"
 }
 
 const round5 = (n: number) => Math.round(n * 2) / 2;
@@ -256,19 +257,54 @@ function setsInRange(sessions: WorkoutSession[], startMs: number, endMs: number)
   return acc;
 }
 
-/** Analyze the most recent 7 days of training against the volume landmarks and
- *  produce per-muscle status + concrete recommendations. Uses a TRAILING 7-day
- *  window anchored to the latest logged session (not the calendar week), so it's
- *  never a half-finished week and works with any training split / async cycle. */
+/** Analyze recent training against the volume landmarks and produce per-muscle
+ *  status + concrete recommendations.
+ *
+ *  Window choice matters: programs like the Pure Bodybuilding PPL run one
+ *  "program week" (microcycle) across ~9-10 calendar days, so calendar or
+ *  trailing-7-day windows would smear one microcycle's sets into the next.
+ *  When the latest session is tagged with a program week (`weekId`), the
+ *  current window is THAT microcycle (from its first session onward) and the
+ *  comparison window is the previous microcycle — volume concludes when the
+ *  program week ends and starts anew with the next. Untagged training falls
+ *  back to a trailing 7-day window anchored to the latest session. */
 export function analyzeVolume(sessions: WorkoutSession[]): VolumeReport {
-  const times = sessions.map((s) => Date.parse(s.completedAt ?? s.date)).filter((t) => !Number.isNaN(t));
-  if (times.length === 0) {
-    return { hasData: false, weekStart: null, weeksLogged: 0, muscles: [], trained: [], neglected: [], headline: 'Log a workout to see your per-muscle volume.', unclassified: [] };
+  const stamped = sessions
+    .map((s) => ({ s, t: Date.parse(s.completedAt ?? s.date) }))
+    .filter((x) => !Number.isNaN(x.t))
+    .sort((a, b) => b.t - a.t); // newest first
+  if (stamped.length === 0) {
+    return { hasData: false, weekStart: null, weeksLogged: 0, muscles: [], trained: [], neglected: [], headline: 'Log a workout to see your per-muscle volume.', unclassified: [], windowLabel: 'last 7 days' };
   }
-  const anchor = times.reduce((a, b) => Math.max(a, b), -Infinity); // latest session
-  const curr = setsInRange(sessions, anchor - 7 * DAY_MS, anchor);
-  const prevW = setsInRange(sessions, anchor - 14 * DAY_MS, anchor - 7 * DAY_MS);
-  const prevHasData = times.some((t) => t > anchor - 14 * DAY_MS && t <= anchor - 7 * DAY_MS);
+  const anchor = stamped[0].t;
+  const latestWeekId = stamped[0].s.weekId;
+
+  let curr: Record<Muscle, number>;
+  let prevW: Record<Muscle, number>;
+  let prevHasData: boolean;
+  let windowLabel: string;
+  let windowStartMs: number;
+
+  if (latestWeekId) {
+    // Microcycle mode — current program week vs the previous one.
+    const curStart = Math.min(...stamped.filter((x) => x.s.weekId === latestWeekId).map((x) => x.t));
+    const prevTagged = stamped.find((x) => x.t < curStart && x.s.weekId && x.s.weekId !== latestWeekId);
+    const prevStart = prevTagged
+      ? Math.min(...stamped.filter((x) => x.s.weekId === prevTagged.s.weekId).map((x) => x.t))
+      : null;
+    curr = setsInRange(sessions, curStart - 1, anchor); // custom days logged mid-cycle count too
+    prevW = prevStart != null ? setsInRange(sessions, prevStart - 1, curStart - 1) : emptySets();
+    prevHasData = prevStart != null;
+    windowLabel = stamped[0].s.weekName ?? 'this program week';
+    windowStartMs = curStart;
+  } else {
+    // No program-week tagging: trailing 7 days anchored to the latest session.
+    curr = setsInRange(sessions, anchor - 7 * DAY_MS, anchor);
+    prevW = setsInRange(sessions, anchor - 14 * DAY_MS, anchor - 7 * DAY_MS);
+    prevHasData = stamped.some((x) => x.t > anchor - 14 * DAY_MS && x.t <= anchor - 7 * DAY_MS);
+    windowLabel = 'last 7 days';
+    windowStartMs = anchor - 7 * DAY_MS;
+  }
 
   const muscles: MuscleAnalysis[] = ALL_MUSCLES.map((m) => {
     const sets = round5(curr[m] ?? 0);
@@ -293,7 +329,8 @@ export function analyzeVolume(sessions: WorkoutSession[]): VolumeReport {
   if (over) parts.push(`${over} over your recoverable limit`);
   if (under) parts.push(`${under} under-trained`);
   if (dialed) parts.push(`${dialed} dialed in`);
-  const headline = parts.length ? `Last 7 days: ${parts.join(', ')}.` : 'Log a full training week to read your volume.';
+  const label = windowLabel.charAt(0).toUpperCase() + windowLabel.slice(1);
+  const headline = parts.length ? `${label}: ${parts.join(', ')}.` : 'Log a full training week to read your volume.';
 
-  return { hasData: true, weekStart: new Date(anchor - 7 * DAY_MS).toISOString(), weeksLogged: muscleSetsByWeek(sessions).length, muscles: sorted, trained, neglected, headline, unclassified };
+  return { hasData: true, weekStart: new Date(windowStartMs).toISOString(), weeksLogged: muscleSetsByWeek(sessions).length, muscles: sorted, trained, neglected, headline, unclassified, windowLabel };
 }

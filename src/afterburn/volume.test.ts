@@ -3,10 +3,12 @@ import { classifyExercise, muscleSetsByWeek, analyzeVolume, LANDMARKS } from './
 import type { WorkoutSession } from './types';
 
 // Build a session with N entries, each a name + a count of completed sets.
-const sess = (id: string, date: string, lifts: [name: string, sets: number][]): WorkoutSession =>
+const sess = (id: string, date: string, lifts: [name: string, sets: number][], week?: { id: string; name: string }): WorkoutSession =>
   ({
     id,
     date,
+    weekId: week?.id,
+    weekName: week?.name,
     entries: lifts.map(([name, n]) => ({
       name,
       sets: Array.from({ length: n }, () => ({ weight: '100', reps: '8', done: true })),
@@ -129,5 +131,32 @@ describe('analyzeVolume', () => {
     ]);
     const chest = r.muscles.find((m) => m.muscle === 'chest')!;
     expect(chest.sets).toBe(3); // only the recent session
+  });
+});
+
+describe('analyzeVolume — program-week (microcycle) mode', () => {
+  const w1 = { id: 'w1', name: 'Week 1 · Build' };
+  const w2 = { id: 'w2', name: 'Week 2 · Build' };
+
+  it('counts a whole 9-day program week as one window (no 7-day cutoff)', () => {
+    const r = analyzeVolume([
+      sess('a', '2026-03-09T10:00:00.000Z', [['Cable Fly', 6]], w1),
+      sess('b', '2026-03-17T10:00:00.000Z', [['Cable Fly', 6]], w1), // 8 days later, same program week
+    ]);
+    const chest = r.muscles.find((m) => m.muscle === 'chest')!;
+    expect(chest.sets).toBe(12); // trailing-7-day would have dropped session a
+    expect(r.windowLabel).toBe('Week 1 · Build');
+  });
+
+  it('starts the tally anew when the next program week begins', () => {
+    const r = analyzeVolume([
+      sess('a', '2026-03-09T10:00:00.000Z', [['Cable Fly', 6]], w1),
+      sess('b', '2026-03-17T10:00:00.000Z', [['Cable Fly', 6]], w1),
+      sess('c', '2026-03-19T10:00:00.000Z', [['Cable Fly', 4]], w2), // Week 2, 2 days after w1 ended
+    ]);
+    const chest = r.muscles.find((m) => m.muscle === 'chest')!;
+    expect(chest.sets).toBe(4); // only Week 2 — Week 1 concluded
+    expect(chest.prevSets).toBe(12); // compared against the full previous microcycle
+    expect(r.windowLabel).toBe('Week 2 · Build');
   });
 });
