@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus, Sparkles, Gauge, Wind, Play, Square } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useAfterburn, weeklyVolume, volumeTrend, weekAdherence, detectPRs, formatVolume } from './store';
+import { useAfterburn, volumeByProgramWeek, volumeTrend, weekAdherence, detectPRs, formatVolume } from './store';
 import { analyzeVolume, MUSCLE_LABEL } from './volume';
 import type { MuscleAnalysis, VolumeStatus } from './volume';
 import { recoveryReadiness, co2Band } from './recovery';
@@ -177,9 +177,21 @@ export default function Progress() {
   const [w, setW] = useState('');
   const [mountedAt] = useState(() => Date.now());
 
-  const volume = useMemo(() => weeklyVolume(sessions), [sessions]);
-  const volPoints: ChartPoint[] = volume.map((v) => ({ date: v.weekStart, value: v.volume }));
+  // Volume per PROGRAM week (microcycle): a "week" of the async 8-day cycle can
+  // span ~9-10 calendar days — its volume concludes when its sessions do, and
+  // the next program week starts from zero.
+  const volume = useMemo(() => volumeByProgramWeek(sessions), [sessions]);
+  const volPoints: ChartPoint[] = volume.map((v) => ({ date: v.start, value: v.volume }));
   const latestWeek = volume[volume.length - 1];
+  // Latest bucket is "in progress" while its program week still has undone days.
+  const latestInProgress = useMemo(() => {
+    if (!latestWeek) return false;
+    if (latestWeek.weekId) {
+      const adh = weekAdherence(program, sessions, latestWeek.weekId);
+      return adh.total > 0 && adh.done < adh.total;
+    }
+    return new Date(latestWeek.start).getTime() > mountedAt - 7 * 86_400_000;
+  }, [latestWeek, program, sessions, mountedAt]);
 
   // ---- "Volume IQ" — hard sets per muscle vs scientific landmarks ----
   const vol = useMemo(() => analyzeVolume(sessions), [sessions]);
@@ -327,7 +339,7 @@ export default function Progress() {
             <div>
               <p className="text-sm text-ink font-medium">{vol.headline}</p>
               <p className="text-[11px] text-ink-subtle mt-1">
-                Hard sets per muscle over your last 7 training days vs your science-based landmarks — ticks mark MEV (start growing), MAV (sweet spot) and MRV (recovery ceiling).
+                Hard sets per muscle for <span className="text-ink">{vol.windowLabel}</span> vs your science-based landmarks — ticks mark MEV (start growing), MAV (sweet spot) and MRV (recovery ceiling). Counted per program week, so a new week starts the tally fresh.
               </p>
             </div>
 
@@ -456,7 +468,7 @@ export default function Progress() {
       {/* Weekly training volume — overall progress, not per-exercise */}
       <section className="space-y-3">
         <h2 className="section-label flex items-center gap-1.5">
-          <TrendingUp className="w-3.5 h-3.5" /> Weekly volume
+          <TrendingUp className="w-3.5 h-3.5" /> Volume by program week
         </h2>
         {volume.length === 0 ? (
           <p className="text-sm text-ink-subtle">Log some workouts and your total weekly training volume shows up here.</p>
@@ -464,11 +476,11 @@ export default function Progress() {
           <div className="card p-4 space-y-2">
             <Chart points={volPoints} unit="" accent="var(--ember)" format={(v) => formatVolume(v, unit)} />
             <p className="text-[11px] text-ink-subtle">
-              Total load = weight × reps across <span className="text-ink">all</span> lifts, bucketed by week (in {unit}).
+              Total load = weight × reps across <span className="text-ink">all</span> lifts, tallied per <span className="text-ink">program week</span> (a week ends when all its sessions are done — even past 7 calendar days; in {unit}).
               {latestWeek && (
                 <>
-                  {' '}Latest week: <span className="text-ink font-medium">{formatVolume(latestWeek.volume, unit)}</span> over {latestWeek.sets} sets
-                  {new Date(latestWeek.weekStart).getTime() > mountedAt - 7 * 86_400_000 ? ' · current week still in progress' : ''}.
+                  {' '}{latestWeek.label || 'Latest week'}: <span className="text-ink font-medium">{formatVolume(latestWeek.volume, unit)}</span> over {latestWeek.sets} sets
+                  {latestInProgress ? ' · still in progress' : ''}.
                 </>
               )}
             </p>

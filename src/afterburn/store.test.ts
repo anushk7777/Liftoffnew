@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { weeklyVolume, volumeTrend, detectPRs, formatVolume } from './store';
+import { weeklyVolume, volumeByProgramWeek, volumeTrend, detectPRs, formatVolume } from './store';
 import type { WorkoutSession } from './types';
 
 // Minimal session builder — only the fields weeklyVolume/detectPRs read.
-const sess = (id: string, date: string, name: string, sets: [number, number][]): WorkoutSession =>
+const sess = (id: string, date: string, name: string, sets: [number, number][], week?: { id: string; name: string }): WorkoutSession =>
   ({
     id,
     date,
+    weekId: week?.id,
+    weekName: week?.name,
     entries: [{ name, sets: sets.map(([weight, reps]) => ({ weight: String(weight), reps: String(reps) })) }],
   }) as unknown as WorkoutSession;
 
@@ -69,5 +71,33 @@ describe('volumeTrend', () => {
     expect(t.thisWeek).toBe(1200);
     expect(t.deltaPct).toBe(20);
     expect(t.dir).toBe('up');
+  });
+});
+
+describe('volumeByProgramWeek', () => {
+  const w1 = { id: 'w1', name: 'Week 1 · Build' };
+  const w2 = { id: 'w2', name: 'Week 2 · Build' };
+
+  it("keeps a program week's spillover sessions in that week's bucket", () => {
+    // Week 1 spans 9 calendar days (async 8-day cycle) — the last session falls
+    // in the NEXT calendar week but must still count toward Week 1.
+    const out = volumeByProgramWeek([
+      sess('a', '2026-03-09T10:00:00.000Z', 'Bench', [[100, 5]], w1), // Mon
+      sess('b', '2026-03-17T10:00:00.000Z', 'Bench', [[100, 5]], w1), // next Tue — spillover
+      sess('c', '2026-03-19T10:00:00.000Z', 'Bench', [[100, 8]], w2), // Week 2 starts fresh
+    ]);
+    expect(out).toHaveLength(2);
+    expect(out[0].label).toBe('Week 1 · Build');
+    expect(out[0].volume).toBe(1000); // both Week 1 sessions
+    expect(out[1].label).toBe('Week 2 · Build');
+    expect(out[1].volume).toBe(800);
+  });
+
+  it('falls back to calendar weeks for untagged sessions', () => {
+    const out = volumeByProgramWeek([
+      sess('a', '2026-03-09T10:00:00.000Z', 'Bench', [[100, 5]]),
+      sess('b', '2026-03-17T10:00:00.000Z', 'Bench', [[100, 5]]),
+    ]);
+    expect(out).toHaveLength(2); // different calendar Mondays
   });
 });

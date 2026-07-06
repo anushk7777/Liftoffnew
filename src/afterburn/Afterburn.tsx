@@ -376,6 +376,17 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
             </p>
           )}
 
+          {/* Rolling-cycle explainer — an 8-session "week" spans ~9-10 calendar
+              days by design; don't skip ahead. Shown until the week is done. */}
+          {week && week.days.length > 7 && weekDone < week.days.length && (
+            <p className="text-[11px] text-ink-subtle px-1">
+              This program runs {week.days.length} sessions per program week on a rolling cycle — do them in
+              order at your pace (it's normal for one "week" to take 9–10 days). Finish all{' '}
+              {week.days.length} before moving to the next week; volume is tallied per program week, so
+              nothing spills over.
+            </p>
+          )}
+
           {/* Async-cycle hint: jump straight into the next un-logged day. */}
           {week && nextDay && weekDone < week.days.length && (
             <button

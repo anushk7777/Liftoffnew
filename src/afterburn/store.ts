@@ -206,6 +206,59 @@ export function weeklyVolume(sessions: WorkoutSession[]): { weekStart: string; v
     .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
 }
 
+export interface ProgramWeekVolume {
+  key: string;
+  label: string; // "Week 2 · Build" for tagged sessions, "" for calendar fallback
+  start: string; // ISO of the bucket's first session (chart x-axis)
+  volume: number;
+  sets: number;
+  weekId?: string;
+}
+
+/** Total training load per PROGRAM week (microcycle). A program "week" like the
+ *  Pure Bodybuilding cycle spans ~9-10 calendar days, so calendar buckets would
+ *  smear one microcycle's volume into the next — here a week's volume concludes
+ *  when its sessions do. Sessions without a weekId fall back to calendar
+ *  (Monday-start) buckets. Oldest→newest. */
+export function volumeByProgramWeek(sessions: WorkoutSession[]): ProgramWeekVolume[] {
+  const groups = new Map<string, { label: string; weekId?: string; startMs: number; volume: number; sets: number }>();
+  for (const s of sessions) {
+    const t = Date.parse(s.completedAt ?? s.date);
+    if (Number.isNaN(t)) continue;
+    let key: string;
+    let label = '';
+    let weekId: string | undefined;
+    if (s.weekId) {
+      key = `w:${s.weekId}`;
+      label = s.weekName ?? 'Program week';
+      weekId = s.weekId;
+    } else {
+      const d = new Date(t);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      key = `c:${d.toISOString()}`;
+    }
+    let g = groups.get(key);
+    if (!g) {
+      g = { label, weekId, startMs: t, volume: 0, sets: 0 };
+      groups.set(key, g);
+    }
+    g.startMs = Math.min(g.startMs, t);
+    for (const e of s.entries)
+      for (const st of e.sets) {
+        const w = parseFloat(st.weight);
+        const r = parseInt(st.reps, 10);
+        if (Number.isFinite(w) && w > 0 && Number.isFinite(r) && r > 0) {
+          g.volume += w * r;
+          g.sets += 1;
+        }
+      }
+  }
+  return [...groups.entries()]
+    .map(([key, g]) => ({ key, label: g.label, weekId: g.weekId, start: new Date(g.startMs).toISOString(), volume: Math.round(g.volume), sets: g.sets }))
+    .sort((a, b) => a.start.localeCompare(b.start));
+}
+
 // ───────────────────────── Progress signals (derived) ─────────────────────────
 const epley = (w: number, r: number) => (w > 0 && r > 0 ? w * (1 + r / 30) : 0);
 
