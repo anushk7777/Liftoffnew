@@ -268,100 +268,48 @@ function buildWeek(days: DayT[], n: number, phase: string, isDeload: boolean): W
   };
 }
 
-// The Weak Point Table — pick the muscle you want to bring up; the two Arms-day
-// weak-point slots offer its Exercise 1 (primary/loaded) and Exercise 2
-// (isolation/finisher) options. Transcribed from the program's published table;
-// tweak any row freely — this constant is the single source the picker reads.
+// The Weak Points Table — transcribed VERBATIM from the program PDF (p.2). On an
+// Arms & Weak Points day you pick ONE muscle and do 1-2 of its listed exercises
+// (Exercise 1 slot, then optionally Exercise 2). "Pick one of the options above.
+// Do not do all of them in one day!" These are the ONLY six weak points Jeff
+// gives dedicated exercises for; other lagging muscles (hamstrings, calves,
+// mid-back, upper traps, abs, biceps, triceps) already carry high volume in the
+// program — he says execute them well rather than add 1-2 sets.
 const WEAK_POINT_TABLE: WeakPointGroup[] = [
   {
-    muscle: 'Upper chest',
-    volumeKey: 'chest',
-    exercise1: ['Low-Incline DB Press', 'Incline Barbell Press', 'Incline Machine Press'],
-    exercise2: ['Low-to-High Cable Flye', 'Incline Cable Flye'],
-  },
-  {
-    muscle: 'Chest (overall)',
-    volumeKey: 'chest',
-    exercise1: ['Machine Chest Press', 'DB Bench Press'],
-    exercise2: ['Pec Deck', 'Cable Crossover'],
-  },
-  {
-    muscle: 'Side delts',
+    muscle: 'Shoulders',
     volumeKey: 'shoulders',
-    exercise1: ['DB Lateral Raise', 'Cable Lateral Raise'],
-    exercise2: ['Machine Lateral Raise', 'Lean-Away Cable Lateral Raise'],
+    exercise1: ['Cuffed Behind-The-Back Lateral Raise', 'Machine Lateral Raise', 'Dumbbell Lateral Raise'],
+    exercise2: ['Machine Shoulder Press', 'Smith Machine Shoulder Press', 'Standing DB Arnold Press'],
   },
   {
-    muscle: 'Rear delts',
-    volumeKey: 'shoulders',
-    exercise1: ['Reverse Pec Deck', 'Rear Delt Cable Flye'],
-    exercise2: ['Face Pull', 'Bent-Over Rear Delt Flye'],
-  },
-  {
-    muscle: 'Lats (width)',
+    muscle: 'Lats ("Back Width")',
     volumeKey: 'back',
-    exercise1: ['Wide-Grip Lat Pulldown', 'Neutral-Grip Pulldown', 'Weighted Pull-Up'],
-    exercise2: ['Straight-Arm Cable Pulldown', 'Rope Lat Pullover'],
-  },
-  {
-    muscle: 'Mid-back (thickness)',
-    volumeKey: 'back',
-    exercise1: ['Chest-Supported Row', 'Seated Cable Row'],
-    exercise2: ['Single-Arm DB Row', 'Machine High Row'],
-  },
-  {
-    muscle: 'Traps',
-    volumeKey: 'traps',
-    exercise1: ['Barbell Shrug', 'DB Shrug'],
-    exercise2: ['Cable Shrug', 'Trap Bar Shrug'],
-  },
-  {
-    muscle: 'Biceps',
-    volumeKey: 'biceps',
-    exercise1: ['EZ-Bar Curl', 'DB Curl'],
-    exercise2: ['Preacher Curl', 'Incline DB Curl', 'Hammer Curl'],
-  },
-  {
-    muscle: 'Triceps',
-    volumeKey: 'triceps',
-    exercise1: ['Skull Crusher', 'Close-Grip Bench Press'],
-    exercise2: ['Cable Pressdown', 'Overhead Cable Triceps Extension'],
-  },
-  {
-    muscle: 'Forearms',
-    volumeKey: 'forearms',
-    exercise1: ['Barbell Wrist Curl', 'DB Wrist Curl'],
-    exercise2: ['Reverse Curl', 'Wrist Roller'],
+    exercise1: ['Cable Lat Prayer', 'DB Lat Pullover', 'Machine Lat Pullover'],
+    exercise2: ['Lat-Focused Cable Row', 'Elbows-In 1-Arm DB Row', 'Half-Kneeling 1-Arm Lat Pulldown'],
   },
   {
     muscle: 'Quads',
     volumeKey: 'quads',
-    exercise1: ['Leg Press', 'Hack Squat'],
-    exercise2: ['Leg Extension', 'Sissy Squat'],
-  },
-  {
-    muscle: 'Hamstrings',
-    volumeKey: 'hamstrings',
-    exercise1: ['Romanian Deadlift', 'Seated Leg Curl'],
-    exercise2: ['Lying Leg Curl', 'Nordic Ham Curl'],
+    exercise1: ['Leg Extension', 'Reverse Nordics'],
+    exercise2: ['Single-Leg Leg Press', 'Sissy Squat'],
   },
   {
     muscle: 'Glutes',
     volumeKey: 'glutes',
-    exercise1: ['Barbell Hip Thrust', 'Bulgarian Split Squat'],
-    exercise2: ['Cable Glute Kickback', 'Machine Hip Thrust'],
+    exercise1: ['Machine Hip Abduction', 'Cable Hip Abduction', 'Lateral Band Walk'],
+    exercise2: ['Barbell Hip Thrust', 'Single-Leg DB Hip Thrust'],
   },
   {
-    muscle: 'Calves',
-    volumeKey: 'calves',
-    exercise1: ['Standing Calf Raise', 'Smith Machine Calf Raise'],
-    exercise2: ['Seated Calf Raise', 'Leg Press Calf Raise'],
+    muscle: 'Chest',
+    volumeKey: 'chest',
+    exercise1: ['Low Incline DB Flye', 'Low-To-High Cable Crossover'],
+    exercise2: ['Chest Press Machine (incline if upper pecs lagging, flat if whole chest)', 'Dumbbell Chest Press (incline if upper pecs lagging, flat if whole chest)'],
   },
   {
-    muscle: 'Abs',
-    volumeKey: 'abs',
-    exercise1: ['Cable Crunch', 'Hanging Leg Raise'],
-    exercise2: ['Ab Wheel Rollout', 'Weighted Plank'],
+    muscle: 'Neck',
+    exercise1: ['Plate-Loaded Neck Curls'],
+    exercise2: ['Head Harness Neck Extension', 'Plate-Loaded Neck Extension'],
   },
 ];
 
