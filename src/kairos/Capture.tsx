@@ -6,7 +6,7 @@ import { pop, springSoft, useReducedMotion } from '../lib/motion';
 import { haptics } from '../lib/haptics';
 import { useKairos } from './store';
 import { MOODS } from './moments';
-import { cameraSupported, openCamera, stopStream, frameToDataUrl } from './photo';
+import { cameraSupported, openCamera, stopStream, frameToDataUrl, uploadMomentPhoto } from './photo';
 import type { MoodId } from './types';
 
 const AMOR_FATI_PROMPTS = [
@@ -101,6 +101,7 @@ function CameraSheet({ onCapture, onClose }: { onCapture: (dataUrl: string) => v
 export default function Capture({ onSaved }: { onSaved?: () => void }) {
   const rm = useReducedMotion();
   const addMoment = useKairos((s) => s.addMoment);
+  const updateMoment = useKairos((s) => s.updateMoment);
   const [text, setText] = useState('');
   const [mood, setMood] = useState<MoodId | undefined>();
   const [photo, setPhoto] = useState<string | undefined>();
@@ -115,7 +116,15 @@ export default function Capture({ onSaved }: { onSaved?: () => void }) {
 
   const save = () => {
     if (!canSave) return;
-    addMoment({ text, mood, photo, place, song, songUrl });
+    const created = addMoment({ text, mood, photo, place, song, songUrl });
+    // Move the photo off the JSON row into Storage in the background. The moment
+    // already holds the inline data URL (shows instantly, safe offline); on a
+    // successful upload we swap it for the lightweight storage path.
+    if (photo) {
+      uploadMomentPhoto(created.id, photo).then((path) => {
+        if (path) updateMoment(created.id, { photo: path });
+      });
+    }
     haptics.success();
     setText('');
     setMood(undefined);

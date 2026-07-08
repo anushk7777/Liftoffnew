@@ -36,9 +36,12 @@ anniversary, which is the whole point of the feature. If you'd rather keep
 everything on-device only, the app still works fully offline — the resurfacing
 email/push simply won't fire.
 
-> Photos are downscaled (max 1024px, JPEG) before storage so a moment stays
-> lightweight. For a very large archive, moving photos to Supabase Storage is a
-> planned follow-up; v1 keeps them inline.
+> Photos are downscaled (max 1024px, JPEG) before storage, then uploaded to a
+> **private Supabase Storage bucket** (`journal-photos`), one folder per user,
+> with RLS so only you can read them. The moment stores a lightweight path (not
+> the image bytes), and the app renders it via a short-lived signed URL. Until
+> the storage bucket migration is run, photos fall back to being stored inline
+> in `journal_data` (still saved, just heavier). See setup step 5 below.
 
 ## Backend setup (one-time)
 
@@ -69,6 +72,11 @@ for reminders, most of this is already done.
 4. **Schedule it.** Run `supabase/migrations/20260708_schedule_journal_resurfacing.sql`
    to add a daily pg_cron job (13:00 UTC). Requires the `pg_cron` + `pg_net`
    extensions (Database → Extensions).
+
+5. **Photo storage.** Run `supabase/migrations/20260709_journal_photos_bucket.sql`
+   to create the private `journal-photos` bucket + per-user RLS. After this,
+   captured photos upload to Storage and the JSON row only holds a path. (Photos
+   captured before this ran remain inline and keep working.)
 
 ## Testing delivery
 
