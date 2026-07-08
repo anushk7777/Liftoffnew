@@ -18,7 +18,7 @@ export default function OnThisDay() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
       <div className="mb-5">
-        <h2 className="font-display text-2xl text-ink">On this day</h2>
+        <h2 className="font-dream text-dream text-[1.7rem]">On this day</h2>
         <p className="text-sm text-ink-muted mt-0.5">
           The same date in years past — resurfaced so you can meet your past self.
         </p>

@@ -131,7 +131,7 @@ export default function Capture({ onSaved }: { onSaved?: () => void }) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
       <div className="mb-5">
-        <h2 className="font-display text-2xl text-ink">This moment</h2>
+        <h2 className="font-dream text-dream text-[1.7rem]">This moment</h2>
         <p className="text-sm text-ink-muted mt-0.5">{prompt}</p>
       </div>
 
@@ -141,7 +141,7 @@ export default function Capture({ onSaved }: { onSaved?: () => void }) {
           onChange={(e) => setText(e.target.value)}
           placeholder="Write what's happening, and how it feels…"
           rows={5}
-          className="w-full bg-transparent resize-none outline-none font-display text-lg leading-relaxed text-ink placeholder:text-ink-subtle"
+          className="w-full bg-transparent resize-none outline-none font-dream text-lg leading-relaxed text-ink placeholder:text-ink-subtle"
         />
 
         {photo && (
