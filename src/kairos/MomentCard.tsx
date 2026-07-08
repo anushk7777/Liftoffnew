@@ -81,7 +81,7 @@ export default function MomentCard({
               onChange={(e) => setDText(e.target.value)}
               rows={4}
               placeholder="Refine your words…"
-              className="w-full bg-transparent resize-none outline-none font-display text-[1.05rem] leading-relaxed text-ink placeholder:text-ink-subtle border-b border-border pb-2"
+              className="w-full bg-transparent resize-none outline-none font-dream text-[1.05rem] leading-relaxed text-ink placeholder:text-ink-subtle border-b border-border pb-2"
             />
             {/* Mood */}
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -121,7 +121,7 @@ export default function MomentCard({
         ) : (
           <>
             {moment.text && (
-              <p className="font-display text-[1.05rem] leading-relaxed text-ink whitespace-pre-wrap break-words">{moment.text}</p>
+              <p className="font-dream text-[1.05rem] leading-relaxed text-ink whitespace-pre-wrap break-words">{moment.text}</p>
             )}
 
             {moment.song && (

@@ -30,7 +30,7 @@ function Header() {
           >
             <Sparkles className="w-4 h-4 text-white" />
           </span>
-          <span className="font-display text-xl text-ink">Kairos</span>
+          <span className="font-dream text-dream text-2xl tracking-tight">Kairos</span>
         </div>
         <span className="ml-auto text-xs text-ink-subtle hidden sm:block">your private diary of moments</span>
       </div>
@@ -56,7 +56,7 @@ export default function Kairos() {
 
   return (
     <div className="min-h-screen bg-background text-ink relative">
-      <div className="fixed inset-0 radial-atmosphere pointer-events-none z-0" />
+      <div className="fixed inset-0 kairos-aura pointer-events-none z-0" />
       <div className="relative z-10">
         <Header />
 

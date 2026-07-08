@@ -38,10 +38,13 @@
     --ember-soft: rgba(255, 90, 30, 0.12);
     --ember-grad: linear-gradient(150deg, #ff8a3d, #ff3d2e);
 
-    /* Kairos signature twilight — the journaling workspace's accent. */
-    --kairos: #6a5acd;
-    --kairos-soft: rgba(106, 90, 205, 0.12);
-    --kairos-grad: linear-gradient(150deg, #8b7fe0, #6a5acd);
+    /* Kairos — dreamy, nostalgic dusk. A twilight violet warmed by rose and a
+       touch of amber; used for the journaling workspace's atmosphere + accents. */
+    --kairos: #7b5fd4;
+    --kairos-soft: rgba(123, 95, 212, 0.12);
+    --kairos-rose: #d76aa0;
+    --kairos-gold: #e8a15c;
+    --kairos-grad: linear-gradient(120deg, #8b7fe0 0%, #c76ba6 55%, #e8a15c 100%);
 
     --glow: rgba(0, 0, 0, 0.05);
 
@@ -93,6 +96,13 @@
     --ember: #ff6a3d;
     --ember-soft: rgba(255, 106, 61, 0.16);
     --ember-grad: linear-gradient(150deg, #ff8a3d, #ff3d2e);
+
+    /* Kairos on dark — more luminous so the dusk glow reads against the ink. */
+    --kairos: #a998f2;
+    --kairos-soft: rgba(169, 152, 242, 0.16);
+    --kairos-rose: #eb86b6;
+    --kairos-gold: #f2b877;
+    --kairos-grad: linear-gradient(120deg, #a998f2 0%, #e084b6 55%, #f2b877 100%);
 
     --glow: rgba(255, 255, 255, 0.1);
 
@@ -296,6 +306,42 @@
     letter-spacing: 0.005em;
     line-height: 1.12;
   }
+  /* Kairos display face — Fraunces, a soft old-style serif. Airier than
+     Instrument Serif (which reads condensed): generous line-height + open
+     tracking give the diary its dreamy, unhurried, nostalgic voice. */
+  .font-dream {
+    font-family: 'Fraunces', 'Instrument Serif', Georgia, serif;
+    font-optical-sizing: auto;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    line-height: 1.22;
+  }
+  .font-dream-italic {
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1.3;
+  }
+  /* Vibrant-but-soft dusk gradient text for Kairos hero words. */
+  .text-dream {
+    background: var(--kairos-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  /* A luminous, minimal dusk wash — Kairos's atmospheric backdrop. Layered soft
+     radial glows (violet, rose, amber) that read as nostalgic without clutter. */
+  .kairos-aura {
+    background:
+      radial-gradient(60% 50% at 15% 0%, color-mix(in srgb, var(--kairos) 22%, transparent), transparent 70%),
+      radial-gradient(55% 45% at 92% 8%, color-mix(in srgb, var(--kairos-rose) 20%, transparent), transparent 70%),
+      radial-gradient(70% 55% at 78% 100%, color-mix(in srgb, var(--kairos-gold) 16%, transparent), transparent 72%),
+      radial-gradient(60% 60% at 8% 92%, color-mix(in srgb, var(--kairos) 14%, transparent), transparent 72%);
+  }
+
   .font-body {
     font-family: var(--font-body);
     letter-spacing: -0.011em;

@@ -29,7 +29,7 @@ export default function Timeline() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
       <div className="mb-5">
-        <h2 className="font-display text-2xl text-ink">Your moments</h2>
+        <h2 className="font-dream text-dream text-[1.7rem]">Your moments</h2>
         <p className="text-sm text-ink-muted mt-0.5">
           {moments.length} moment{moments.length === 1 ? '' : 's'} kept.
         </p>
