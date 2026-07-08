@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, X, Check, RotateCcw } from 'lucide-react';
+import { Camera, X, Check, RotateCcw, Music } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { pop, springSoft, useReducedMotion } from '../lib/motion';
 import { haptics } from '../lib/haptics';
@@ -105,6 +105,8 @@ export default function Capture({ onSaved }: { onSaved?: () => void }) {
   const [mood, setMood] = useState<MoodId | undefined>();
   const [photo, setPhoto] = useState<string | undefined>();
   const [place, setPlace] = useState('');
+  const [song, setSong] = useState('');
+  const [songUrl, setSongUrl] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [prompt] = useState(() => AMOR_FATI_PROMPTS[Math.floor(new Date().getSeconds() / 10) % AMOR_FATI_PROMPTS.length]);
@@ -113,12 +115,14 @@ export default function Capture({ onSaved }: { onSaved?: () => void }) {
 
   const save = () => {
     if (!canSave) return;
-    addMoment({ text, mood, photo, place });
+    addMoment({ text, mood, photo, place, song, songUrl });
     haptics.success();
     setText('');
     setMood(undefined);
     setPhoto(undefined);
     setPlace('');
+    setSong('');
+    setSongUrl('');
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 1800);
     onSaved?.();
@@ -179,6 +183,27 @@ export default function Capture({ onSaved }: { onSaved?: () => void }) {
           placeholder="Where are you? (optional)"
           className="input mt-3 !py-2 text-sm"
         />
+
+        {/* The song of this moment. Type the name (it becomes tappable on
+            YouTube Music), or paste a link to jump straight to it. */}
+        <div className="mt-2 flex items-center gap-2">
+          <Music className="w-4 h-4 text-ink-subtle shrink-0" style={{ color: 'var(--kairos)' }} />
+          <input
+            value={song}
+            onChange={(e) => setSong(e.target.value)}
+            placeholder="What are you listening to? (optional)"
+            className="input !py-2 text-sm flex-1"
+          />
+        </div>
+        {song.trim() && (
+          <input
+            value={songUrl}
+            onChange={(e) => setSongUrl(e.target.value)}
+            placeholder="Paste the YouTube Music link (optional)"
+            className="input mt-2 !py-2 text-sm"
+            inputMode="url"
+          />
+        )}
 
         <div className="mt-4 flex items-center gap-2">
           {cameraSupported() && (

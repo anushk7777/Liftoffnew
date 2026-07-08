@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
-import { Trash2, MapPin } from 'lucide-react';
+import { Trash2, MapPin, Music } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { rise, pop, useReducedMotion } from '../lib/motion';
-import { moodMeta } from './moments';
+import { moodMeta, songLink } from './moments';
 import type { Moment } from './types';
 
 /** One moment, rendered as a card. `lead` is an optional resurfacing line
@@ -22,6 +22,7 @@ export default function MomentCard({
   const [confirming, setConfirming] = useState(false);
   const mood = moodMeta(moment.mood);
   const dt = new Date(moment.createdAt);
+  const song = songLink(moment);
 
   return (
     <motion.article variants={rm ? undefined : rise} className="card overflow-hidden">
@@ -59,6 +60,19 @@ export default function MomentCard({
           <p className="font-display text-[1.05rem] leading-relaxed text-ink whitespace-pre-wrap break-words">
             {moment.text}
           </p>
+        )}
+
+        {moment.song && (
+          <a
+            href={song}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1.5 max-w-full px-2.5 py-1.5 rounded-full text-xs font-medium border border-border hover:border-border-strong transition-colors"
+            style={{ color: 'var(--kairos)' }}
+          >
+            <Music className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{moment.song}</span>
+          </a>
         )}
 
         <div className="mt-3 flex items-center gap-2 text-xs text-ink-subtle">

@@ -39,6 +39,8 @@ export interface NewMoment {
   mood?: MoodId;
   photo?: string;
   place?: string;
+  song?: string;
+  songUrl?: string;
 }
 
 interface KairosState {
@@ -96,6 +98,8 @@ export const useKairos = create<KairosState>()(
           mood: m.mood,
           photo: m.photo,
           place: m.place?.trim() || undefined,
+          song: m.song?.trim() || undefined,
+          songUrl: m.songUrl?.trim() || undefined,
         };
         set((s) => ({ moments: [moment, ...s.moments] }));
         return moment;
