@@ -10,6 +10,7 @@ import { EmptyState } from '../components/ui';
 export default function OnThisDay() {
   const rm = useReducedMotion();
   const moments = useKairos((s) => s.moments);
+  const updateMoment = useKairos((s) => s.updateMoment);
   const deleteMoment = useKairos((s) => s.deleteMoment);
   // Anchor to "now" once per render pass via a stable date (fine for a feed).
   const resurfaced = useMemo(() => onThisDay(moments), [moments]);
@@ -37,7 +38,7 @@ export default function OnThisDay() {
           className="space-y-4"
         >
           {resurfaced.map((r) => (
-            <MomentCard key={r.moment.id} moment={r.moment} lead={yearsAgoLabel(r.yearsAgo)} onDelete={deleteMoment} />
+            <MomentCard key={r.moment.id} moment={r.moment} lead={yearsAgoLabel(r.yearsAgo)} onEdit={updateMoment} onDelete={deleteMoment} />
           ))}
         </motion.div>
       )}
