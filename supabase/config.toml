@@ -4,3 +4,7 @@ project_id = "kqsudgkpzawyloccjtpa"
 # user, so it must not require a user JWT.
 [functions.send-reminders]
 verify_jwt = false
+
+# The Kairos anniversary resurfacer is likewise called by pg_cron (once a day).
+[functions.send-journal-resurfacing]
+verify_jwt = false

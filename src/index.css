@@ -38,6 +38,11 @@
     --ember-soft: rgba(255, 90, 30, 0.12);
     --ember-grad: linear-gradient(150deg, #ff8a3d, #ff3d2e);
 
+    /* Kairos signature twilight — the journaling workspace's accent. */
+    --kairos: #6a5acd;
+    --kairos-soft: rgba(106, 90, 205, 0.12);
+    --kairos-grad: linear-gradient(150deg, #8b7fe0, #6a5acd);
+
     --glow: rgba(0, 0, 0, 0.05);
 
     --card-grad: linear-gradient(165deg, #ffffff 0%, #f3f1ee 100%);

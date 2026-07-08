@@ -1,4 +1,4 @@
-import { Rocket, Flame } from 'lucide-react';
+import { Rocket, Flame, Sparkles } from 'lucide-react';
 import { useAppMode } from './mode';
 
 // Shown right after login when no workspace is chosen yet.
@@ -14,7 +14,7 @@ export default function ProfilePicker() {
           <p className="text-ink-muted mt-1">Pick your workspace — switch any time.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <button
             onClick={() => setMode('focus')}
             className="card p-7 text-left hover:border-accent/50 hover:bg-hover transition-colors group"
@@ -38,6 +38,19 @@ export default function ProfilePicker() {
             <h2 className="font-display text-xl font-bold">Liftoff Afterburn</h2>
             <p className="text-sm text-ink-muted mt-1">
               Log your training: your plan mapped set-by-set with target RPE, RPE achieved, and a rating per set.
+            </p>
+          </button>
+
+          <button
+            onClick={() => setMode('kairos')}
+            className="card p-7 text-left hover:border-[var(--border-strong)] hover:bg-hover transition-colors group"
+          >
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform" style={{ background: 'var(--kairos-soft)' }}>
+              <Sparkles className="w-6 h-6" style={{ color: 'var(--kairos)' }} />
+            </div>
+            <h2 className="font-display text-xl font-bold">Kairos</h2>
+            <p className="text-sm text-ink-muted mt-1">
+              Your private diary of moments — capture the instant, with a photo if you like, and meet it again on its anniversaries.
             </p>
           </button>
         </div>
