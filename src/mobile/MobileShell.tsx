@@ -204,6 +204,14 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
             <span className="text-xs font-medium">Afterburn</span>
           </button>
           <button
+            onClick={() => { setMoreOpen(false); haptics.tap(); setAppMode('kairos'); }}
+            className="card flex flex-col items-center justify-center gap-2 py-5 active:scale-95 transition-transform border-[var(--border)]"
+            style={{ color: 'var(--kairos)' }}
+          >
+            <Sparkles className="w-6 h-6" />
+            <span className="text-xs font-medium">Kairos</span>
+          </button>
+          <button
             onClick={() => { toggleTheme(); haptics.tap(); }}
             className="card flex flex-col items-center justify-center gap-2 py-5 active:scale-95 transition-transform"
           >

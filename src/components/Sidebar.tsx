@@ -91,6 +91,14 @@ export default function Sidebar({
           <span className="font-body text-sm">Enter Afterburn</span>
         </button>
         <button
+          onClick={() => setAppMode('kairos')}
+          className="mode-switch w-full justify-center"
+          style={{ color: 'var(--kairos)', background: 'var(--kairos-soft)' }}
+        >
+          <Sparkles className="w-5 h-5 shrink-0" />
+          <span className="font-body text-sm">Enter Kairos</span>
+        </button>
+        <button
           onClick={toggleTheme}
           className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[var(--text-muted)] font-medium hover:text-[var(--accent)] hover:neo-button transition-all duration-200 active:scale-95"
         >

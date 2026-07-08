@@ -31,6 +31,7 @@ const Stats = lazy(() => import('./pages/Stats'));
 //  - Afterburn pulls in afterburn/store + the ~900-line plan.ts data
 //  - CommandPalette pulls in the Afterburn store for its workout commands
 const Afterburn = lazy(() => import('./afterburn/Afterburn'));
+const Kairos = lazy(() => import('./kairos/Kairos'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
 import SettingsPage from './pages/Settings';
 import Schedule from './pages/Schedule';
@@ -164,6 +165,20 @@ function Shell() {
             <CommandPalette onClose={() => setPaletteOpen(false)} />
           </Suspense>
         )}
+        <AlarmOverlay />
+      </>
+    );
+  if (appMode === 'kairos')
+    return (
+      <>
+        <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center text-ink-subtle animate-pulse">Loading…</div>}>
+          <Kairos />
+        </Suspense>
+        {/* Keep the PWA update path reachable inside Kairos too. Focus-only
+            widgets (panic button, quick-add) stay out to keep the diary calm. */}
+        <OfflineBanner />
+        <PWAPrompt />
+        <InstallPrompt />
         <AlarmOverlay />
       </>
     );
