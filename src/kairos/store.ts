@@ -43,19 +43,48 @@ export interface NewMoment {
   songUrl?: string;
 }
 
+/** Fields of a captured moment that can be refined later. The capture *time*
+ *  (createdAt) and photo identity stay as they were — amor fati. */
+export type MomentEdit = Partial<Pick<Moment, 'text' | 'mood' | 'photo' | 'place' | 'song' | 'songUrl'>>;
+
 interface KairosState {
   moments: Moment[];
   _cloudLoaded: boolean;
   loadMoments: () => Promise<void>;
   /** Capture a moment. The timestamp is locked here, at the instant of capture. */
   addMoment: (m: NewMoment) => Moment;
+  /** Refine an existing moment's words/mood/song/place. createdAt stays locked. */
+  updateMoment: (id: string, patch: MomentEdit) => void;
   /** Delete a moment (the one destructive action — capture-time is otherwise immutable). */
   deleteMoment: (id: string) => void;
 }
 
+// Upsert the whole moments list to the user's cloud row. Shared by the debounced
+// subscribe and the after-load "seed the cloud" flush.
+async function pushMomentsToCloud(moments: Moment[]): Promise<void> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return;
+    const ts = new Date().toISOString();
+    const { error } = await supabase.from('journal_data').upsert(
+      { id: session.user.id, data: { moments }, updated_at: ts },
+      { onConflict: 'id' },
+    );
+    if (error) {
+      console.error('Kairos cloud sync failed', error);
+      return;
+    }
+    setMarker(ts);
+  } catch (e) {
+    console.error('Kairos cloud sync failed', e);
+  }
+}
+
 export const useKairos = create<KairosState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       moments: [],
       _cloudLoaded: false,
 
@@ -79,10 +108,16 @@ export const useKairos = create<KairosState>()(
             .single();
           if (error && error.code !== 'PGRST116') console.error('Kairos cloud load failed', error);
           const cloudTs = data?.updated_at ?? '';
-          if (data?.data && cloudTs > getMarker()) {
-            const d = data.data as { moments?: Moment[] };
-            if (Array.isArray(d.moments)) set({ moments: d.moments });
+          const cloudMoments = (data?.data as { moments?: Moment[] } | undefined)?.moments;
+          if (Array.isArray(cloudMoments) && cloudTs > getMarker()) {
+            // Cloud is newer — adopt it.
+            set({ moments: cloudMoments });
             setMarker(cloudTs || new Date().toISOString());
+          } else if (get().moments.length > 0 && (!Array.isArray(cloudMoments) || cloudMoments.length < get().moments.length)) {
+            // Local has moments the cloud doesn't (e.g. captured before the table
+            // existed, or a device that's ahead). Seed/refresh the cloud now so
+            // nothing lives only on this device.
+            await pushMomentsToCloud(get().moments);
           }
         } catch (e) {
           console.error('Kairos cloud load failed', e);
@@ -105,6 +140,23 @@ export const useKairos = create<KairosState>()(
         return moment;
       },
 
+      updateMoment: (id, patch) =>
+        set((s) => ({
+          moments: s.moments.map((mo) =>
+            mo.id !== id
+              ? mo
+              : {
+                  ...mo,
+                  ...patch,
+                  // Normalize the optional string fields (trim → undefined when blank).
+                  text: patch.text !== undefined ? patch.text.trim() : mo.text,
+                  place: patch.place !== undefined ? patch.place.trim() || undefined : mo.place,
+                  song: patch.song !== undefined ? patch.song.trim() || undefined : mo.song,
+                  songUrl: patch.songUrl !== undefined ? patch.songUrl.trim() || undefined : mo.songUrl,
+                },
+          ),
+        })),
+
       deleteMoment: (id) => set((s) => ({ moments: s.moments.filter((x) => x.id !== id) })),
     }),
     {
@@ -124,24 +176,5 @@ useKairos.subscribe((state) => {
   if (state.moments === lastMoments) return;
   lastMoments = state.moments;
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(async () => {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) return;
-      const ts = new Date().toISOString();
-      const { error } = await supabase.from('journal_data').upsert(
-        { id: session.user.id, data: { moments: state.moments }, updated_at: ts },
-        { onConflict: 'id' },
-      );
-      if (error) {
-        console.error('Kairos cloud sync failed', error);
-        return;
-      }
-      setMarker(ts);
-    } catch (e) {
-      console.error('Kairos cloud sync failed', e);
-    }
-  }, 1000);
+  syncTimer = setTimeout(() => pushMomentsToCloud(state.moments), 1000);
 });

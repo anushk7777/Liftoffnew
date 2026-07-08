@@ -10,6 +10,7 @@ import { EmptyState } from '../components/ui';
 export default function Timeline() {
   const rm = useReducedMotion();
   const moments = useKairos((s) => s.moments);
+  const updateMoment = useKairos((s) => s.updateMoment);
   const deleteMoment = useKairos((s) => s.deleteMoment);
   const buckets = useMemo(() => byMonth(moments), [moments]);
 
@@ -45,7 +46,7 @@ export default function Timeline() {
               className="space-y-4"
             >
               {b.moments.map((m) => (
-                <MomentCard key={m.id} moment={m} onDelete={deleteMoment} />
+                <MomentCard key={m.id} moment={m} onEdit={updateMoment} onDelete={deleteMoment} />
               ))}
             </motion.div>
           </section>
