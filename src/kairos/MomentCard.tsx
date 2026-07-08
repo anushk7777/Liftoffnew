@@ -5,6 +5,7 @@ import { Trash2, MapPin, Music, Pencil, Check, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { rise, pop, useReducedMotion } from '../lib/motion';
 import { moodMeta, songLink, MOODS } from './moments';
+import { usePhotoUrl } from './usePhotoUrl';
 import type { MomentEdit } from './store';
 import type { Moment } from './types';
 
@@ -35,6 +36,7 @@ export default function MomentCard({
   const mood = moodMeta(moment.mood);
   const dt = new Date(moment.createdAt);
   const song = songLink(moment);
+  const photoUrl = usePhotoUrl(moment.photo);
 
   const startEdit = () => {
     setDText(moment.text);
@@ -54,7 +56,11 @@ export default function MomentCard({
     <motion.article variants={rm ? undefined : rise} className="card overflow-hidden">
       {moment.photo && (
         <div className="relative bg-elevated">
-          <img src={moment.photo} alt="" loading="lazy" className="w-full max-h-[62vh] object-cover" />
+          {photoUrl ? (
+            <img src={photoUrl} alt="" loading="lazy" className="w-full max-h-[62vh] object-cover" />
+          ) : (
+            <div className="w-full aspect-[4/3] animate-pulse bg-elevated" />
+          )}
         </div>
       )}
       <div className="p-4">

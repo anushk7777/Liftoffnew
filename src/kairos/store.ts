@@ -12,6 +12,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { deleteMomentPhoto } from './photo';
 import type { Moment, MoodId } from './types';
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -157,7 +158,11 @@ export const useKairos = create<KairosState>()(
           ),
         })),
 
-      deleteMoment: (id) => set((s) => ({ moments: s.moments.filter((x) => x.id !== id) })),
+      deleteMoment: (id) => {
+        const gone = get().moments.find((x) => x.id === id);
+        if (gone?.photo) void deleteMomentPhoto(gone.photo); // best-effort storage cleanup
+        set((s) => ({ moments: s.moments.filter((x) => x.id !== id) }));
+      },
     }),
     {
       name: 'liftoff-kairos',
