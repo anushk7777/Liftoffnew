@@ -111,3 +111,12 @@ export function excerpt(text: string, max = 140): string {
   const t = text.trim().replace(/\s+/g, ' ');
   return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
 }
+
+/** The tappable link for a moment's song: the explicit link if given, else a
+ *  YouTube Music search for the typed name (so just typing the song is enough
+ *  to find it again). Returns undefined when there's no song. */
+export function songLink(moment: { song?: string; songUrl?: string }): string | undefined {
+  if (moment.songUrl && moment.songUrl.trim()) return moment.songUrl.trim();
+  if (moment.song && moment.song.trim()) return `https://music.youtube.com/search?q=${encodeURIComponent(moment.song.trim())}`;
+  return undefined;
+}

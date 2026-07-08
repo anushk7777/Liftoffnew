@@ -28,4 +28,9 @@ export interface Moment {
   photo?: string;
   /** Optional place label the user typed (kept lightweight; no geolocation). */
   place?: string;
+  /** Optional "the song of this moment" — free text (e.g. "Artist — Title"). */
+  song?: string;
+  /** Optional link to the song (YouTube Music / YouTube / Spotify). If absent
+   *  but `song` is set, the UI links to a YouTube Music search for the name. */
+  songUrl?: string;
 }

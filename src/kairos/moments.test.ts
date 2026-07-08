@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { onThisDay, milestoneResurfaced, sameCalendarDay, byMonth, yearsAgoLabel, excerpt, moodMeta } from './moments';
+import { onThisDay, milestoneResurfaced, sameCalendarDay, byMonth, yearsAgoLabel, excerpt, moodMeta, songLink } from './moments';
 import type { Moment } from './types';
 
 const mo = (id: string, iso: string, text = 'x'): Moment => ({ id, createdAt: iso, text });
@@ -81,5 +81,12 @@ describe('small helpers', () => {
     expect(moodMeta('calm')?.emoji).toBe('🌊');
     expect(moodMeta(undefined)).toBeUndefined();
     expect(moodMeta('nope')).toBeUndefined();
+  });
+
+  it('builds a song link: explicit url wins, else a YouTube Music search', () => {
+    expect(songLink({})).toBeUndefined();
+    expect(songLink({ songUrl: 'https://music.youtube.com/watch?v=abc' })).toBe('https://music.youtube.com/watch?v=abc');
+    expect(songLink({ song: 'Bon Iver — Holocene' })).toBe('https://music.youtube.com/search?q=Bon%20Iver%20%E2%80%94%20Holocene');
+    expect(songLink({ song: '  ' })).toBeUndefined();
   });
 });

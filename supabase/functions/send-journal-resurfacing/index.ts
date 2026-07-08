@@ -144,9 +144,16 @@ Deno.serve(async (req) => {
               const d = new Date(h.moment.createdAt);
               const dateStr = d.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
               const text = h.moment.text ? escapeHtml(h.moment.text) : "<em>(a photo you kept — open Kairos to see it)</em>";
+              let songHtml = "";
+              const songName = (h.moment.song ?? "").trim();
+              if (songName) {
+                const link = (h.moment.songUrl ?? "").trim() || `https://music.youtube.com/search?q=${encodeURIComponent(songName)}`;
+                songHtml = `<div style="margin-top:12px"><a href="${escapeHtml(link)}" style="font:500 13px/1 -apple-system,Segoe UI,sans-serif;color:#6a5acd;text-decoration:none">♪ ${escapeHtml(songName)}</a></div>`;
+              }
               return `<div style="margin:0 0 22px;padding:18px 20px;border:1px solid #e4e2de;border-radius:14px;background:#faf9f7">
                 <div style="font:600 12px/1 -apple-system,Segoe UI,sans-serif;color:#6a5acd;letter-spacing:.02em;margin-bottom:8px">${yearsAgoLabel(h.yearsAgo).toUpperCase()}</div>
                 <div style="font:400 18px/1.5 Georgia,serif;color:#16151a;white-space:pre-wrap">${text}</div>
+                ${songHtml}
                 <div style="font:400 12px/1 -apple-system,Segoe UI,sans-serif;color:#8a8880;margin-top:12px">${dateStr}</div>
               </div>`;
             }).join("");
