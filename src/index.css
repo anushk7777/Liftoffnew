@@ -75,6 +75,57 @@
     color-scheme: light;
   }
 
+  /* ============================================================
+     Focus "Daylight" — the productivity workspace's own identity:
+     a calm warm-paper surface with a single deep-blue accent. Scoped
+     to the Focus shell so it stays light + premium regardless of the
+     global light/dark toggle (Afterburn/Kairos keep their own looks).
+     ============================================================ */
+  .focus-daylight {
+    --bg: #f6f5f1;
+    --surface: #ffffff;
+    --elevated: #f1efe9;
+    --sidebar: #f2f1ec;
+    --border: #e8e6df;
+    --border-strong: #dad7cf;
+    --hover: rgba(30, 40, 70, 0.045);
+    --hover-strong: rgba(30, 40, 70, 0.08);
+
+    --text: #1b1a16;
+    --text-muted: #78756c;
+    --text-subtle: #a7a49b;
+    --ink: #1b1a16;
+    --ink-muted: #78756c;
+    --ink-subtle: #a7a49b;
+
+    /* single accent — a deep, muted, trustworthy blue */
+    --accent: #35528a;
+    --accent-hover: #2b4576;
+    --accent-soft: #eaeef6;
+    --accent-text: #ffffff;
+    --primary: #35528a;
+    --on-primary: #ffffff;
+
+    --success: #3f7d5c;
+    --warning: #b1823f;
+    --danger: #c25563;
+
+    --glow: rgba(0, 0, 0, 0.05);
+    --card-grad: #ffffff;
+    --card-grad-strong: #ffffff;
+
+    --shadow-sm: 0 1px 2px rgba(20, 22, 30, 0.05);
+    --shadow-md: 0 6px 22px rgba(20, 22, 30, 0.06);
+    --shadow-lg: 0 18px 50px rgba(20, 22, 30, 0.09);
+    --shadow-hover: 0 22px 55px rgba(20, 22, 30, 0.12);
+
+    color-scheme: light;
+    background: var(--bg);
+    color: var(--text);
+  }
+  /* The dark decorative atmosphere layers read as a grey smudge on paper — mute them. */
+  .focus-daylight .radial-atmosphere { display: none; }
+
   /* Dark theme — Monochrome Editorial (layered blacks + ink-on-white accents) */
   .dark {
     --bg: #0a0a0b;

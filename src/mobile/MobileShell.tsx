@@ -68,9 +68,9 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-background text-on-surface">
+    <div className="focus-daylight flex flex-col h-[100dvh]">
       {/* Top bar */}
-      <header className="shrink-0 flex items-center justify-between px-4 h-14 border-b border-white/10 bg-surface-container/70 backdrop-blur-md pt-[env(safe-area-inset-top)] box-content">
+      <header className="shrink-0 flex items-center justify-between px-4 h-14 border-b border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur-md pt-[env(safe-area-inset-top)] box-content">
         <AnimatePresence mode="wait">
           <motion.h1
             key={title}
@@ -78,7 +78,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
             animate={{ opacity: 1, y: 0 }}
             exit={rm ? undefined : { opacity: 0, y: -6 }}
             transition={{ duration: 0.16, ease: [0.21, 1, 0.4, 1] }}
-            className="font-display text-xl text-ink truncate"
+            className="font-display text-xl text-[var(--text)] truncate"
           >
             {title}
           </motion.h1>
@@ -86,7 +86,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
         <button
           onClick={onOpenSearch}
           aria-label="Search"
-          className="w-11 h-11 -mr-2 flex items-center justify-center rounded-full text-on-surface-variant active:bg-white/10"
+          className="w-11 h-11 -mr-2 flex items-center justify-center rounded-full text-[var(--text-muted)] active:bg-[var(--hover)]"
         >
           <Search className="w-5 h-5" />
         </button>
@@ -136,7 +136,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
       </motion.button>
 
       {/* Bottom tab bar — the soft pill glides between tabs via layoutId. */}
-      <nav className="shrink-0 grid grid-cols-5 border-t border-white/10 bg-surface-container/85 backdrop-blur-md pb-[env(safe-area-inset-bottom)] z-30">
+      <nav className="shrink-0 grid grid-cols-5 border-t border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur-md pb-[env(safe-area-inset-bottom)] z-30">
         {TABS.map(({ to, label, icon: Icon, end }) => {
           const isActive = end ? location.pathname === to : location.pathname.startsWith(to);
           return (
@@ -147,14 +147,14 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
               onClick={() => haptics.tap()}
               className={cn(
                 'relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[11px] font-medium',
-                isActive ? 'text-primary' : 'text-on-surface-variant',
+                isActive ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]',
               )}
             >
               {isActive && (
                 <motion.span
                   layoutId="mobile-tab-pill"
                   transition={rm ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }}
-                  className="absolute top-1.5 w-14 h-7 rounded-full bg-accent-soft"
+                  className="absolute top-1.5 w-14 h-7 rounded-full" style={{ background: 'var(--accent-soft)' }}
                 />
               )}
               <motion.span
@@ -172,7 +172,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
           onClick={() => setMoreOpen(true)}
           className={cn(
             'flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[11px] font-medium',
-            MORE_LINKS.some((l) => l.to === location.pathname) ? 'text-primary' : 'text-on-surface-variant',
+            MORE_LINKS.some((l) => l.to === location.pathname) ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]',
           )}
         >
           <MoreHorizontal className="w-5 h-5" />
