@@ -78,7 +78,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
             animate={{ opacity: 1, y: 0 }}
             exit={rm ? undefined : { opacity: 0, y: -6 }}
             transition={{ duration: 0.16, ease: [0.21, 1, 0.4, 1] }}
-            className="font-display text-xl text-[var(--text)] truncate"
+            className="text-[22px] font-bold tracking-tight text-[var(--text)] truncate"
           >
             {title}
           </motion.h1>
