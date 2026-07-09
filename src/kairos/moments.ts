@@ -28,10 +28,6 @@ export function moodMeta(id?: MoodId | string): MoodMeta | undefined {
   return id ? MOOD_BY_ID[id] : undefined;
 }
 
-/** The anniversaries we resurface, in years. 1/2/3 as the user asked, plus the
- *  milestone 5- and 10-year marks. Order matters only for display. */
-export const RESURFACE_YEARS = [1, 2, 3, 5, 10] as const;
-
 /** Local Y/M/D of an ISO timestamp — resurfacing is a *calendar-day* concept,
  *  so we compare civil dates, not 24h multiples. */
 export function ymd(iso: string | Date): { y: number; m: number; d: number } {
@@ -67,13 +63,6 @@ export function onThisDay(moments: Moment[], now: Date = new Date()): Resurfaced
     out.push({ moment: mo, yearsAgo: today.y - md.y });
   }
   return out.sort((a, b) => a.yearsAgo - b.yearsAgo || b.moment.createdAt.localeCompare(a.moment.createdAt));
-}
-
-/** The subset of On-This-Day moments that hit a *milestone* anniversary
- *  (1/2/3/5/10 years) — what the annual email + push actually resurface. */
-export function milestoneResurfaced(moments: Moment[], now: Date = new Date()): Resurfaced[] {
-  const years = new Set<number>(RESURFACE_YEARS);
-  return onThisDay(moments, now).filter((r) => years.has(r.yearsAgo));
 }
 
 /** "1 year ago" / "3 years ago" — the resurfacing lead line. */

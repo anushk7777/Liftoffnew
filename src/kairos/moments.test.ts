@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { onThisDay, milestoneResurfaced, sameCalendarDay, byMonth, yearsAgoLabel, excerpt, moodMeta, songLink } from './moments';
+import { onThisDay, sameCalendarDay, byMonth, yearsAgoLabel, excerpt, moodMeta, songLink } from './moments';
 import type { Moment } from './types';
 
 const mo = (id: string, iso: string, text = 'x'): Moment => ({ id, createdAt: iso, text });
@@ -42,16 +42,16 @@ describe('onThisDay', () => {
   });
 });
 
-describe('milestoneResurfaced', () => {
+describe('onThisDay — every year', () => {
   const now = new Date('2026-07-08T10:00:00');
-  it('keeps only 1/2/3/5/10-year anniversaries', () => {
+  it('resurfaces every earlier year on the date, not only milestones', () => {
     const moments = [
       mo('y1', '2025-07-08T09:00:00'),
-      mo('y4', '2022-07-08T09:00:00'), // 4 yrs — not a milestone
+      mo('y4', '2022-07-08T09:00:00'), // 4 yrs — still resurfaces
       mo('y5', '2021-07-08T09:00:00'),
       mo('y10', '2016-07-08T09:00:00'),
     ];
-    expect(milestoneResurfaced(moments, now).map((r) => r.yearsAgo)).toEqual([1, 5, 10]);
+    expect(onThisDay(moments, now).map((r) => r.yearsAgo)).toEqual([1, 4, 5, 10]);
   });
 });
 
