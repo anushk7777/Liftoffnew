@@ -2,7 +2,7 @@ import { useState, lazy, Suspense } from 'react';
 import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LayoutDashboard, CheckSquare, Timer, CalendarDays, MoreHorizontal, Plus, Search,
+  LayoutDashboard, CheckSquare, Timer, MoreHorizontal, Plus, Search,
   Map, Sparkles, Repeat, Inbox, BarChart3, Settings as SettingsIcon, Moon, Sun, Flame,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -13,7 +13,7 @@ import { haptics } from '../lib/haptics';
 import { BottomSheet } from './components/BottomSheet';
 import { PullToRefresh } from './components/PullToRefresh';
 
-import MobileToday from './screens/MobileToday';
+import MissionControl from '../pages/MissionControl';
 import MobileTasks from './screens/MobileTasks';
 import MobileRoadmap from './screens/MobileRoadmap';
 import Focus from '../pages/Focus';
@@ -26,14 +26,13 @@ import { EmptyState } from '../components/ui';
 const Stats = lazy(() => import('../pages/Stats'));
 
 const TABS = [
-  { to: '/', label: 'Today', icon: LayoutDashboard, end: true },
+  { to: '/', label: 'Mission', icon: LayoutDashboard, end: true },
+  { to: '/roadmap', label: 'Trajectory', icon: Map },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { to: '/focus', label: 'Focus', icon: Timer },
-  { to: '/schedule', label: 'Schedule', icon: CalendarDays },
+  { to: '/focus', label: 'Engage', icon: Timer },
 ];
 
 const MORE_LINKS = [
-  { to: '/roadmap', label: 'Roadmap', icon: Map },
   { to: '/coach', label: 'Coach', icon: Sparkles },
   { to: '/habits', label: 'Habits', icon: Repeat },
   { to: '/brain-dump', label: 'Brain Dump', icon: Inbox },
@@ -42,8 +41,8 @@ const MORE_LINKS = [
 ];
 
 const TITLES: Record<string, string> = {
-  '/': 'Today', '/tasks': 'Tasks', '/focus': 'Focus', '/schedule': 'Schedule',
-  '/roadmap': 'Roadmap', '/coach': 'Coach', '/habits': 'Habits',
+  '/': 'Mission Control', '/tasks': 'Tasks', '/focus': 'Engage', '/schedule': 'Schedule',
+  '/roadmap': 'Trajectory', '/coach': 'Coach', '/habits': 'Habits',
   '/brain-dump': 'Brain Dump', '/stats': 'Stats', '/settings': 'Settings',
 };
 
@@ -105,7 +104,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
                 exit={rm ? undefined : { opacity: 0, y: -10, transition: { duration: 0.14 } }}
               >
                 <Routes location={location}>
-                  <Route path="/" element={<MobileToday />} />
+                  <Route path="/" element={<MissionControl />} />
                   <Route path="/tasks" element={<MobileTasks />} />
                   <Route path="/focus" element={<Focus />} />
                   <Route path="/schedule" element={<Schedule />} />

@@ -11,7 +11,6 @@ import {
   Sun,
   Sparkles,
   HelpCircle,
-  CalendarDays,
   Flame,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -19,12 +18,11 @@ import { useAppMode } from '../afterburn/mode';
 import { cn } from '../lib/utils';
 
 const NAV = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/schedule', label: 'Schedule', icon: CalendarDays },
+  { to: '/', label: 'Mission Control', icon: LayoutDashboard, end: true },
+  { to: '/roadmap', label: 'Trajectory', icon: Map },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { to: '/focus', label: 'Engage', icon: Timer },
   { to: '/coach', label: 'Coach', icon: Sparkles },
-  { to: '/focus', label: 'Focus', icon: Timer },
-  { to: '/roadmap', label: 'Roadmap', icon: Map },
   { to: '/stats', label: 'Stats', icon: BarChart3 },
 ];
 

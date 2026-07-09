@@ -46,6 +46,13 @@
     --kairos-gold: #e8a15c;
     --kairos-grad: linear-gradient(120deg, #8b7fe0 0%, #c76ba6 55%, #e8a15c 100%);
 
+    /* Mission Control — altitude. Deep sky → aurora cyan, with the ember reserved
+       for ignition/launch moments. The identity of the main Liftoff workspace. */
+    --mission: #0e7490;
+    --mission-soft: rgba(14, 116, 144, 0.12);
+    --mission-cyan: #22b8cf;
+    --mission-grad: linear-gradient(120deg, #22b8cf 0%, #2f74d0 60%, #4f46e5 100%);
+
     --glow: rgba(0, 0, 0, 0.05);
 
     --card-grad: linear-gradient(165deg, #ffffff 0%, #f3f1ee 100%);
@@ -103,6 +110,12 @@
     --kairos-rose: #eb86b6;
     --kairos-gold: #f2b877;
     --kairos-grad: linear-gradient(120deg, #a998f2 0%, #e084b6 55%, #f2b877 100%);
+
+    /* Mission Control on dark — brighter aurora against the ink. */
+    --mission: #4cc4e0;
+    --mission-soft: rgba(76, 196, 224, 0.16);
+    --mission-cyan: #5fd3e8;
+    --mission-grad: linear-gradient(120deg, #5fd3e8 0%, #6aa8ff 60%, #8b7bff 100%);
 
     --glow: rgba(255, 255, 255, 0.1);
 
@@ -340,6 +353,26 @@
       radial-gradient(55% 45% at 92% 8%, color-mix(in srgb, var(--kairos-rose) 20%, transparent), transparent 70%),
       radial-gradient(70% 55% at 78% 100%, color-mix(in srgb, var(--kairos-gold) 16%, transparent), transparent 72%),
       radial-gradient(60% 60% at 8% 92%, color-mix(in srgb, var(--kairos) 14%, transparent), transparent 72%);
+  }
+
+  /* Mission Control — an "altitude" wash: cool aurora up top, a warm ignition
+     ember low at the horizon (you're on the launchpad looking up). */
+  .text-mission {
+    background: var(--mission-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  .mission-aura {
+    background:
+      /* cool sky, up high */
+      radial-gradient(62% 46% at 84% 0%, color-mix(in srgb, var(--mission-cyan) 20%, transparent), transparent 70%),
+      radial-gradient(55% 42% at 8% 4%, color-mix(in srgb, var(--mission) 15%, transparent), transparent 72%),
+      /* warm sunrise rising at the horizon — the hopeful, alive note */
+      radial-gradient(90% 42% at 50% 112%, color-mix(in srgb, var(--ember) 26%, transparent), transparent 64%),
+      radial-gradient(60% 34% at 24% 104%, color-mix(in srgb, #f4a862 22%, transparent), transparent 70%),
+      radial-gradient(60% 34% at 80% 106%, color-mix(in srgb, #e879a6 16%, transparent), transparent 72%);
   }
 
   .font-body {

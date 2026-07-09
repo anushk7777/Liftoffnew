@@ -43,6 +43,9 @@ interface AppState {
   syncNow: () => Promise<void>;
 
   // Settings
+  // The mission: a one-line statement of the single goal you're launching toward.
+  mission: string;
+  setMission: (mission: string) => void;
   targetDate: string;
   // Explicit anchor for the coach's pace math — set once when the roadmap is
   // first set up (or backfilled from the earliest signal for existing users),
@@ -207,6 +210,8 @@ export const useStore = create<AppState>()(
   // ---- Settings ----
   // Default ~6 months out from first run (never a shared/stale hardcoded date).
   // Existing users keep their persisted targetDate.
+  mission: '',
+  setMission: (mission) => set({ mission }),
   targetDate: format(addMonths(new Date(), 6), 'yyyy-MM-dd'),
   journeyStart: undefined,
   theme: 'dark',
