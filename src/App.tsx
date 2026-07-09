@@ -19,7 +19,7 @@ import AlarmOverlay from './components/AlarmOverlay';
 import InstallPrompt from './components/InstallPrompt';
 import OfflineBanner from './components/OfflineBanner';
 
-import Dashboard from './pages/Dashboard';
+import MissionControl from './pages/MissionControl';
 import Coach from './pages/Coach';
 import Tasks from './pages/Tasks';
 import Habits from './pages/Habits';
@@ -196,7 +196,7 @@ function Shell() {
   // ---- Desktop layout ----
   const routesEl = (
     <Routes location={location}>
-      <Route path="/" element={<Dashboard />} />
+      <Route path="/" element={<MissionControl />} />
       <Route path="/coach" element={<Coach />} />
       <Route path="/tasks" element={<Tasks />} />
       <Route path="/habits" element={<Habits />} />
