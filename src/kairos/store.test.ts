@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useKairos } from './store';
+import { useKairos, inlinePhotoMoments } from './store';
+import type { Moment } from './types';
 
 // The store imports supabase, but with no VITE_ env vars in the test env
 // isSupabaseConfigured is false and the cloud paths short-circuit — so these
@@ -36,6 +37,17 @@ describe('useKairos.updateMoment', () => {
     const m = useKairos.getState().addMoment({ text: 'x', song: 'Old' });
     useKairos.getState().updateMoment(m.id, { song: '   ' });
     expect(useKairos.getState().moments[0].song).toBeUndefined();
+  });
+});
+
+describe('inlinePhotoMoments', () => {
+  it('selects only moments whose photo is still inline base64', () => {
+    const ms: Moment[] = [
+      { id: 'a', createdAt: '2026-01-01T00:00:00Z', text: '', photo: 'data:image/jpeg;base64,AAAA' },
+      { id: 'b', createdAt: '2026-01-01T00:00:00Z', text: '', photo: 'user/b.jpg' }, // already a storage path
+      { id: 'c', createdAt: '2026-01-01T00:00:00Z', text: 'no photo' },
+    ];
+    expect(inlinePhotoMoments(ms).map((m) => m.id)).toEqual(['a']);
   });
 });
 
