@@ -12,6 +12,7 @@ import { useCoachActions } from '../components/useCoachActions';
 import { ConsistencyGraph } from '../components/ConsistencyGraph';
 import { AnimatedNumber } from '../components/ui';
 import { Sparkline } from '../components/charts';
+import MemoriesCard from '../kairos/MemoriesCard';
 import type { TodoTask } from '../store/data';
 
 function greeting() {
@@ -261,6 +262,9 @@ export default function Dashboard() {
           </div>
         </KpiCard>
       </motion.div>
+
+      {/* Kairos "On this day" — moments you wrote on this date in earlier years. */}
+      <MemoriesCard />
 
       {/* Row 1: Mission Critical + Focus dial */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-20">

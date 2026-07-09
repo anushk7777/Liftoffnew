@@ -40,7 +40,17 @@ function Header() {
 
 export default function Kairos() {
   const rm = useReducedMotion();
-  const [tab, setTab] = useState<Tab>('capture');
+  // Open on the tab requested by an external entry point (e.g. the home
+  // "On this day" memories box), else the capture screen.
+  const [tab, setTab] = useState<Tab>(() => {
+    try {
+      const t = sessionStorage.getItem('kairos_tab');
+      if (t) sessionStorage.removeItem('kairos_tab');
+      return t === 'onthisday' || t === 'timeline' ? (t as Tab) : 'capture';
+    } catch {
+      return 'capture';
+    }
+  });
   const loadMoments = useKairos((s) => s.loadMoments);
 
   // Pull cloud moments when entering (recency-guarded in the store).

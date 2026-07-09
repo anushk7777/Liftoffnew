@@ -11,6 +11,7 @@ import { haptics } from '../../lib/haptics';
 import { buildProfile, getSuggestions } from '../../lib/coach';
 import type { CoachState } from '../../lib/coach';
 import { ConsistencyGraph } from '../../components/ConsistencyGraph';
+import MemoriesCard from '../../kairos/MemoriesCard';
 
 function greeting() {
   const h = new Date().getHours();
@@ -73,6 +74,9 @@ export default function MobileToday() {
           <span className="font-mono-data text-sm font-semibold text-accent"><AnimatedNumber value={pct} />%</span>
         </div>
       </motion.header>
+
+      {/* Kairos "On this day" memories */}
+      <MemoriesCard />
 
       {/* Coach insight */}
       {suggestions[0]?.title && (

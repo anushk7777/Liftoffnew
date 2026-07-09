@@ -1,9 +1,10 @@
 // Supabase Edge Function: send-journal-resurfacing
 // The heart of Kairos's "amor fati" loop. Once a day it scans every user's
-// journal for moments captured on this same calendar day in an earlier year, and
-// on the milestone anniversaries (1, 2, 3, 5, 10 years) it resurfaces them:
+// journal for moments captured on this same calendar day in an EARLIER year —
+// every anniversary (1 year ago, 2 years ago, …) — and resurfaces them:
 //   • a web-push nudge (reuses the same VAPID infra as task reminders), and
 //   • an email — "1 year ago today you wrote…" — if RESEND_API_KEY is set.
+// It stays silent on any day that has no anniversary; it is NOT a daily reminder.
 //
 // Crash-proof: every failure returns readable JSON. `?test=1` resurfaces each
 // user's most recent moment right now (bypassing the anniversary + de-dup check)
@@ -13,8 +14,6 @@
 // VAPID_* secrets already used by send-reminders; email additionally needs
 // RESEND_API_KEY and RESEND_FROM. Set "Verify JWT" OFF so the cron can call it.
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const RESURFACE_YEARS = [1, 2, 3, 5, 10];
 
 function ymd(iso: string) {
   const d = new Date(iso);
@@ -87,8 +86,7 @@ Deno.serve(async (req) => {
           const md = ymd(mo.createdAt);
           if (md.y >= today.y) continue;
           if (!sameCalendarDay(md, today)) continue;
-          const yearsAgo = today.y - md.y;
-          if (RESURFACE_YEARS.includes(yearsAgo)) hits.push({ moment: mo, yearsAgo });
+          hits.push({ moment: mo, yearsAgo: today.y - md.y }); // every earlier year
         }
       }
       if (!hits.length) continue;
