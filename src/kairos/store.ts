@@ -12,8 +12,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { deleteMomentPhoto } from './photo';
+import { deleteMomentPhoto, uploadMomentPhoto } from './photo';
 import type { Moment, MoodId } from './types';
+
+/** Moments whose photo is still stored inline as base64 (captured before the
+ *  Storage bucket existed) — the candidates for the one-time migration. */
+export function inlinePhotoMoments(moments: Moment[]): Moment[] {
+  return moments.filter((m) => !!m.photo && m.photo.startsWith('data:'));
+}
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -58,7 +64,12 @@ interface KairosState {
   updateMoment: (id: string, patch: MomentEdit) => void;
   /** Delete a moment (the one destructive action — capture-time is otherwise immutable). */
   deleteMoment: (id: string) => void;
+  /** One-time: upload any inline (base64) photos to Storage + swap to a path. */
+  migrateInlinePhotos: () => Promise<void>;
 }
+
+// Runs at most once per session (across every entry point that loads moments).
+let migrationStarted = false;
 
 // Upsert the whole moments list to the user's cloud row. Shared by the debounced
 // subscribe and the after-load "seed the cloud" flush.
@@ -124,6 +135,8 @@ export const useKairos = create<KairosState>()(
           console.error('Kairos cloud load failed', e);
         }
         set({ _cloudLoaded: true });
+        // Fire-and-forget one-time migration of any legacy inline photos.
+        void get().migrateInlinePhotos();
       },
 
       addMoment: (m) => {
@@ -162,6 +175,22 @@ export const useKairos = create<KairosState>()(
         const gone = get().moments.find((x) => x.id === id);
         if (gone?.photo) void deleteMomentPhoto(gone.photo); // best-effort storage cleanup
         set((s) => ({ moments: s.moments.filter((x) => x.id !== id) }));
+      },
+
+      // Move photos captured before the Storage bucket existed (inline base64)
+      // into the bucket, one at a time, swapping each moment's photo to a path.
+      // Best-effort: an upload that can't run (offline / bucket missing) leaves
+      // the base64 in place, so nothing is lost and it retries next session.
+      migrateInlinePhotos: async () => {
+        if (!isSupabaseConfigured || migrationStarted) return;
+        migrationStarted = true;
+        const pending = inlinePhotoMoments(get().moments);
+        for (const m of pending) {
+          const path = await uploadMomentPhoto(m.id, m.photo!);
+          if (path && get().moments.some((x) => x.id === m.id)) {
+            get().updateMoment(m.id, { photo: path });
+          }
+        }
       },
     }),
     {
