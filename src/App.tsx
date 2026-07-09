@@ -218,7 +218,7 @@ function Shell() {
   );
 
   return (
-    <div className="bg-background text-on-surface font-body-lg min-h-screen overflow-hidden selection:bg-primary/30 flex relative">
+    <div className="focus-daylight font-body-lg min-h-screen overflow-hidden flex relative">
       <div className="fixed inset-0 radial-atmosphere pointer-events-none z-0"></div>
 
       {!focusMode && (

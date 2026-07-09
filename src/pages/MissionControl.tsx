@@ -1,40 +1,47 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { format, formatDistanceToNow } from 'date-fns';
-import { Rocket, Target, Check, ArrowUpRight, Pencil, Radio, Zap, ChevronRight } from 'lucide-react';
+import { format } from 'date-fns';
+import { Check, Clock, ChevronRight, Rocket } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getBriefing } from '../lib/coach';
 import type { CoachState } from '../lib/coach';
 import { nextMission, recentWins, trajectoryTone } from '../lib/mission';
-import { AnimatedNumber } from '../components/ui';
-import { stagger, rise, pop, springSoft, useReducedMotion } from '../lib/motion';
-import MemoriesCard from '../kairos/MemoriesCard';
+
+const tnum = { fontVariantNumeric: 'tabular-nums' } as const;
+
+function relTime(iso: string, now: number): string {
+  const days = Math.floor((now - Date.parse(iso)) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return `${days} days ago`;
+  const w = Math.floor(days / 7);
+  return w === 1 ? '1 week ago' : `${w} weeks ago`;
+}
 
 function MissionEditor({ onClose }: { onClose: () => void }) {
   const { mission, setMission, targetDate, setTargetDate } = useStore();
   const [text, setText] = useState(mission);
   const [date, setDate] = useState(targetDate);
   return (
-    <div className="card p-5" style={{ background: 'var(--card-grad)' }}>
-      <label className="section-label">Your mission</label>
+    <div className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-md)' }}>
+      <div className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">Your mission</div>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={2}
         autoFocus
-        placeholder="What are you launching toward? (e.g. Land a senior engineer role)"
-        className="w-full bg-transparent resize-none outline-none font-display text-2xl leading-tight text-ink placeholder:text-ink-subtle mt-1"
+        placeholder="What are you working toward? (e.g. Become a senior software engineer)"
+        className="w-full bg-transparent resize-none outline-none text-[1.6rem] leading-tight font-semibold tracking-tight text-[var(--text)] placeholder:text-[var(--text-subtle)] mt-2"
       />
       <div className="mt-3 flex items-center gap-3 flex-wrap">
-        <label className="text-xs text-ink-muted">Launch date</label>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input !py-1.5 !px-2 text-sm w-auto" />
+        <label className="text-xs text-[var(--text-muted)]">Launch date</label>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5" />
         <div className="ml-auto flex gap-2">
-          <button onClick={onClose} className="btn btn-secondary !py-1.5 !px-3 text-sm">Cancel</button>
+          <button onClick={onClose} className="text-sm font-medium px-3 py-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover)]">Cancel</button>
           <button
             onClick={() => { setMission(text.trim()); setTargetDate(date); onClose(); }}
-            className="btn !py-1.5 !px-4 text-sm text-white"
-            style={{ background: 'var(--mission-grad)' }}
+            className="text-sm font-semibold px-4 py-1.5 rounded-lg text-[var(--accent-text)]"
+            style={{ background: 'var(--accent)' }}
           >
             Set mission
           </button>
@@ -44,16 +51,18 @@ function MissionEditor({ onClose }: { onClose: () => void }) {
   );
 }
 
+const Label = ({ children }: { children: React.ReactNode }) => (
+  <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">{children}</span>
+);
+
 export default function MissionControl() {
-  const rm = useReducedMotion();
   const navigate = useNavigate();
   const {
     mission, targetDate, phases, tasks, setTaskStatus, toggleRoadmapTask,
     focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, journeyStart,
   } = useStore();
-
   const [editing, setEditing] = useState(false);
-  const [burst, setBurst] = useState(false);
+  const [now] = useState(() => Date.now());
 
   const briefing = useMemo(() => {
     const state: CoachState = { phases, tasks, focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, targetDate, journeyStart };
@@ -62,191 +71,163 @@ export default function MissionControl() {
 
   const step = useMemo(() => nextMission(phases, tasks), [phases, tasks]);
   const wins = useMemo(() => recentWins(tasks), [tasks]);
+  const focus7d = useMemo(() => {
+    const cut = now - 7 * 86400000;
+    return focusSessions.filter((s) => s.kind === 'focus' && Date.parse(s.date) >= cut).reduce((a, s) => a + (s.durationMins || 0), 0);
+  }, [focusSessions, now]);
+
   const tone = trajectoryTone(briefing.status);
-  const daysLeft = briefing.daysLeft;
   const actual = Math.round(briefing.actualPct);
   const expected = Math.round(briefing.expectedPct);
+  const daysLeft = briefing.daysLeft;
   const hasRoadmap = briefing.status !== 'idle';
+
+  // ring geometry
+  const R = 45;
+  const C = 2 * Math.PI * R;
 
   const completeStep = () => {
     if (!step) return;
     if (step.kind === 'roadmap' && step.roadmap) toggleRoadmapTask(step.roadmap.phaseId, step.roadmap.weekId, step.roadmap.taskId);
     else if (step.taskId) setTaskStatus(step.taskId, 'done');
-    setBurst(true);
-    setTimeout(() => setBurst(false), 1300);
   };
 
   return (
-    <div className="relative">
-      <div className="fixed inset-0 mission-aura pointer-events-none opacity-90 z-0" />
-      <motion.div
-        variants={rm ? undefined : stagger}
-        initial={rm ? undefined : 'hidden'}
-        animate={rm ? undefined : 'show'}
-        className="relative z-10 w-full flex flex-col gap-6 pb-16 max-w-3xl mx-auto"
-      >
-        {/* Eyebrow */}
-        <motion.div variants={rm ? undefined : rise} className="flex items-center gap-2 pt-2">
-          <Radio className="w-4 h-4" style={{ color: 'var(--mission)' }} />
-          <span className="text-[11px] font-bold tracking-[0.22em] uppercase text-ink-muted">Mission Control</span>
-          <span className="ml-auto text-[11px] font-medium tracking-wide uppercase text-ink-subtle">{format(new Date(), 'EEE · MMM d')}</span>
-        </motion.div>
+    <div className="w-full max-w-2xl mx-auto flex flex-col gap-6 pb-10">
+      {/* top row */}
+      <div className="flex items-center justify-between pt-1">
+        <Label>Mission</Label>
+        <span className="text-xs text-[var(--text-subtle)]" style={tnum}>{format(now, 'EEE, MMM d')}</span>
+      </div>
 
-        {/* The Mission */}
-        {editing ? (
-          <motion.div variants={rm ? undefined : rise}>
-            <MissionEditor onClose={() => setEditing(false)} />
-          </motion.div>
-        ) : mission ? (
-          <motion.button
-            variants={rm ? undefined : rise}
-            onClick={() => setEditing(true)}
-            className="text-left group"
-          >
-            <div className="flex items-start gap-2">
-              <h1 className="font-display text-3xl sm:text-4xl leading-[1.1] text-ink flex-1">{mission}</h1>
-              <Pencil className="w-4 h-4 mt-2 text-ink-subtle opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-            </div>
-            <p className="mt-2 text-sm text-ink-muted">
-              <span className="font-mono-data font-semibold" style={{ color: 'var(--mission)' }}>T‑minus {daysLeft} days</span>
-              {' '}to launch · {format(new Date(targetDate), 'MMM d, yyyy')}
-            </p>
-          </motion.button>
-        ) : (
-          <motion.button
-            variants={rm ? undefined : rise}
-            onClick={() => setEditing(true)}
-            className="card p-6 text-left hover:border-[var(--border-strong)] transition-colors"
-            style={{ background: 'var(--card-grad)' }}
-          >
-            <Target className="w-7 h-7 mb-3" style={{ color: 'var(--mission)' }} />
-            <h1 className="font-display text-2xl text-ink">Name your mission</h1>
-            <p className="text-sm text-ink-muted mt-1">One goal you're launching toward. Everything here orients to it.</p>
-          </motion.button>
-        )}
-
-        {/* Trajectory */}
-        <motion.div variants={rm ? undefined : rise} className="card p-5" style={{ background: 'var(--card-grad)' }}>
-          <div className="flex items-center justify-between">
-            <span className="section-label">Trajectory</span>
-            <span className="text-sm font-semibold" style={{ color: tone.color }}>{tone.label}</span>
-          </div>
-
-          {hasRoadmap ? (
-            <>
-              <div className="flex items-end gap-2 mt-3">
-                <span className="font-display text-5xl leading-none" style={{ color: 'var(--mission)' }}>
-                  <AnimatedNumber value={actual} />%
-                </span>
-                <span className="text-sm text-ink-muted mb-1">to launch</span>
-              </div>
-              {/* Ascent track: fill = actual, marker = on-pace expected */}
-              <div className="relative mt-4 h-3 rounded-full bg-elevated overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: 'var(--mission-grad)' }}
-                  initial={rm ? { width: `${actual}%` } : { width: 0 }}
-                  animate={{ width: `${actual}%` }}
-                  transition={{ duration: 0.9, ease: [0.21, 1, 0.4, 1] }}
-                />
-              </div>
-              <div className="relative h-4">
-                <div className="absolute top-0 -translate-x-1/2 flex flex-col items-center" style={{ left: `${Math.min(100, expected)}%` }}>
-                  <div className="w-px h-2 bg-[var(--border-strong)]" />
-                  <span className="text-[10px] text-ink-subtle whitespace-nowrap">on‑pace {expected}%</span>
-                </div>
-              </div>
-              <p className="text-xs text-ink-muted mt-1">{briefing.detail}</p>
-            </>
-          ) : (
-            <button onClick={() => navigate('/roadmap')} className="mt-3 w-full text-left flex items-center gap-3 group">
-              <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--mission-soft)' }}>
-                <Rocket className="w-5 h-5" style={{ color: 'var(--mission)' }} />
-              </span>
-              <span className="flex-1">
-                <span className="block text-sm font-semibold text-ink">Chart your trajectory</span>
-                <span className="block text-xs text-ink-muted">Break the mission into a roadmap so I can track your pace.</span>
-              </span>
-              <ChevronRight className="w-5 h-5 text-ink-subtle group-hover:translate-x-0.5 transition-transform" />
-            </button>
-          )}
-        </motion.div>
-
-        {/* Today's mission — the single next step */}
-        <motion.div variants={rm ? undefined : rise} className="card p-5 relative overflow-hidden" style={{ borderColor: 'color-mix(in srgb, var(--mission) 30%, transparent)' }}>
-          <span className="section-label">Today's mission</span>
-          {step ? (
-            <div className="mt-2 flex items-center gap-4">
-              <div className="min-w-0 flex-1">
-                <p className="font-display text-xl text-ink leading-snug">{step.title}</p>
-                {step.context && <p className="text-xs text-ink-subtle mt-1 truncate">{step.context}</p>}
-              </div>
-              <motion.button
-                whileTap={rm ? undefined : { scale: 0.92 }}
-                transition={pop}
-                onClick={completeStep}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-white"
-                style={{ background: 'var(--mission-grad)' }}
-              >
-                <Check className="w-4 h-4" /> Complete
-              </motion.button>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-ink-muted">All systems go — nothing queued. <button onClick={() => navigate('/roadmap')} className="font-semibold" style={{ color: 'var(--mission)' }}>Add your next step →</button></p>
-          )}
-          <AnimatePresence>
-            {burst && (
-              <motion.div
-                initial={rm ? { opacity: 1 } : { opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={springSoft}
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                style={{ background: 'color-mix(in srgb, var(--mission) 10%, transparent)' }}
-              >
-                <span className="inline-flex items-center gap-1.5 font-display text-2xl" style={{ color: 'var(--mission)' }}>
-                  <Zap className="w-6 h-6" /> Logged — climbing
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        {/* Engage (focus) + Launch log */}
-        <motion.button
-          variants={rm ? undefined : rise}
-          onClick={() => navigate('/focus')}
-          className="card p-4 flex items-center gap-3 hover:border-[var(--border-strong)] transition-colors text-left"
+      {/* mission statement */}
+      {editing ? (
+        <MissionEditor onClose={() => setEditing(false)} />
+      ) : mission ? (
+        <button onClick={() => setEditing(true)} className="text-left -mt-2">
+          <h1 className="text-[1.85rem] sm:text-[2.1rem] leading-[1.15] font-semibold tracking-tight text-[var(--text)] text-balance">{mission}</h1>
+          <p className="mt-3 text-[15px] text-[var(--text-muted)]">
+            <b className="text-[var(--text)] font-semibold" style={tnum}>{daysLeft} days</b> to launch · {format(new Date(targetDate), 'MMM d, yyyy')}
+          </p>
+        </button>
+      ) : (
+        <button
+          onClick={() => setEditing(true)}
+          className="text-left rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6 hover:border-[var(--border-strong)] transition-colors"
+          style={{ boxShadow: 'var(--shadow-sm)' }}
         >
-          <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--mission-soft)' }}>
-            <Zap className="w-5 h-5" style={{ color: 'var(--mission)' }} />
+          <span className="inline-flex w-10 h-10 rounded-xl items-center justify-center mb-3" style={{ background: 'var(--accent-soft)' }}>
+            <Rocket className="w-5 h-5" style={{ color: 'var(--accent)' }} />
           </span>
-          <span className="flex-1">
-            <span className="block text-sm font-semibold text-ink">Engage — deep work</span>
-            <span className="block text-xs text-ink-muted">{pomodoro.focusMins}-minute focus block on the mission</span>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Name your mission</h1>
+          <p className="text-[15px] text-[var(--text-muted)] mt-1">One goal you're working toward. Everything here orients to it.</p>
+        </button>
+      )}
+
+      {/* trajectory */}
+      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
+        <div className="flex items-center justify-between mb-4">
+          <Label>Trajectory</Label>
+          <span className="text-[12.5px] font-semibold flex items-center gap-1.5" style={{ color: tone.color }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: tone.color }} />
+            {tone.label}
           </span>
-          <ArrowUpRight className="w-5 h-5 text-ink-subtle" />
-        </motion.button>
-
-        <MemoriesCard />
-
-        <motion.div variants={rm ? undefined : rise}>
-          <span className="section-label">Launch log</span>
-          {wins.length ? (
-            <div className="mt-2 space-y-1.5">
-              {wins.map((w) => (
-                <div key={w.id} className="flex items-center gap-2.5 text-sm">
-                  <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--success)' }} />
-                  <span className="text-ink truncate flex-1">{w.title}</span>
-                  <span className="text-xs text-ink-subtle shrink-0">{formatDistanceToNow(new Date(w.at), { addSuffix: true })}</span>
-                </div>
-              ))}
+        </div>
+        {hasRoadmap ? (
+          <div className="flex items-center gap-5">
+            <div className="relative w-[104px] h-[104px] shrink-0">
+              <svg viewBox="0 0 104 104" width="104" height="104">
+                <circle cx="52" cy="52" r={R} fill="none" stroke="var(--border)" strokeWidth="8" />
+                <circle cx="52" cy="52" r={R} fill="none" stroke="var(--accent)" strokeWidth="8" strokeLinecap="round" transform="rotate(-90 52 52)" strokeDasharray={C} strokeDashoffset={C * (1 - actual / 100)} />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-[26px] font-bold tracking-tight text-[var(--text)]" style={tnum}>{actual}<span className="text-[15px]">%</span></span>
+                <span className="text-[10px] text-[var(--text-muted)]">complete</span>
+              </div>
             </div>
-          ) : (
-            <p className="mt-2 text-sm text-ink-subtle">Your completed steps will log here — proof of the climb.</p>
-          )}
-        </motion.div>
-      </motion.div>
+            <div className="flex-1 flex flex-col gap-3">
+              <div className="flex justify-between items-baseline text-[13px]">
+                <span className="text-[var(--text-muted)]">On-pace target</span>
+                <span className="font-semibold" style={tnum}>{expected}%</span>
+              </div>
+              <div className="flex justify-between items-baseline text-[13px]">
+                <span className="text-[var(--text-muted)]">Days remaining</span>
+                <span className="font-semibold" style={tnum}>{daysLeft}</span>
+              </div>
+              <p className="text-[12.5px] text-[var(--text-muted)] leading-relaxed">{briefing.detail}</p>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => navigate('/roadmap')} className="w-full text-left flex items-center gap-3 group">
+            <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--accent-soft)' }}>
+              <Rocket className="w-5 h-5" style={{ color: 'var(--accent)' }} />
+            </span>
+            <span className="flex-1">
+              <span className="block text-sm font-semibold text-[var(--text)]">Chart your trajectory</span>
+              <span className="block text-[13px] text-[var(--text-muted)]">Break the mission into a roadmap so I can track your pace.</span>
+            </span>
+            <ChevronRight className="w-5 h-5 text-[var(--text-subtle)] group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        )}
+      </section>
+
+      {/* next objective */}
+      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <Label>Next objective</Label>
+          {step?.context && <span className="text-xs text-[var(--text-subtle)]">{step.context}</span>}
+        </div>
+        {step ? (
+          <>
+            <p className="text-[19px] font-semibold tracking-tight leading-snug text-[var(--text)]">{step.title}</p>
+            <button
+              onClick={completeStep}
+              className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl py-3.5 text-[15px] font-semibold text-[var(--accent-text)] active:scale-[0.99] transition-transform"
+              style={{ background: 'var(--accent)' }}
+            >
+              <Check className="w-4 h-4" /> Mark complete
+            </button>
+          </>
+        ) : (
+          <p className="text-[15px] text-[var(--text-muted)]">Nothing queued. <button onClick={() => navigate('/roadmap')} className="font-semibold" style={{ color: 'var(--accent)' }}>Add your next step →</button></p>
+        )}
+      </section>
+
+      {/* telemetry */}
+      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] grid grid-cols-3" style={{ boxShadow: 'var(--shadow-sm)' }}>
+        {[
+          { n: String(daysLeft), s: '', l: 'Days left' },
+          { n: String(streak), s: ' day', l: 'Streak' },
+          { n: (focus7d / 60).toFixed(1), s: ' h', l: 'Focus · 7d' },
+        ].map((c, i) => (
+          <div key={c.l} className={`px-4 py-4 ${i > 0 ? 'border-l border-[var(--border)]' : ''}`}>
+            <div className="text-[22px] font-bold tracking-tight text-[var(--text)]" style={tnum}>{c.n}<span className="text-[13px] text-[var(--text-muted)] font-medium">{c.s}</span></div>
+            <div className="text-[11px] text-[var(--text-subtle)] mt-1">{c.l}</div>
+          </div>
+        ))}
+      </section>
+
+      {/* launch log */}
+      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
+        <h4 className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)] mb-4 flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5" /> Launch log
+        </h4>
+        {wins.length ? (
+          <div className="flex flex-col gap-4">
+            {wins.map((w) => (
+              <div key={w.id} className="flex gap-3">
+                <span className="w-[7px] h-[7px] rounded-full mt-[7px] shrink-0" style={{ background: 'var(--success)' }} />
+                <div>
+                  <div className="text-sm text-[var(--text)] leading-snug">{w.title}</div>
+                  <div className="text-[11.5px] text-[var(--text-subtle)] mt-0.5">{relTime(w.at, now)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--text-subtle)]">Your completed steps will appear here.</p>
+        )}
+      </section>
     </div>
   );
 }
