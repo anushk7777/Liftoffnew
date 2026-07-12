@@ -58,7 +58,7 @@ export function BottomSheet({
             }}
           >
             <div className="shrink-0 flex justify-center pt-3 pb-1" aria-hidden>
-              <span className="h-1.5 w-10 rounded-full bg-on-surface-variant/30" />
+              <span className="h-1.5 w-10 rounded-full bg-border-strong" />
             </div>
             {title && (
               <h2 className="px-5 pb-3 font-display text-lg font-bold text-ink">{title}</h2>

@@ -78,10 +78,10 @@ export function trajectoryTone(status: Briefing['status']): TrajectoryTone {
     case 'ahead':
       return { tone: 'ahead', label: 'Ahead of trajectory', color: 'var(--success)' };
     case 'on-track':
-      return { tone: 'on-track', label: 'On course', color: 'var(--mission)' };
+      return { tone: 'on-track', label: 'On course', color: 'var(--cozy)' };
     case 'behind':
       return { tone: 'behind', label: 'Drifting — burn to correct', color: 'var(--warning)' };
     default:
-      return { tone: 'idle', label: 'Pre-launch', color: 'var(--mission)' };
+      return { tone: 'idle', label: 'Pre-launch', color: 'var(--cozy)' };
   }
 }

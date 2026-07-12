@@ -145,7 +145,7 @@ export default function Tasks() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setDay((d) => startOfDay(addDays(d, -1)))}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-white/5 transition-colors"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-hover transition-colors"
             title="Previous day"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -156,7 +156,7 @@ export default function Tasks() {
           </div>
           <button
             onClick={() => setDay((d) => startOfDay(addDays(d, 1)))}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-white/5 transition-colors"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-hover transition-colors"
             title="Next day"
           >
             <ChevronRight className="w-5 h-5" />
@@ -165,7 +165,7 @@ export default function Tasks() {
         {!viewingToday && (
           <button
             onClick={() => setDay(startOfDay(new Date()))}
-            className="text-xs font-label-caps px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            className="text-xs font-label-caps px-3 py-1.5 rounded-lg border border-cozy bg-cozy-soft text-primary hover:bg-accent-soft transition-colors"
           >
             Today
           </button>
@@ -174,7 +174,7 @@ export default function Tasks() {
           <span className="font-mono-data text-xs text-on-surface-variant">
             {doneToday.length}/{total} done
           </span>
-          <div className="w-28 h-2 rounded-full bg-white/5 overflow-hidden">
+          <div className="w-28 h-2 rounded-full bg-hover overflow-hidden">
             <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
         </div>
@@ -182,14 +182,14 @@ export default function Tasks() {
 
       {/* Capture box for the selected day */}
       <div className="relative group mb-6">
-        <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/40 to-secondary/40 rounded-2xl blur opacity-0 group-focus-within:opacity-40 transition duration-500" />
-        <div className="relative glass-panel rounded-2xl flex items-center p-2 pl-5 ring-1 ring-white/10 focus-within:ring-primary/40">
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-cozy-soft to-cozy-soft rounded-2xl blur opacity-0 group-focus-within:opacity-40 transition duration-500" />
+        <div className="relative glass-panel rounded-2xl flex items-center p-2 pl-5 ring-1 ring-border focus-within:ring-cozy">
           <input
             value={quick}
             onChange={(e) => setQuick(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addForDay()}
             placeholder={viewingToday ? 'Capture a task for today…' : `Capture a task for ${format(day, 'MMM d')}…`}
-            className="flex-1 bg-transparent border-none focus:ring-0 text-base text-on-surface placeholder:text-on-surface-variant/40"
+            className="flex-1 bg-transparent border-none focus:ring-0 text-base text-on-surface placeholder:text-text-subtle"
           />
           <button
             onClick={addForDay}
@@ -212,10 +212,10 @@ export default function Tasks() {
               const items = scheduled.filter((t) => new Date(t.scheduledAt!).getHours() === h);
               return (
                 <div key={h} className="flex gap-3 group/hour animate-rise" style={{ animationDelay: `${(h - hours[0]) * 22}ms` }}>
-                  <div className="w-14 shrink-0 text-right pt-2 font-mono-data text-[11px] text-on-surface-variant/60">
+                  <div className="w-14 shrink-0 text-right pt-2 font-mono-data text-[11px] text-text-subtle">
                     {hourLabel(h)}
                   </div>
-                  <div className="flex-1 border-l border-white/10 pl-3 min-h-[3.25rem] py-2 space-y-2">
+                  <div className="flex-1 border-l border-border pl-3 min-h-[3.25rem] py-2 space-y-2">
                     {items.map((t) => (
                       <ScheduledItem
                         key={t.id}
@@ -227,7 +227,7 @@ export default function Tasks() {
                     ))}
                     <button
                       onClick={() => openNew({ scheduledAt: atHour(h).toISOString(), dueDate: dayISO, priority: 'medium' })}
-                      className="opacity-0 group-hover/hour:opacity-100 transition-opacity text-xs text-on-surface-variant/60 hover:text-primary inline-flex items-center gap-1"
+                      className="opacity-0 group-hover/hour:opacity-100 transition-opacity text-xs text-text-subtle hover:text-primary inline-flex items-center gap-1"
                     >
                       <Plus className="w-3.5 h-3.5" /> add at {hourLabel(h)}
                     </button>
@@ -245,7 +245,7 @@ export default function Tasks() {
               <Clock className="w-4 h-4" /> No time set · {unscheduled.length}
             </h3>
             {unscheduled.length === 0 ? (
-              <p className="text-sm text-on-surface-variant/50 py-2">Everything for this day has a time block.</p>
+              <p className="text-sm text-text-subtle py-2">Everything for this day has a time block.</p>
             ) : (
               <div className="space-y-2">
                 {unscheduled.map((t) => (
@@ -268,7 +268,7 @@ export default function Tasks() {
               <Inbox className="w-4 h-4" /> Backlog · {backlog.length}
             </h3>
             {backlog.length === 0 ? (
-              <p className="text-sm text-on-surface-variant/50 py-2">No undated tasks waiting.</p>
+              <p className="text-sm text-text-subtle py-2">No undated tasks waiting.</p>
             ) : (
               <div className="space-y-2">
                 {backlog.slice(0, 12).map((t) => (
@@ -330,10 +330,10 @@ function StatusToggle({ status, onToggle }: { status: Status; onToggle: () => vo
       className={cn(
         'mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all hover:scale-110 active:scale-95',
         done
-          ? 'bg-primary border-primary text-on-primary shadow-[0_0_10px_rgba(192,193,255,0.5)]'
+          ? 'bg-primary border-primary text-on-primary shadow-none'
           : status === 'doing'
-            ? 'border-secondary text-secondary bg-secondary/10'
-            : 'border-on-surface-variant/40 text-transparent hover:border-primary bg-black/20',
+            ? 'border-secondary text-secondary bg-cozy-soft'
+            : 'border-border-strong text-transparent hover:border-primary bg-elevated',
       )}
     >
       <Check className="w-3 h-3" />
@@ -353,7 +353,7 @@ function ScheduledItem({
   onUnschedule: () => void;
 }) {
   return (
-    <div className="group/item glass-panel rounded-xl px-3 py-2 flex items-center gap-3 hover:border-primary/40 transition-colors">
+    <div className="group/item glass-panel rounded-xl px-3 py-2 flex items-center gap-3 hover:border-border-strong transition-colors">
       <StatusToggle status={task.status} onToggle={onToggle} />
       <span className="font-mono-data text-[11px] text-primary w-14 shrink-0">{format(new Date(task.scheduledAt!), 'h:mm a')}</span>
       <PriorityDot priority={task.priority} />
@@ -387,12 +387,12 @@ function LooseItem({
 }) {
   const done = task.status === 'done';
   return (
-    <div className="group/item glass-panel rounded-xl px-3 py-2 flex items-center gap-3 hover:border-primary/40 transition-colors">
+    <div className="group/item glass-panel rounded-xl px-3 py-2 flex items-center gap-3 hover:border-border-strong transition-colors">
       <StatusToggle status={task.status} onToggle={onToggle} />
       <PriorityDot priority={task.priority} />
       <button
         onClick={onEdit}
-        className={cn('flex-1 min-w-0 text-left text-sm truncate', done ? 'line-through text-on-surface-variant/50' : 'text-on-surface hover:text-primary')}
+        className={cn('flex-1 min-w-0 text-left text-sm truncate', done ? 'line-through text-text-subtle' : 'text-on-surface hover:text-primary')}
       >
         {task.title}
       </button>
@@ -403,7 +403,7 @@ function LooseItem({
               key={q.hour}
               onClick={() => onSchedule(q.hour)}
               title={`Schedule at ${hourLabel(q.hour)}`}
-              className="font-mono-data text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-on-surface-variant hover:bg-primary/20 hover:text-primary transition-colors"
+              className="font-mono-data text-[10px] px-1.5 py-0.5 rounded bg-hover text-on-surface-variant hover:bg-accent-soft hover:text-primary transition-colors"
             >
               {q.label}
             </button>
@@ -429,7 +429,7 @@ function BacklogItem({
   onEdit: () => void;
 }) {
   return (
-    <div className="group/item glass-panel rounded-xl px-3 py-2 flex items-center gap-2 hover:border-primary/40 transition-colors">
+    <div className="group/item glass-panel rounded-xl px-3 py-2 flex items-center gap-2 hover:border-border-strong transition-colors">
       <PriorityDot priority={task.priority} />
       <button onClick={onEdit} className="flex-1 min-w-0 text-left text-sm text-on-surface hover:text-primary truncate">
         {task.title}
@@ -437,7 +437,7 @@ function BacklogItem({
       <button
         onClick={onMove}
         title={`Move to ${dayLabel}`}
-        className="shrink-0 inline-flex items-center gap-1 font-mono-data text-[10px] px-2 py-1 rounded-lg bg-white/5 text-on-surface-variant hover:bg-primary/20 hover:text-primary transition-colors"
+        className="shrink-0 inline-flex items-center gap-1 font-mono-data text-[10px] px-2 py-1 rounded-lg bg-hover text-on-surface-variant hover:bg-accent-soft hover:text-primary transition-colors"
       >
         <CornerDownRight className="w-3 h-3" /> {dayLabel}
       </button>

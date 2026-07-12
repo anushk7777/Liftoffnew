@@ -32,6 +32,10 @@
     --success: #4f9472;
     --warning: #b1823f;
 
+    /* Cozy caramel — Focus's single warm highlight (redefined in its scope). */
+    --cozy: #b0703c;
+    --cozy-soft: rgba(176, 112, 60, 0.13);
+
     /* Afterburn signature ember — used ONLY to highlight key progress metrics
        (PRs, momentum verdict, trend charts, rest timer), never the whole UI. */
     --ember: #f2562a;
@@ -76,54 +80,97 @@
   }
 
   /* ============================================================
-     Focus "Daylight" — the productivity workspace's own identity:
-     a calm warm-paper surface with a single deep-blue accent. Scoped
-     to the Focus shell so it stays light + premium regardless of the
-     global light/dark toggle (Afterburn/Kairos keep their own looks).
+     Focus — TWO colors only: ink (black) + one cozy caramel.
+     Ink carries every primary action; cozy is the single warm
+     highlight (active states, progress, "today"). Neutrals are
+     warm paper in light / warm charcoal in dark. Scoped to the
+     Focus shell; Afterburn (ember) & Kairos (dusk) keep theirs.
      ============================================================ */
   .focus-daylight {
-    --bg: #f6f5f1;
+    --bg: #f7f5f1;
     --surface: #ffffff;
-    --elevated: #f1efe9;
-    --sidebar: #f2f1ec;
-    --border: #e8e6df;
-    --border-strong: #dad7cf;
-    --hover: rgba(30, 40, 70, 0.045);
-    --hover-strong: rgba(30, 40, 70, 0.08);
+    --elevated: #f0ede7;
+    --sidebar: #f2f0ea;
+    --border: #e8e5de;
+    --border-strong: #d8d4cb;
+    --hover: rgba(40, 35, 25, 0.05);
+    --hover-strong: rgba(40, 35, 25, 0.09);
 
-    --text: #1b1a16;
-    --text-muted: #78756c;
-    --text-subtle: #a7a49b;
-    --ink: #1b1a16;
-    --ink-muted: #78756c;
-    --ink-subtle: #a7a49b;
+    --text: #1c1a16;
+    --text-muted: #7a766c;
+    --text-subtle: #a8a499;
 
-    /* single accent — a deep, muted, trustworthy blue */
-    --accent: #35528a;
-    --accent-hover: #2b4576;
-    --accent-soft: #eaeef6;
+    /* color 1 — ink. Every primary action is black. */
+    --accent: #1c1a16;
+    --accent-hover: #000000;
+    --accent-soft: rgba(28, 26, 22, 0.07);
     --accent-text: #ffffff;
-    --primary: #35528a;
+    --primary: #1c1a16;
     --on-primary: #ffffff;
 
-    --success: #3f7d5c;
-    --warning: #b1823f;
-    --danger: #c25563;
+    /* color 2 — cozy caramel. The one warm highlight. */
+    --cozy: #b0703c;
+    --cozy-soft: rgba(176, 112, 60, 0.13);
+
+    --success: #4f7d5f;
+    --warning: #ad8040;
+    --danger: #bd5b5b;
 
     --glow: rgba(0, 0, 0, 0.05);
     --card-grad: #ffffff;
     --card-grad-strong: #ffffff;
 
-    --shadow-sm: 0 1px 2px rgba(20, 22, 30, 0.05);
-    --shadow-md: 0 6px 22px rgba(20, 22, 30, 0.06);
-    --shadow-lg: 0 18px 50px rgba(20, 22, 30, 0.09);
-    --shadow-hover: 0 22px 55px rgba(20, 22, 30, 0.12);
+    --shadow-sm: 0 1px 2px rgba(25, 22, 16, 0.05);
+    --shadow-md: 0 6px 22px rgba(25, 22, 16, 0.06);
+    --shadow-lg: 0 18px 50px rgba(25, 22, 16, 0.09);
+    --shadow-hover: 0 22px 55px rgba(25, 22, 16, 0.12);
 
     color-scheme: light;
     background: var(--bg);
     color: var(--text);
   }
-  /* The dark decorative atmosphere layers read as a grey smudge on paper — mute them. */
+  /* Dark mode for Focus — warm charcoal (not blue-black), ink flips to
+     off-white, cozy warms up so it glows gently against the dark. */
+  .dark .focus-daylight {
+    --bg: #141311;
+    --surface: #1c1b18;
+    --elevated: #262420;
+    --sidebar: #191815;
+    --border: #2c2a25;
+    --border-strong: #3b382f;
+    --hover: rgba(255, 250, 240, 0.05);
+    --hover-strong: rgba(255, 250, 240, 0.09);
+
+    --text: #f2efe9;
+    --text-muted: #9b968a;
+    --text-subtle: #6b675d;
+
+    --accent: #f2efe9;
+    --accent-hover: #ffffff;
+    --accent-soft: rgba(242, 239, 233, 0.1);
+    --accent-text: #171512;
+    --primary: #f2efe9;
+    --on-primary: #171512;
+
+    --cozy: #d99a63;
+    --cozy-soft: rgba(217, 154, 99, 0.15);
+
+    --success: #8db895;
+    --warning: #d3a866;
+    --danger: #d98a8a;
+
+    --glow: rgba(255, 255, 255, 0.07);
+    --card-grad: #1c1b18;
+    --card-grad-strong: #1c1b18;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 6px 22px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.45);
+    --shadow-hover: 0 22px 55px rgba(0, 0, 0, 0.55);
+
+    color-scheme: dark;
+  }
+  /* The decorative atmosphere layers read as smudges on flat surfaces — mute them. */
   .focus-daylight .radial-atmosphere { display: none; }
 
   /* Dark theme — Monochrome Editorial (layered blacks + ink-on-white accents) */
@@ -149,6 +196,9 @@
     --danger: #d98a8a;
     --success: #8fbf9a;
     --warning: #d9b06a;
+
+    --cozy: #d99a63;
+    --cozy-soft: rgba(217, 154, 99, 0.15);
 
     /* Ember stays brand-orange in both themes; a touch stronger soft-fill on dark. */
     --ember: #ff6a3d;

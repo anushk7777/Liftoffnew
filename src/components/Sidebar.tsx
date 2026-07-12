@@ -38,7 +38,7 @@ export default function Sidebar({
   const { pathname } = useLocation();
 
   return (
-    <nav className="flex flex-col h-full py-6 px-4 w-64 bg-[var(--bg)] border-r border-white/5 z-50 transition-colors duration-300">
+    <nav className="flex flex-col h-full py-6 px-4 w-64 bg-[var(--bg)] border-r border-border z-50 transition-colors duration-300">
       {/* Brand / Header */}
       <div className="flex items-center gap-3 mb-10 pl-2 text-[var(--text)]">
         <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true" className="shrink-0">
@@ -80,7 +80,7 @@ export default function Sidebar({
       </ul>
 
       {/* Footer Tabs */}
-      <div className="mt-auto pt-4 space-y-3 border-t border-white/5">
+      <div className="mt-auto pt-4 space-y-3 border-t border-border">
         <button
           onClick={() => setAppMode('afterburn')}
           className="mode-switch mode-switch-ember w-full justify-center"
