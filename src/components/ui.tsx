@@ -48,7 +48,7 @@ export function PageHeader({
           </div>
         )}
         <div>
-          <h1 className="font-display text-2xl sm:text-[28px] font-bold tracking-tight text-ink">
+          <h1 className="text-2xl sm:text-[28px] font-bold tracking-[-0.02em] text-ink">
             {title}
           </h1>
           {subtitle && <p className="text-sm text-ink-muted mt-1">{subtitle}</p>}

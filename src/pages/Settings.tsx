@@ -21,6 +21,7 @@ import type { AiModelId } from '../lib/aicoach';
 import { useAppMode } from '../afterburn/mode';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
+import { DateTimePicker } from '../components/DateTimePicker';
 
 export default function Settings() {
   const {
@@ -154,11 +155,12 @@ export default function Settings() {
                 </button>
               );
             })}
-            <input
-              type="date"
+            <DateTimePicker
+              mode="date"
+              clearable={false}
+              placeholder="Custom date"
               value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-              className="input !w-auto !py-1.5 !px-3 text-xs"
+              onChange={(v) => v && setTargetDate(v)}
             />
           </div>
         </Section>

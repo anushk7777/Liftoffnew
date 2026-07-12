@@ -12,6 +12,13 @@ interface DateTimePickerProps {
   value: string; // "yyyy-MM-ddTHH:mm:ss" local, or "" for none
   onChange: (val: string) => void;
   className?: string;
+  /** 'datetime' (default) shows the time wheels; 'date' is a calendar-only
+   *  picker that emits "yyyy-MM-dd". */
+  mode?: 'datetime' | 'date';
+  /** Label shown on the trigger chip before a date is chosen. */
+  placeholder?: string;
+  /** Hide the clear (×) affordance — for required fields like a goal date. */
+  clearable?: boolean;
 }
 
 const ITEM_H = 36; // px — one wheel row
@@ -77,11 +84,21 @@ function Wheel({ items, index, onIndex }: { items: string[]; index: number; onIn
  *  calendar and an iOS-style three-wheel time picker (hours / minutes / AM-PM).
  *  Fully themed for light+dark, no native inputs, fixed width (never stretches).
  *  Emits local "yyyy-MM-ddTHH:mm:ss"; a date with no time is T00:00:00. */
-export function DateTimePicker({ value, onChange, className }: DateTimePickerProps) {
+export function DateTimePicker({
+  value,
+  onChange,
+  className,
+  mode = 'datetime',
+  placeholder = 'Pick a date',
+  clearable = true,
+}: DateTimePickerProps) {
   const rm = useReducedMotion();
-  const parsed = value ? new Date(value) : null;
+  const dateOnly = mode === 'date';
+  // In date mode the value is a bare "yyyy-MM-dd"; parse it at local noon so a
+  // negative UTC offset can't roll it back a day.
+  const parsed = value ? new Date(dateOnly ? `${value}T12:00:00` : value) : null;
   const selected = parsed && isValid(parsed) ? parsed : null;
-  const hasTime = !!selected && !(selected.getHours() === 0 && selected.getMinutes() === 0);
+  const hasTime = !dateOnly && !!selected && !(selected.getHours() === 0 && selected.getMinutes() === 0);
 
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState<Date>(() => startOfMonth(selected ?? new Date()));
@@ -98,12 +115,13 @@ export function DateTimePicker({ value, onChange, className }: DateTimePickerPro
   }, [viewMonth]);
 
   const emit = (d: Date, withTime: boolean) =>
-    onChange(`${format(d, 'yyyy-MM-dd')}T${withTime ? format(d, 'HH:mm') : '00:00'}:00`);
+    onChange(dateOnly ? format(d, 'yyyy-MM-dd') : `${format(d, 'yyyy-MM-dd')}T${withTime ? format(d, 'HH:mm') : '00:00'}:00`);
 
   const pickDay = (day: Date) => {
     const next = new Date(day);
     if (selected && hasTime) next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
     emit(next, !!selected && hasTime);
+    if (dateOnly) setOpen(false);
   };
 
   // Wheel indices ← current value (defaults 9:00 AM until a time is chosen).
@@ -135,10 +153,10 @@ export function DateTimePicker({ value, onChange, className }: DateTimePickerPro
           )}
         >
           <CalendarDays className="w-4 h-4" style={{ color: selected ? 'var(--cozy)' : undefined }} />
-          {selected ? dayChipLabel(selected) : 'Pick a date'}
+          {selected ? (dateOnly ? format(selected, 'MMM d, yyyy') : dayChipLabel(selected)) : placeholder}
         </button>
 
-        {selected && (
+        {selected && !dateOnly && (
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -149,7 +167,7 @@ export function DateTimePicker({ value, onChange, className }: DateTimePickerPro
           </button>
         )}
 
-        {selected && (
+        {selected && clearable && (
           <button
             type="button"
             onClick={() => { onChange(''); setOpen(false); }}
@@ -220,6 +238,7 @@ export function DateTimePicker({ value, onChange, className }: DateTimePickerPro
             </div>
 
             {/* Time — iOS-style snap wheels */}
+            {!dateOnly && (
             <div className="border-t border-[var(--border)] px-3 py-3">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10.5px] font-bold tracking-[0.08em] uppercase text-[var(--text-subtle)] flex items-center gap-1.5">
@@ -253,8 +272,10 @@ export function DateTimePicker({ value, onChange, className }: DateTimePickerPro
                 <Wheel items={MERIDIEM} index={apIdx} onIndex={(i) => setWheels(hourIdx, minIdx, i)} />
               </div>
             </div>
+            )}
 
             {/* Done */}
+            {!dateOnly && (
             <div className="flex justify-end px-3 pb-3">
               <button type="button" onClick={() => setOpen(false)}
                 className="rounded-full px-4 py-1.5 text-[12.5px] font-bold text-[var(--accent-text)] active:scale-95 transition-transform"
@@ -262,6 +283,7 @@ export function DateTimePicker({ value, onChange, className }: DateTimePickerPro
                 Done
               </button>
             </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

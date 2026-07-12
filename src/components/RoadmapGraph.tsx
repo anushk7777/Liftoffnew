@@ -92,48 +92,50 @@ const getLayoutedElements = (nodes: RoadmapNodeT[], edges: Edge[], direction = '
 
 // --- Custom Node ---
 function RoadmapNode({ data }: NodeProps<RoadmapNodeT>) {
-  const bgColor = {
-    yellow: 'bg-[#ffedb3] border-[#f5d76e] text-amber-900',
-    blue: 'bg-[#d0ebff] border-[#a5d8ff] text-blue-900',
-    green: 'bg-[#d3f9d8] border-[#b2f2bb] text-green-900',
-    lime: 'bg-[#e9fac8] border-[#c0eb75] text-lime-900',
-    purple: 'bg-[#eebefa] border-[#d0bfff] text-purple-900',
-  }[data.color];
-
+  // Two-color system: every node is the same neutral card; the cozy left-edge
+  // marks a project (vs a course), and completed nodes fill ink.
+  const isProject = data.type?.toLowerCase() === 'project';
   return (
     <div
       className={cn(
-        'relative px-4 py-3 rounded-lg border-2 shadow-sm min-w-[240px] max-w-[260px] cursor-pointer hover:shadow-md transition-shadow',
-        bgColor,
-        data.completed ? 'opacity-60 grayscale' : 'opacity-100'
+        'relative px-4 py-3 rounded-xl border min-w-[240px] max-w-[260px] cursor-pointer transition-all',
+        data.completed ? 'opacity-70' : 'hover:-translate-y-0.5',
       )}
+      style={{
+        background: 'var(--surface)',
+        borderColor: 'var(--border)',
+        borderLeft: `3px solid ${isProject ? 'var(--cozy)' : 'var(--border-strong)'}`,
+        boxShadow: 'var(--shadow-sm)',
+        color: 'var(--text)',
+      }}
     >
       <Handle type="target" position={Position.Top} className="opacity-0" />
-      
+
       {data.tag && (
-        <div className="absolute -top-3 left-2 bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded-full font-semibold shadow-sm z-10 whitespace-nowrap">
+        <div className="absolute -top-2.5 left-2 text-[10px] px-2 py-0.5 rounded-full font-semibold z-10 whitespace-nowrap"
+          style={{ background: 'var(--cozy)', color: '#fff' }}>
           {data.tag}
         </div>
       )}
 
       {data.completed && (
-        <div className="absolute -right-2 -top-2 bg-success text-white p-1 rounded-full shadow-sm z-10">
+        <div className="absolute -right-2 -top-2 p-1 rounded-full z-10" style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}>
           <Check className="w-3 h-3" />
         </div>
       )}
 
       <div className="flex flex-col gap-1">
-        <h3 className={cn('font-display font-semibold text-sm leading-tight', data.completed && 'line-through')}>
+        <h3 className={cn('font-semibold text-sm leading-tight', data.completed && 'line-through')} style={{ color: 'var(--text)' }}>
           {data.label}
         </h3>
-        {data.subLabel && <p className="text-xs opacity-80 leading-tight">{data.subLabel}</p>}
-        
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-black/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">
+        {data.subLabel && <p className="text-xs leading-tight" style={{ color: 'var(--text-muted)' }}>{data.subLabel}</p>}
+
+        <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: isProject ? 'var(--cozy)' : 'var(--text-subtle)' }}>
             {data.type}
           </span>
           {data.added && (
-             <span className="text-[10px] font-medium bg-black/5 px-1.5 rounded">In Tasks</span>
+            <span className="text-[10px] font-medium px-1.5 rounded" style={{ background: 'var(--hover)', color: 'var(--text-muted)' }}>In Tasks</span>
           )}
         </div>
       </div>

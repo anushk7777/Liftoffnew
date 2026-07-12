@@ -38,15 +38,15 @@ export function Sparkline({
     >
       <defs>
         <linearGradient id={`sl-${id}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.28} />
-          <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+          <stop offset="0%" stopColor="var(--cozy)" stopOpacity={0.3} />
+          <stop offset="100%" stopColor="var(--cozy)" stopOpacity={0} />
         </linearGradient>
       </defs>
       <path d={area} fill={`url(#sl-${id})`} className={rm ? undefined : 'chart-area-in'} />
       <path
         d={line}
         fill="none"
-        stroke="var(--accent)"
+        stroke="var(--cozy)"
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -76,8 +76,8 @@ export function MiniBars({
         {data.map((d, i) => (
           <div key={i} className="flex-1 flex flex-col justify-end" title={`${d.label}: ${d.value}`}>
             <div
-              className={`rounded-t-md bg-accent/85 hover:bg-accent transition-colors origin-bottom ${rm ? '' : 'chart-bar-grow'}`}
-              style={{ height: `${Math.max(2, (d.value / max) * 100)}%`, animationDelay: rm ? undefined : `${i * 35}ms` }}
+              className={`rounded-t-md origin-bottom ${rm ? '' : 'chart-bar-grow'}`}
+              style={{ height: `${Math.max(2, (d.value / max) * 100)}%`, background: 'var(--cozy)', animationDelay: rm ? undefined : `${i * 35}ms` }}
             />
           </div>
         ))}
