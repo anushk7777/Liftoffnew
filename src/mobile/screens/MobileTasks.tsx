@@ -27,7 +27,7 @@ function dueMeta(t: TodoTask): { text: string; tone: string } | null {
   if (!t.dueDate) return null;
   const d = new Date(t.dueDate);
   if (t.status !== 'done' && isPast(d) && !isToday(d)) return { text: `Overdue · ${format(d, 'MMM d')}`, tone: 'var(--danger)' };
-  if (isToday(d)) return { text: 'Today', tone: 'var(--accent)' };
+  if (isToday(d)) return { text: 'Today', tone: 'var(--cozy)' };
   if (isTomorrow(d)) return { text: 'Tomorrow', tone: 'var(--text-muted)' };
   return { text: `Due ${format(d, 'MMM d')}`, tone: 'var(--text-muted)' };
 }
@@ -44,13 +44,13 @@ function Checkbox({ status, onClick }: { status: string; onClick: () => void }) 
       <span
         className={cn('w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-colors')}
         style={{
-          borderColor: done ? 'var(--accent)' : doing ? 'var(--accent)' : 'var(--border-strong)',
+          borderColor: done ? 'var(--accent)' : doing ? 'var(--cozy)' : 'var(--border-strong)',
           background: done ? 'var(--accent)' : 'transparent',
           color: 'var(--accent-text)',
         }}
       >
         {done && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
-        {doing && <span className="w-2 h-2 rounded-full" style={{ background: 'var(--accent)' }} />}
+        {doing && <span className="w-2 h-2 rounded-full" style={{ background: 'var(--cozy)' }} />}
       </span>
     </button>
   );

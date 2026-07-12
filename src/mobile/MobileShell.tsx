@@ -130,7 +130,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
         animate={{ scale: 1, rotate: 0 }}
         transition={pop}
         whileTap={rm ? undefined : { scale: 0.85 }}
-        className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-40 w-14 h-14 rounded-full bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex items-center justify-center"
+        className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-40 w-14 h-14 rounded-full bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center"
       >
         <Plus className="w-7 h-7" />
       </motion.button>
@@ -147,14 +147,14 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
               onClick={() => haptics.tap()}
               className={cn(
                 'relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[11px] font-medium',
-                isActive ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]',
+                isActive ? 'text-[var(--cozy)]' : 'text-[var(--text-muted)]',
               )}
             >
               {isActive && (
                 <motion.span
                   layoutId="mobile-tab-pill"
                   transition={rm ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }}
-                  className="absolute top-1.5 w-14 h-7 rounded-full" style={{ background: 'var(--accent-soft)' }}
+                  className="absolute top-1.5 w-14 h-7 rounded-full" style={{ background: 'var(--cozy-soft)' }}
                 />
               )}
               <motion.span
@@ -172,7 +172,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
           onClick={() => setMoreOpen(true)}
           className={cn(
             'flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[11px] font-medium',
-            MORE_LINKS.some((l) => l.to === location.pathname) ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]',
+            MORE_LINKS.some((l) => l.to === location.pathname) ? 'text-[var(--cozy)]' : 'text-[var(--text-muted)]',
           )}
         >
           <MoreHorizontal className="w-5 h-5" />
@@ -188,7 +188,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
               onClick={() => go(to)}
               className={cn(
                 'card flex flex-col items-center justify-center gap-2 py-5 active:scale-95 transition-transform',
-                location.pathname === to && 'border-primary/40 text-primary',
+                location.pathname === to && 'border-border-strong text-primary',
               )}
             >
               <Icon className="w-6 h-6" />

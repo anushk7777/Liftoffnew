@@ -116,8 +116,8 @@ export default function MissionControl() {
           className="text-left rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6 hover:border-[var(--border-strong)] transition-colors"
           style={{ boxShadow: 'var(--shadow-sm)' }}
         >
-          <span className="inline-flex w-10 h-10 rounded-xl items-center justify-center mb-3" style={{ background: 'var(--accent-soft)' }}>
-            <Rocket className="w-5 h-5" style={{ color: 'var(--accent)' }} />
+          <span className="inline-flex w-10 h-10 rounded-xl items-center justify-center mb-3" style={{ background: 'var(--cozy-soft)' }}>
+            <Rocket className="w-5 h-5" style={{ color: 'var(--cozy)' }} />
           </span>
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Name your mission</h1>
           <p className="text-[15px] text-[var(--text-muted)] mt-1">One goal you're working toward. Everything here orients to it.</p>
@@ -138,7 +138,7 @@ export default function MissionControl() {
             <div className="relative w-[104px] h-[104px] shrink-0">
               <svg viewBox="0 0 104 104" width="104" height="104">
                 <circle cx="52" cy="52" r={R} fill="none" stroke="var(--border)" strokeWidth="8" />
-                <circle cx="52" cy="52" r={R} fill="none" stroke="var(--accent)" strokeWidth="8" strokeLinecap="round" transform="rotate(-90 52 52)" strokeDasharray={C} strokeDashoffset={C * (1 - actual / 100)} />
+                <circle cx="52" cy="52" r={R} fill="none" stroke="var(--cozy)" strokeWidth="8" strokeLinecap="round" transform="rotate(-90 52 52)" strokeDasharray={C} strokeDashoffset={C * (1 - actual / 100)} />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-[26px] font-bold tracking-tight text-[var(--text)]" style={tnum}>{actual}<span className="text-[15px]">%</span></span>
@@ -189,7 +189,7 @@ export default function MissionControl() {
             </button>
           </>
         ) : (
-          <p className="text-[15px] text-[var(--text-muted)]">Nothing queued. <button onClick={() => navigate('/roadmap')} className="font-semibold" style={{ color: 'var(--accent)' }}>Add your next step →</button></p>
+          <p className="text-[15px] text-[var(--text-muted)]">Nothing queued. <button onClick={() => navigate('/roadmap')} className="font-semibold" style={{ color: 'var(--cozy)' }}>Add your next step →</button></p>
         )}
       </section>
 

@@ -68,7 +68,7 @@ export default function MobileRoadmap() {
                           >
                             <span className={cn(
                               'w-5 h-5 rounded-full border flex items-center justify-center',
-                              task.completed ? 'bg-accent border-accent text-[var(--accent-text)]' : 'border-on-surface-variant/50',
+                              task.completed ? 'bg-accent border-accent text-[var(--accent-text)]' : 'border-border-strong',
                             )}>
                               {task.completed && <Check className="w-3.5 h-3.5" />}
                             </span>

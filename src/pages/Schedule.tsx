@@ -169,7 +169,7 @@ export default function Schedule() {
                   </div>
                   <button
                     onClick={() => scheduleTask(task.id, selectedDate)}
-                    className="p-1.5 rounded-md bg-hover text-text-muted hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-1.5 rounded-md bg-hover text-text-muted hover:text-primary hover:bg-cozy-soft transition-colors opacity-0 group-hover:opacity-100"
                     title={`Schedule for ${format(selectedDate, 'MMM d')}`}
                   >
                     <Plus className="w-4 h-4" />
