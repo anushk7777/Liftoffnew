@@ -584,47 +584,61 @@ function TaskForm({
           />
         </div>
 
-        {/* Compact row: Priority + Status + Category + Estimate */}
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex items-center gap-1">
-            {(['low', 'medium', 'high'] as Priority[]).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPriority(p)}
-                className={cn(
-                  'px-2 py-1 rounded-md text-xs font-medium capitalize transition-colors',
-                  priority === p
-                    ? p === 'high' ? 'bg-danger/20 text-danger border border-danger/30'
-                      : p === 'medium' ? 'bg-warning/20 text-warning border border-warning/30'
-                      : 'bg-elevated text-ink-muted border border-border'
-                    : 'bg-transparent text-ink-subtle hover:bg-hover border border-transparent',
-                )}
-              >
-                {p}
-              </button>
-            ))}
+        {/* Priority + status as segmented chips (no native selects) */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex p-0.5 rounded-full bg-elevated border border-border">
+            {(['low', 'medium', 'high'] as Priority[]).map((p) => {
+              const dot = p === 'high' ? 'var(--danger)' : p === 'medium' ? 'var(--warning)' : 'var(--text-subtle)';
+              const sel = priority === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPriority(p)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold capitalize transition-colors',
+                    sel ? 'text-[var(--text)]' : 'text-[var(--text-muted)]',
+                  )}
+                  style={sel ? { background: 'var(--surface)', boxShadow: 'var(--shadow-sm)' } : undefined}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot }} />
+                  {p}
+                </button>
+              );
+            })}
           </div>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as Status)}
-            className="input !w-auto !py-1 !px-2 text-xs"
-          >
-            <option value="todo">To do</option>
-            <option value="doing">In progress</option>
-            <option value="done">Done</option>
-          </select>
+          <div className="flex p-0.5 rounded-full bg-elevated border border-border">
+            {([['todo', 'To do'], ['doing', 'Doing'], ['done', 'Done']] as [Status, string][]).map(([s, label]) => {
+              const sel = status === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatus(s)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-semibold transition-colors',
+                    sel ? 'text-[var(--text)]' : 'text-[var(--text-muted)]',
+                  )}
+                  style={sel ? { background: 'var(--surface)', boxShadow: 'var(--shadow-sm)' } : undefined}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <input
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             placeholder="Category"
-            className="input !w-24 !py-1 !px-2 text-xs"
+            className="input !w-28 !py-1.5 !px-3 !rounded-full text-xs"
           />
           <input
             value={estimate}
             onChange={(e) => setEstimate(e.target.value)}
-            placeholder="⏱ Est."
-            className="input !w-20 !py-1 !px-2 text-xs"
+            placeholder="Estimate (30m)"
+            className="input !w-36 !py-1.5 !px-3 !rounded-full text-xs"
           />
         </div>
 
