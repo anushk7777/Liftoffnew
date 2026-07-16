@@ -86,87 +86,96 @@
      warm paper in light / warm charcoal in dark. Scoped to the
      Focus shell; Afterburn (ember) & Kairos (dusk) keep theirs.
      ============================================================ */
+  /* Liftoff / Focus — Obsidian: electric indigo primary + a soft-violet
+     secondary. Geist carries the whole workspace (scoped here so Kairos &
+     Afterburn keep their own type + colour identities). */
   .focus-daylight {
-    --bg: #f7f5f1;
+    --bg: #fafafb;
     --surface: #ffffff;
-    --elevated: #f0ede7;
-    --sidebar: #f2f0ea;
-    --border: #e8e5de;
-    --border-strong: #d8d4cb;
-    --hover: rgba(40, 35, 25, 0.05);
-    --hover-strong: rgba(40, 35, 25, 0.09);
+    --elevated: #f2f2f5;
+    --sidebar: #f6f6f9;
+    --border: #e9e9ef;
+    --border-strong: #d9d9e2;
+    --hover: rgba(60, 60, 90, 0.05);
+    --hover-strong: rgba(60, 60, 90, 0.09);
 
-    --text: #1c1a16;
-    --text-muted: #7a766c;
-    --text-subtle: #a8a499;
+    --text: #16161c;
+    --text-muted: #62626d;
+    --text-subtle: #9a9aa6;
 
-    /* color 1 — ink. Every primary action is black. */
-    --accent: #1c1a16;
-    --accent-hover: #000000;
-    --accent-soft: rgba(28, 26, 22, 0.07);
+    /* primary — electric indigo */
+    --accent: #5b5ef0;
+    --accent-hover: #4a4de2;
+    --accent-soft: rgba(91, 94, 240, 0.1);
     --accent-text: #ffffff;
-    --primary: #1c1a16;
+    --primary: #5b5ef0;
     --on-primary: #ffffff;
 
-    /* color 2 — cozy caramel. The one warm highlight. */
-    --cozy: #b0703c;
-    --cozy-soft: rgba(176, 112, 60, 0.13);
+    /* secondary highlight — soft violet */
+    --cozy: #8b5cf6;
+    --cozy-soft: rgba(139, 92, 246, 0.12);
 
-    --success: #4f7d5f;
-    --warning: #ad8040;
-    --danger: #bd5b5b;
+    --success: #17a673;
+    --warning: #c98a3a;
+    --danger: #e0556a;
 
-    --glow: rgba(0, 0, 0, 0.05);
+    --glow: rgba(99, 102, 241, 0.08);
     --card-grad: #ffffff;
     --card-grad-strong: #ffffff;
 
-    --shadow-sm: 0 1px 2px rgba(25, 22, 16, 0.05);
-    --shadow-md: 0 6px 22px rgba(25, 22, 16, 0.06);
-    --shadow-lg: 0 18px 50px rgba(25, 22, 16, 0.09);
-    --shadow-hover: 0 22px 55px rgba(25, 22, 16, 0.12);
+    --shadow-sm: 0 1px 2px rgba(20, 20, 40, 0.05);
+    --shadow-md: 0 6px 22px rgba(20, 20, 40, 0.07);
+    --shadow-lg: 0 18px 50px rgba(20, 20, 40, 0.1);
+    --shadow-hover: 0 22px 55px rgba(20, 20, 40, 0.13);
+
+    /* Geist — Liftoff workspace typeface (scoped) */
+    --font-body: 'Geist Variable', system-ui, sans-serif;
+    --font-display: 'Geist Variable', system-ui, sans-serif;
+    --font-serif: 'Geist Variable', system-ui, sans-serif;
+    --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
 
     color-scheme: light;
     background: var(--bg);
     color: var(--text);
   }
-  /* Dark mode for Focus — warm charcoal (not blue-black), ink flips to
-     off-white, cozy warms up so it glows gently against the dark. */
+  /* Dark mode for Focus — true obsidian black with an electric-indigo accent
+     and a soft-violet secondary that glows gently against the black. */
   .dark .focus-daylight {
-    --bg: #141311;
-    --surface: #1c1b18;
-    --elevated: #262420;
-    --sidebar: #191815;
-    --border: #2c2a25;
-    --border-strong: #3b382f;
-    --hover: rgba(255, 250, 240, 0.05);
-    --hover-strong: rgba(255, 250, 240, 0.09);
+    --bg: #08080a;
+    --surface: #101014;
+    --elevated: #17171d;
+    --sidebar: #0b0b0f;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --hover: rgba(255, 255, 255, 0.04);
+    --hover-strong: rgba(255, 255, 255, 0.08);
 
-    --text: #f2efe9;
-    --text-muted: #9b968a;
-    --text-subtle: #6b675d;
+    --text: #f4f4f7;
+    --text-muted: #9d9da8;
+    --text-subtle: #5c5c68;
 
-    --accent: #f2efe9;
-    --accent-hover: #ffffff;
-    --accent-soft: rgba(242, 239, 233, 0.1);
-    --accent-text: #171512;
-    --primary: #f2efe9;
-    --on-primary: #171512;
+    --accent: #6d70f5;
+    --accent-hover: #8a8dff;
+    --accent-soft: rgba(109, 112, 245, 0.16);
+    --accent-text: #ffffff;
+    --primary: #6d70f5;
+    --on-primary: #ffffff;
 
-    --cozy: #d99a63;
-    --cozy-soft: rgba(217, 154, 99, 0.15);
+    --cozy: #a78bfa;
+    --cozy-soft: rgba(167, 139, 250, 0.16);
 
-    --success: #8db895;
-    --warning: #d3a866;
-    --danger: #d98a8a;
+    --success: #4ce0a6;
+    --warning: #f0b36b;
+    --danger: #ff7a86;
 
-    --glow: rgba(255, 255, 255, 0.07);
-    --card-grad: #1c1b18;
-    --card-grad-strong: #1c1b18;
+    --glow: rgba(109, 112, 245, 0.2);
+    --card-grad: #101014;
+    --card-grad-strong: #121218;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 6px 22px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.45);
-    --shadow-hover: 0 22px 55px rgba(0, 0, 0, 0.55);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 22px 60px rgba(0, 0, 0, 0.7);
+    --shadow-hover: 0 26px 70px rgba(0, 0, 0, 0.75);
 
     color-scheme: dark;
   }
@@ -422,6 +431,21 @@
     font-synthesis: none;
     letter-spacing: 0.005em;
     line-height: 1.12;
+  }
+  /* Inside the Liftoff/Focus workspace the display face is Geist (a full weight
+     axis), so restore real bold headlines — the 400!important above exists only
+     for Instrument Serif, which the other worlds still use. */
+  .focus-daylight .font-display {
+    font-weight: 700 !important;
+    font-synthesis: weight;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+  }
+  .focus-daylight .font-display-italic {
+    font-weight: 600 !important;
+    font-synthesis: weight;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
   }
   /* Kairos display face — Fraunces, a soft old-style serif. Airier than
      Instrument Serif (which reads condensed): generous line-height + open
@@ -787,5 +811,66 @@
       box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   }
   .mode-switch-ink:hover { box-shadow: 0 12px 30px rgba(0,0,0,0.5); }
+}
+
+/* =========================================================================
+   Liftoff workspace — motion & glow polish (scoped to .focus-daylight so it
+   never leaks into Kairos or Afterburn).
+   ========================================================================= */
+@layer utilities {
+  /* Breathing indigo glow on the quick-add FAB. */
+  @keyframes focus-fab-glow {
+    0%, 100% {
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45),
+        0 0 14px -2px color-mix(in srgb, var(--accent) 32%, transparent);
+    }
+    50% {
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5),
+        0 0 32px 0 color-mix(in srgb, var(--accent) 58%, transparent);
+    }
+  }
+  .focus-daylight .focus-fab {
+    animation: focus-fab-glow 3s ease-in-out infinite;
+  }
+  .focus-daylight .focus-fab:hover {
+    animation: none;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5),
+      0 0 34px 0 color-mix(in srgb, var(--accent) 68%, transparent);
+  }
+
+  /* Accent glow on hover for primary interactive elements. */
+  .focus-daylight .glow-accent {
+    transition: box-shadow 0.25s ease, transform 0.15s ease, background-color 0.2s ease;
+  }
+  .focus-daylight .glow-accent:hover {
+    box-shadow: 0 0 22px -3px color-mix(in srgb, var(--accent) 62%, transparent);
+  }
+
+  /* A soft indigo underglow beneath the top nav. */
+  .focus-daylight .topnav-underglow::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--accent) 45%, transparent),
+      transparent
+    );
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  /* Gentle lift for tappable tiles inside the workspace. */
+  .focus-daylight .lift {
+    transition: transform 0.18s cubic-bezier(0.21, 1, 0.4, 1), box-shadow 0.18s ease;
+  }
+  .focus-daylight .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
 }
 
