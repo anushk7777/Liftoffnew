@@ -111,9 +111,9 @@
     --primary: #5b5ef0;
     --on-primary: #ffffff;
 
-    /* secondary highlight — soft violet */
-    --cozy: #8b5cf6;
-    --cozy-soft: rgba(139, 92, 246, 0.12);
+    /* secondary highlight — warm honey amber */
+    --cozy: #d98a3c;
+    --cozy-soft: rgba(217, 138, 60, 0.12);
 
     --success: #17a673;
     --warning: #c98a3a;
@@ -133,6 +133,14 @@
     --font-display: 'Geist Variable', system-ui, sans-serif;
     --font-serif: 'Geist Variable', system-ui, sans-serif;
     --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+
+    /* Focus timer — a luminous aurora (emerald → cyan → sky). Its own
+       signature colour, distinct from the indigo accent. Swap these to
+       recolour the whole cosmic timer. */
+    --timer-1: #34d399;
+    --timer-2: #22d3ee;
+    --timer-3: #38bdf8;
+    --timer-glow: #22d3ee;
 
     color-scheme: light;
     background: var(--bg);
@@ -161,8 +169,8 @@
     --primary: #6d70f5;
     --on-primary: #ffffff;
 
-    --cozy: #a78bfa;
-    --cozy-soft: rgba(167, 139, 250, 0.16);
+    --cozy: #f5b25c;
+    --cozy-soft: rgba(245, 178, 92, 0.16);
 
     --success: #4ce0a6;
     --warning: #f0b36b;

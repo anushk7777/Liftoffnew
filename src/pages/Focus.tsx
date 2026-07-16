@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw, SkipForward, Timer, Coffee, Brain } from 'lucide-react';
 import { isToday } from 'date-fns';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
 import { cn, safeSetItem } from '../lib/utils';
 import { beep } from '../lib/sound';
@@ -60,6 +60,14 @@ export default function Focus() {
     saved && saved.endsAt > Date.now() ? saved.endsAt : null,
   );
   const [running, setRunning] = useState(() => !!(saved && saved.endsAt > Date.now()));
+  const [celebrate, setCelebrate] = useState(false);
+
+  // Auto-clear the finish celebration.
+  useEffect(() => {
+    if (!celebrate) return;
+    const id = setTimeout(() => setCelebrate(false), 2600);
+    return () => clearTimeout(id);
+  }, [celebrate]);
 
   const modeMinutes = useCallback(
     (m: Mode) =>
@@ -96,6 +104,7 @@ export default function Focus() {
   const handleComplete = useCallback(() => {
     beep();
     if (mode === 'focus') {
+      setCelebrate(true);
       logFocusSession(pomodoro.focusMins, 'focus', taskLabel.trim() || undefined, taskId ?? undefined);
       const isLong = round % pomodoro.roundsBeforeLong === 0;
       switchMode(isLong ? 'longBreak' : 'shortBreak', round);
@@ -180,12 +189,14 @@ export default function Focus() {
     .filter((s) => s.kind === 'focus')
     .reduce((acc, s) => acc + s.durationMins, 0);
 
-  // Ring geometry
-  const R = 130;
+  // Ring geometry (viewBox 400×400, centre 200)
+  const R = 160;
   const C = 2 * Math.PI * R;
 
   return (
     <motion.div variants={stagger} initial={rm ? false : 'hidden'} animate="show">
+      <AnimatePresence>{celebrate && !rm && <Celebration />}</AnimatePresence>
+
       <PageHeader
         title="Focus"
         subtitle="Deep work in focused intervals. No distractions."
@@ -209,52 +220,102 @@ export default function Focus() {
         ))}
       </motion.div>
 
-      {/* Timer ring */}
+      {/* Cosmic timer */}
       <motion.div variants={rise} className="flex flex-col items-center">
-        <div className="relative w-80 h-80 flex items-center justify-center mb-10 neo-dial mx-auto">
-          <div className="absolute inset-4 neo-dial-inner flex items-center justify-center">
-            <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 300 300">
-              <circle cx="150" cy="150" r={R} fill="none" stroke="var(--border)" strokeWidth="8" />
-              <circle
-                cx="150"
-                cy="150"
+        <motion.div layout className="relative w-[340px] h-[340px] flex items-center justify-center mb-10 mx-auto">
+          <svg width="340" height="340" viewBox="0 0 400 400" className="absolute -rotate-90">
+            <defs>
+              <linearGradient id="timer-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="var(--timer-1)" />
+                <stop offset="50%" stopColor="var(--timer-2)" />
+                <stop offset="100%" stopColor="var(--timer-3)" />
+              </linearGradient>
+              <filter id="timer-glow">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            <circle cx="200" cy="200" r={R} fill="none" stroke="var(--border)" strokeWidth="6" />
+
+            <circle
+              cx="200"
+              cy="200"
+              r={R}
+              fill="none"
+              stroke="url(#timer-gradient)"
+              strokeWidth="12"
+              strokeLinecap="round"
+              strokeDasharray={C}
+              strokeDashoffset={C * (1 - progress)}
+              filter="url(#timer-glow)"
+              style={{ transition: 'stroke-dashoffset 0.9s linear' }}
+            />
+
+            {running && !celebrate && (
+              <motion.circle
+                cx="200"
+                cy="200"
                 r={R}
                 fill="none"
-                stroke="var(--accent)"
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={C}
-                strokeDashoffset={C * (1 - progress)}
-                style={{ transition: 'stroke-dashoffset 0.5s linear', filter: 'drop-shadow(0 0 8px var(--glow-color))' }}
+                stroke="var(--timer-2)"
+                strokeWidth="2"
+                initial={{ scale: 1, opacity: 0.35 }}
+                animate={{ scale: 1.12, opacity: 0 }}
+                transition={{ repeat: Infinity, duration: 1.6, ease: 'easeOut' }}
+                style={{ transformOrigin: '200px 200px' }}
               />
-            </svg>
-            <div className="flex flex-col items-center z-10">
-              <p className="font-mono-data text-6xl font-bold tabular-nums tracking-tight">
-                {mm}<span className="opacity-50">:</span>{ss}
-              </p>
-              <p className="text-sm text-[var(--accent)] font-bold mt-2 flex items-center gap-1.5 uppercase tracking-widest">
-                {MODE_META[mode].icon}
-                {MODE_META[mode].label} · R{round}
-              </p>
-            </div>
+            )}
+          </svg>
+
+          <div className="absolute z-10 flex flex-col items-center justify-center pointer-events-none">
+            <TimeDisplay timeString={`${mm}:${ss}`} />
+            <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.3em] text-[var(--text-muted)]">
+              {MODE_META[mode].icon}
+              {running ? MODE_META[mode].label : `${MODE_META[mode].label} · R${round}`}
+            </p>
           </div>
-        </div>
+        </motion.div>
 
         {/* Controls */}
-        <div className="flex items-center gap-3 mt-8">
-          <button onClick={reset} className="btn btn-secondary p-3" aria-label="Reset">
-            <RotateCcw className="w-5 h-5" />
-          </button>
-          <button
-            onClick={running ? pause : start}
-            className="btn btn-primary px-8 py-3.5 text-base"
+        <div className="flex items-center gap-6">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={reset}
+            aria-label="Reset"
+            className="p-4 rounded-full text-[var(--text-muted)] hover:text-[var(--text)] border border-border bg-[var(--elevated)] transition-colors"
           >
-            {running ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-            {running ? 'Pause' : 'Start'}
-          </button>
-          <button onClick={skip} className="btn btn-secondary p-3" aria-label="Skip">
+            <RotateCcw className="w-5 h-5" />
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={running ? pause : start}
+            aria-label={running ? 'Pause' : 'Start'}
+            className="p-6 rounded-full text-white flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, var(--timer-1), var(--timer-2), var(--timer-3))',
+              boxShadow: '0 10px 34px -6px var(--timer-glow)',
+            }}
+          >
+            {running ? (
+              <Pause className="w-8 h-8" fill="currentColor" />
+            ) : (
+              <Play className="w-8 h-8 ml-1" fill="currentColor" />
+            )}
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={skip}
+            aria-label="Skip"
+            className="p-4 rounded-full text-[var(--text-muted)] hover:text-[var(--text)] border border-border bg-[var(--elevated)] transition-colors"
+          >
             <SkipForward className="w-5 h-5" />
-          </button>
+          </motion.button>
         </div>
 
         {mode === 'focus' && (
@@ -302,5 +363,107 @@ export default function Focus() {
         />
       </motion.div>
     </motion.div>
+  );
+}
+
+// One flip-in digit — springs up from below with a soft blur as it changes.
+function Digit({ char }: { char: string }) {
+  return (
+    <div className="relative flex justify-center items-center w-[52px] h-[84px] overflow-hidden">
+      <AnimatePresence mode="popLayout">
+        <motion.span
+          key={char}
+          initial={{ y: 52, opacity: 0, scale: 0.8, filter: 'blur(8px)' }}
+          animate={{ y: 0, opacity: 1, scale: 1, filter: 'blur(0px)' }}
+          exit={{ y: -52, opacity: 0, scale: 0.8, filter: 'blur(8px)' }}
+          transition={{ type: 'spring', stiffness: 200, damping: 20, mass: 1 }}
+          className="absolute text-7xl font-bold tracking-tighter text-[var(--text)] font-mono tabular-nums"
+        >
+          {char}
+        </motion.span>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function TimeDisplay({ timeString }: { timeString: string }) {
+  return (
+    <div className="flex items-center justify-center">
+      {timeString.split('').map((char, i) =>
+        char === ':' ? (
+          <span key={`c-${i}`} className="text-6xl font-bold text-[var(--text-subtle)] mx-0.5 -mt-4">
+            :
+          </span>
+        ) : (
+          <Digit key={`d-${i}`} char={char} />
+        ),
+      )}
+    </div>
+  );
+}
+
+// Precomputed once at module load — keeps render pure (no Math.random in the
+// component body) and the burst pattern is indistinguishable between runs.
+const CELEBRATION_COLORS = ['#34d399', '#22d3ee', '#38bdf8', '#a7f3d0', '#67e8f9', '#fde68a'];
+const CELEBRATION_PARTICLES = Array.from({ length: 130 }).map((_, i) => ({
+  angle: (Math.PI * 2 * i) / 130 + (Math.random() * 0.2 - 0.1),
+  targetDistance: 120 + Math.random() * 1000,
+  size: Math.random() * 11 + 4,
+  duration: 1 + Math.random() * 2.4,
+  color: CELEBRATION_COLORS[Math.floor(Math.random() * CELEBRATION_COLORS.length)],
+  delay: Math.random() * 0.2,
+}));
+
+// A one-shot particle burst when a focus session completes.
+function Celebration() {
+  const particles = CELEBRATION_PARTICLES;
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[100] flex items-center justify-center overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, scale: 1 }}
+        animate={{ opacity: [0, 0.45, 0], scale: [1, 1.1] }}
+        transition={{ duration: 1.5, ease: 'easeOut' }}
+        className="absolute inset-0 mix-blend-screen backdrop-blur-[2px]"
+        style={{
+          background:
+            'linear-gradient(120deg, color-mix(in srgb, var(--timer-1) 30%, transparent), color-mix(in srgb, var(--timer-2) 30%, transparent), color-mix(in srgb, var(--timer-3) 30%, transparent))',
+        }}
+      />
+      <motion.div
+        initial={{ scale: 0, opacity: 1 }}
+        animate={{ scale: 4, opacity: 0 }}
+        transition={{ duration: 1.5, ease: 'easeOut' }}
+        className="absolute w-64 h-64 rounded-full blur-[80px] mix-blend-screen"
+        style={{ background: 'linear-gradient(90deg, var(--timer-2), var(--timer-3))' }}
+      />
+      <motion.div
+        initial={{ scale: 0.5, opacity: 1, borderWidth: '20px' }}
+        animate={{ scale: 6, opacity: 0, borderWidth: '1px' }}
+        transition={{ duration: 1.5, ease: 'easeOut' }}
+        className="absolute w-64 h-64 rounded-full mix-blend-screen"
+        style={{ borderStyle: 'solid', borderColor: 'var(--timer-2)' }}
+      />
+      {particles.map((p, i) => (
+        <motion.div
+          key={i}
+          initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
+          animate={{
+            x: Math.cos(p.angle) * p.targetDistance,
+            y: Math.sin(p.angle) * p.targetDistance,
+            scale: [0, 1.2, 0],
+            opacity: [1, 1, 0],
+          }}
+          transition={{ duration: p.duration, delay: p.delay, ease: [0.19, 1, 0.22, 1] }}
+          className="absolute rounded-full"
+          style={{
+            width: p.size,
+            height: p.size,
+            backgroundColor: p.color,
+            boxShadow: `0 0 ${p.size * 3}px ${p.color}, 0 0 ${p.size * 6}px ${p.color}`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
