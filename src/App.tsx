@@ -6,7 +6,7 @@ import { useStore } from './store/useStore';
 import { useIsMobile } from './lib/useIsMobile';
 import { pageVariants, fast, useReducedMotion } from './lib/motion';
 import { useReminders } from './lib/reminders';
-import Sidebar from './components/Sidebar';
+import TopNav from './components/TopNav';
 import MobileShell from './mobile/MobileShell';
 import ModeTransition from './components/ModeTransition';
 import PWAPrompt from './components/PWAPrompt';
@@ -218,21 +218,19 @@ function Shell() {
   );
 
   return (
-    <div className="focus-daylight font-body-lg min-h-screen overflow-hidden flex relative">
+    <div className="focus-daylight font-body-lg h-screen overflow-hidden flex flex-col relative">
       <div className="fixed inset-0 radial-atmosphere pointer-events-none z-0"></div>
 
       {!focusMode && (
-        <div className="shrink-0 z-40 relative">
-          <Sidebar onOpenSearch={() => setPaletteOpen(true)} />
-        </div>
+        <TopNav
+          onOpenSearch={() => setPaletteOpen(true)}
+          onQuickAdd={() => setQuickAddOpen(true)}
+        />
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative z-10">
-        {/* Decorative background */}
-        <div className="absolute top-0 right-0 w-[420px] h-[420px] z-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 70% 30%, rgba(255,255,255,0.06), transparent 60%)' }}></div>
-
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
         <main className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="mx-auto w-full px-5 py-7 sm:px-8 sm:py-10 pb-12 transition-all duration-300 max-w-7xl">
+          <div className="mx-auto w-full px-5 py-8 sm:px-8 sm:py-10 pb-16 transition-all duration-300 max-w-6xl">
             <ErrorBoundary>
               {rm ? (
                 routesEl
@@ -260,7 +258,7 @@ function Shell() {
         onClick={() => setQuickAddOpen(true)}
         aria-label="Quick add task (Ctrl/Cmd N)"
         title="Quick add (Ctrl/⌘ N)"
-        className="fab-btn fixed bottom-8 right-8 z-40 w-16 h-16 rounded-full bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+        className="focus-fab fab-btn fixed bottom-8 right-8 z-40 w-16 h-16 rounded-full bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
       >
         <Plus className="w-8 h-8" />
       </button>
