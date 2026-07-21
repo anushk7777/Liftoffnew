@@ -412,7 +412,7 @@ function TimeDisplay({ timeString }: { timeString: string }) {
 
 // Precomputed once at module load — keeps render pure (no Math.random in the
 // component body) and the burst pattern is indistinguishable between runs.
-const CELEBRATION_COLORS = ['#34d399', '#22d3ee', '#38bdf8', '#a7f3d0', '#67e8f9', '#fde68a'];
+const CELEBRATION_COLORS = ['#ff7a5c', '#ffb07a', '#ff5c8a', '#ffd08a', '#ff9e7a', '#ffe0a3'];
 const CELEBRATION_PARTICLES = Array.from({ length: 130 }).map((_, i) => ({
   angle: (Math.PI * 2 * i) / 130 + (Math.random() * 0.2 - 0.1),
   targetDistance: 120 + Math.random() * 1000,
