@@ -61,6 +61,7 @@ export default function Focus() {
   );
   const [running, setRunning] = useState(() => !!(saved && saved.endsAt > Date.now()));
   const [celebrate, setCelebrate] = useState(false);
+  const [now] = useState(() => Date.now());
 
   // Auto-clear the finish celebration.
   useEffect(() => {
@@ -185,8 +186,10 @@ export default function Focus() {
   const sessionsToday = focusSessions.filter(
     (s) => s.kind === 'focus' && isToday(new Date(s.date)),
   ).length;
-  const totalFocus = focusSessions
-    .filter((s) => s.kind === 'focus')
+  // Rolling 7-day total — refreshes daily instead of accumulating forever.
+  const weekCut = now - 7 * 86400000;
+  const focusWeek = focusSessions
+    .filter((s) => s.kind === 'focus' && new Date(s.date).getTime() >= weekCut)
     .reduce((acc, s) => acc + s.durationMins, 0);
 
   // Ring geometry (viewBox 400×400, centre 200)
@@ -223,6 +226,16 @@ export default function Focus() {
       {/* Cosmic timer */}
       <motion.div variants={rise} className="flex flex-col items-center">
         <motion.div layout className="relative w-[340px] h-[340px] flex items-center justify-center mb-10 mx-auto">
+          {/* Static ambient glow — composited once, so the ring stays 60fps. */}
+          <div
+            className="absolute w-[300px] h-[300px] rounded-full pointer-events-none"
+            style={{
+              background: 'radial-gradient(circle, color-mix(in srgb, var(--timer-glow) 20%, transparent) 0%, transparent 68%)',
+              filter: 'blur(24px)',
+              opacity: running ? 0.9 : 0.5,
+              transition: 'opacity 0.4s ease',
+            }}
+          />
           <svg width="340" height="340" viewBox="0 0 400 400" className="absolute -rotate-90">
             <defs>
               <linearGradient id="timer-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -230,10 +243,6 @@ export default function Focus() {
                 <stop offset="50%" stopColor="var(--timer-2)" />
                 <stop offset="100%" stopColor="var(--timer-3)" />
               </linearGradient>
-              <filter id="timer-glow">
-                <feGaussianBlur stdDeviation="6" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
             </defs>
 
             <circle cx="200" cy="200" r={R} fill="none" stroke="var(--border)" strokeWidth="6" />
@@ -248,8 +257,7 @@ export default function Focus() {
               strokeLinecap="round"
               strokeDasharray={C}
               strokeDashoffset={C * (1 - progress)}
-              filter="url(#timer-glow)"
-              style={{ transition: 'stroke-dashoffset 0.9s linear' }}
+              style={{ transition: 'stroke-dashoffset 0.95s linear' }}
             />
 
             {running && !celebrate && (
@@ -357,8 +365,8 @@ export default function Focus() {
         <StatCard label="Focus today" value={`${focusToday}m`} icon={<Timer className="w-4 h-4" />} />
         <StatCard label="Sessions today" value={sessionsToday} icon={<Brain className="w-4 h-4" />} />
         <StatCard
-          label="Total focus"
-          value={`${Math.floor(totalFocus / 60)}h ${totalFocus % 60}m`}
+          label="This week"
+          value={`${Math.floor(focusWeek / 60)}h ${focusWeek % 60}m`}
           icon={<Timer className="w-4 h-4" />}
         />
       </motion.div>
@@ -370,14 +378,14 @@ export default function Focus() {
 function Digit({ char }: { char: string }) {
   return (
     <div className="relative flex justify-center items-center w-[52px] h-[84px] overflow-hidden">
-      <AnimatePresence mode="popLayout">
+      <AnimatePresence mode="popLayout" initial={false}>
         <motion.span
           key={char}
-          initial={{ y: 52, opacity: 0, scale: 0.8, filter: 'blur(8px)' }}
-          animate={{ y: 0, opacity: 1, scale: 1, filter: 'blur(0px)' }}
-          exit={{ y: -52, opacity: 0, scale: 0.8, filter: 'blur(8px)' }}
-          transition={{ type: 'spring', stiffness: 200, damping: 20, mass: 1 }}
-          className="absolute text-7xl font-bold tracking-tighter text-[var(--text)] font-mono tabular-nums"
+          initial={{ y: '55%', opacity: 0 }}
+          animate={{ y: '0%', opacity: 1 }}
+          exit={{ y: '-55%', opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 30, mass: 0.8 }}
+          className="absolute text-7xl font-bold tracking-tighter text-[var(--text)] font-mono tabular-nums will-change-transform"
         >
           {char}
         </motion.span>

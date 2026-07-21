@@ -19,10 +19,10 @@ import { useAppMode } from '../afterburn/mode';
 import { cn } from '../lib/utils';
 
 const NAV = [
-  { to: '/', label: 'Mission Control', icon: LayoutDashboard, end: true },
-  { to: '/roadmap', label: 'Trajectory', icon: Map },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/roadmap', label: 'Roadmap', icon: Map },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { to: '/focus', label: 'Engage', icon: Timer },
+  { to: '/focus', label: 'Focus', icon: Timer },
   { to: '/coach', label: 'Coach', icon: Sparkles },
   { to: '/stats', label: 'Stats', icon: BarChart3 },
 ];

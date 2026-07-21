@@ -86,9 +86,9 @@
      warm paper in light / warm charcoal in dark. Scoped to the
      Focus shell; Afterburn (ember) & Kairos (dusk) keep theirs.
      ============================================================ */
-  /* Liftoff / Focus — Obsidian: electric indigo primary + a soft-violet
-     secondary. Geist carries the whole workspace (scoped here so Kairos &
-     Afterburn keep their own type + colour identities). */
+  /* Liftoff / Focus — Obsidian black base with a premium mint-emerald accent
+     and a teal secondary. Geist carries the whole workspace (scoped here so
+     Kairos & Afterburn keep their own type + colour identities). */
   .focus-daylight {
     --bg: #fafafb;
     --surface: #ffffff;
@@ -103,23 +103,23 @@
     --text-muted: #62626d;
     --text-subtle: #9a9aa6;
 
-    /* primary — electric indigo */
-    --accent: #5b5ef0;
-    --accent-hover: #4a4de2;
-    --accent-soft: rgba(91, 94, 240, 0.1);
+    /* primary — premium mint-emerald (black is the base) */
+    --accent: #059669;
+    --accent-hover: #047857;
+    --accent-soft: rgba(5, 150, 105, 0.1);
     --accent-text: #ffffff;
-    --primary: #5b5ef0;
+    --primary: #059669;
     --on-primary: #ffffff;
 
-    /* secondary highlight — warm honey amber */
-    --cozy: #d98a3c;
-    --cozy-soft: rgba(217, 138, 60, 0.12);
+    /* secondary highlight — cool teal-mint (same family as the accent) */
+    --cozy: #0d9488;
+    --cozy-soft: rgba(13, 148, 136, 0.12);
 
     --success: #17a673;
     --warning: #c98a3a;
     --danger: #e0556a;
 
-    --glow: rgba(99, 102, 241, 0.08);
+    --glow: rgba(5, 150, 105, 0.08);
     --card-grad: #ffffff;
     --card-grad-strong: #ffffff;
 
@@ -146,8 +146,8 @@
     background: var(--bg);
     color: var(--text);
   }
-  /* Dark mode for Focus — true obsidian black with an electric-indigo accent
-     and a soft-violet secondary that glows gently against the black. */
+  /* Dark mode for Focus — true obsidian black with a mint-emerald accent
+     and a teal secondary that glow gently against the black. */
   .dark .focus-daylight {
     --bg: #08080a;
     --surface: #101014;
@@ -162,21 +162,21 @@
     --text-muted: #9d9da8;
     --text-subtle: #5c5c68;
 
-    --accent: #6d70f5;
-    --accent-hover: #8a8dff;
-    --accent-soft: rgba(109, 112, 245, 0.16);
-    --accent-text: #ffffff;
-    --primary: #6d70f5;
-    --on-primary: #ffffff;
+    --accent: #34e0a1;
+    --accent-hover: #5eeab5;
+    --accent-soft: rgba(52, 224, 161, 0.16);
+    --accent-text: #04140d;
+    --primary: #34e0a1;
+    --on-primary: #04140d;
 
-    --cozy: #f5b25c;
-    --cozy-soft: rgba(245, 178, 92, 0.16);
+    --cozy: #2dd4bf;
+    --cozy-soft: rgba(45, 212, 191, 0.16);
 
     --success: #4ce0a6;
     --warning: #f0b36b;
     --danger: #ff7a86;
 
-    --glow: rgba(109, 112, 245, 0.2);
+    --glow: rgba(52, 224, 161, 0.18);
     --card-grad: #101014;
     --card-grad-strong: #121218;
 

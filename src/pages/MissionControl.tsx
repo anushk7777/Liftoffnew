@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Check, Clock, ChevronRight, Rocket } from 'lucide-react';
+import { Check, Clock, ChevronRight, Target, Map } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getBriefing } from '../lib/coach';
 import type { CoachState } from '../lib/coach';
@@ -24,7 +24,7 @@ function MissionEditor({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(targetDate);
   return (
     <div className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-md)' }}>
-      <div className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">Your mission</div>
+      <div className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">Your goal</div>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -34,7 +34,7 @@ function MissionEditor({ onClose }: { onClose: () => void }) {
         className="w-full bg-transparent resize-none outline-none text-[1.6rem] leading-tight font-semibold tracking-tight text-[var(--text)] placeholder:text-[var(--text-subtle)] mt-2"
       />
       <div className="mt-3 flex items-center gap-3 flex-wrap">
-        <label className="text-xs text-[var(--text-muted)]">Launch date</label>
+        <label className="text-xs text-[var(--text-muted)]">Target date</label>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="text-sm rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5" />
         <div className="ml-auto flex gap-2">
           <button onClick={onClose} className="text-sm font-medium px-3 py-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover)]">Cancel</button>
@@ -43,7 +43,7 @@ function MissionEditor({ onClose }: { onClose: () => void }) {
             className="text-sm font-semibold px-4 py-1.5 rounded-lg text-[var(--accent-text)]"
             style={{ background: 'var(--accent)' }}
           >
-            Set mission
+            Set goal
           </button>
         </div>
       </div>
@@ -96,7 +96,7 @@ export default function MissionControl() {
     <div className="w-full max-w-2xl mx-auto flex flex-col gap-6 pb-10">
       {/* top row */}
       <div className="flex items-center justify-between pt-1">
-        <Label>Mission</Label>
+        <Label>Today</Label>
         <span className="text-xs text-[var(--text-subtle)]" style={tnum}>{format(now, 'EEE, MMM d')}</span>
       </div>
 
@@ -107,7 +107,7 @@ export default function MissionControl() {
         <button onClick={() => setEditing(true)} className="text-left -mt-2">
           <h1 className="text-[1.85rem] sm:text-[2.1rem] leading-[1.15] font-semibold tracking-tight text-[var(--text)] text-balance">{mission}</h1>
           <p className="mt-3 text-[15px] text-[var(--text-muted)]">
-            <b className="text-[var(--text)] font-semibold" style={tnum}>{daysLeft} days</b> to launch · {format(new Date(targetDate), 'MMM d, yyyy')}
+            <b className="text-[var(--text)] font-semibold" style={tnum}>{daysLeft} days</b> to go · {format(new Date(targetDate), 'MMM d, yyyy')}
           </p>
         </button>
       ) : (
@@ -116,18 +116,18 @@ export default function MissionControl() {
           className="text-left rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6 hover:border-[var(--border-strong)] transition-colors"
           style={{ boxShadow: 'var(--shadow-sm)' }}
         >
-          <span className="inline-flex w-10 h-10 rounded-xl items-center justify-center mb-3" style={{ background: 'var(--cozy-soft)' }}>
-            <Rocket className="w-5 h-5" style={{ color: 'var(--cozy)' }} />
+          <span className="inline-flex w-10 h-10 rounded-xl items-center justify-center mb-3" style={{ background: 'var(--accent-soft)' }}>
+            <Target className="w-5 h-5" style={{ color: 'var(--accent)' }} />
           </span>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Name your mission</h1>
-          <p className="text-[15px] text-[var(--text-muted)] mt-1">One goal you're working toward. Everything here orients to it.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text)]">Set your goal</h1>
+          <p className="text-[15px] text-[var(--text-muted)] mt-1">One thing you're working toward. Everything here orients to it.</p>
         </button>
       )}
 
       {/* trajectory */}
       <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
         <div className="flex items-center justify-between mb-4">
-          <Label>Trajectory</Label>
+          <Label>Progress</Label>
           <span className="text-[12.5px] font-semibold flex items-center gap-1.5" style={{ color: tone.color }}>
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: tone.color }} />
             {tone.label}
@@ -160,11 +160,11 @@ export default function MissionControl() {
         ) : (
           <button onClick={() => navigate('/roadmap')} className="w-full text-left flex items-center gap-3 group">
             <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--accent-soft)' }}>
-              <Rocket className="w-5 h-5" style={{ color: 'var(--accent)' }} />
+              <Map className="w-5 h-5" style={{ color: 'var(--accent)' }} />
             </span>
             <span className="flex-1">
-              <span className="block text-sm font-semibold text-[var(--text)]">Chart your trajectory</span>
-              <span className="block text-[13px] text-[var(--text-muted)]">Break the mission into a roadmap so I can track your pace.</span>
+              <span className="block text-sm font-semibold text-[var(--text)]">Map out your plan</span>
+              <span className="block text-[13px] text-[var(--text-muted)]">Break your goal into a roadmap to track your pace.</span>
             </span>
             <ChevronRight className="w-5 h-5 text-[var(--text-subtle)] group-hover:translate-x-0.5 transition-transform" />
           </button>
@@ -174,7 +174,7 @@ export default function MissionControl() {
       {/* next objective */}
       <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
         <div className="flex items-center justify-between mb-3">
-          <Label>Next objective</Label>
+          <Label>Up next</Label>
           {step?.context && <span className="text-xs text-[var(--text-subtle)]">{step.context}</span>}
         </div>
         {step ? (
@@ -210,7 +210,7 @@ export default function MissionControl() {
       {/* launch log */}
       <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
         <h4 className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)] mb-4 flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5" /> Launch log
+          <Clock className="w-3.5 h-3.5" /> Recent wins
         </h4>
         {wins.length ? (
           <div className="flex flex-col gap-4">
