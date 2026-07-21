@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, RotateCcw, SkipForward, Timer, Coffee, Brain } from 'lucide-react';
+import { Play, Pause, Square, SkipForward, Plus, Minus, Timer, Coffee, Brain } from 'lucide-react';
 import { isToday } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
@@ -62,6 +62,9 @@ export default function Focus() {
   const [running, setRunning] = useState(() => !!(saved && saved.endsAt > Date.now()));
   const [celebrate, setCelebrate] = useState(false);
   const [now] = useState(() => Date.now());
+  // Per-session length override (the +/- adjusters), in seconds. Cleared on
+  // mode switch; null means "use the pomodoro setting for this mode".
+  const [customTotal, setCustomTotal] = useState<number | null>(null);
 
   // Auto-clear the finish celebration.
   useEffect(() => {
@@ -88,8 +91,11 @@ export default function Focus() {
     return mins * 60;
   });
 
-  const total = modeMinutes(mode) * 60;
+  const total = customTotal ?? modeMinutes(mode) * 60;
   const progress = total > 0 ? 1 - secondsLeft / total : 0;
+  // A session is "live" while running OR paused midway — the active controls
+  // stay up for both, exactly like the reference implementation.
+  const inSession = running || secondsLeft < total;
 
   const switchMode = useCallback(
     (next: Mode, nextRound: number) => {
@@ -97,23 +103,33 @@ export default function Focus() {
       setRound(nextRound);
       setEndsAt(null);
       setRunning(false);
+      setCustomTotal(null);
       setSecondsLeft(modeMinutes(next) * 60);
     },
     [modeMinutes],
   );
 
+  // The +/- adjusters from the reference: tune this session's length by a
+  // minute at a time (1–99m), only while idle.
+  const adjustTime = (deltaSecs: number) => {
+    if (inSession) return;
+    const next = Math.max(60, Math.min(99 * 60, total + deltaSecs));
+    setCustomTotal(next);
+    setSecondsLeft(next);
+  };
+
   const handleComplete = useCallback(() => {
     beep();
     if (mode === 'focus') {
       setCelebrate(true);
-      logFocusSession(pomodoro.focusMins, 'focus', taskLabel.trim() || undefined, taskId ?? undefined);
+      logFocusSession(Math.max(1, Math.round(total / 60)), 'focus', taskLabel.trim() || undefined, taskId ?? undefined);
       const isLong = round % pomodoro.roundsBeforeLong === 0;
       switchMode(isLong ? 'longBreak' : 'shortBreak', round);
     } else {
-      logFocusSession(modeMinutes(mode), 'break');
+      logFocusSession(Math.max(1, Math.round(total / 60)), 'break');
       switchMode('focus', round + 1);
     }
-  }, [mode, round, pomodoro, taskLabel, taskId, logFocusSession, switchMode, modeMinutes]);
+  }, [mode, round, pomodoro, total, taskLabel, taskId, logFocusSession, switchMode]);
 
   const completeRef = useRef(handleComplete);
   useEffect(() => {
@@ -165,7 +181,7 @@ export default function Focus() {
   const reset = () => {
     setRunning(false);
     setEndsAt(null);
-    setSecondsLeft(modeMinutes(mode) * 60);
+    setSecondsLeft(total);
   };
   const skip = () => {
     if (mode === 'focus') {
@@ -223,20 +239,21 @@ export default function Focus() {
         ))}
       </motion.div>
 
-      {/* Cosmic timer */}
+      {/* Cosmic timer — faithful port of the reference implementation */}
       <motion.div variants={rise} className="flex flex-col items-center">
-        <motion.div layout className="relative w-[340px] h-[340px] flex items-center justify-center mb-10 mx-auto">
-          {/* Static ambient glow — composited once, so the ring stays 60fps. */}
+        <motion.div layout className="relative flex items-center justify-center w-[380px] h-[380px] max-w-full mx-auto">
+          {/* Static ambient glow — cheap composited layer instead of the
+              reference's per-frame feGaussianBlur (which caused the jank). */}
           <div
-            className="absolute w-[300px] h-[300px] rounded-full pointer-events-none"
+            className="absolute w-[320px] h-[320px] rounded-full pointer-events-none"
             style={{
-              background: 'radial-gradient(circle, color-mix(in srgb, var(--timer-glow) 20%, transparent) 0%, transparent 68%)',
-              filter: 'blur(24px)',
-              opacity: running ? 0.9 : 0.5,
-              transition: 'opacity 0.4s ease',
+              background: 'radial-gradient(circle, color-mix(in srgb, var(--timer-glow) 22%, transparent) 0%, transparent 68%)',
+              filter: 'blur(28px)',
+              opacity: running ? 1 : 0.5,
+              transition: 'opacity 0.5s ease',
             }}
           />
-          <svg width="340" height="340" viewBox="0 0 400 400" className="absolute -rotate-90">
+          <svg width="380" height="380" viewBox="0 0 400 400" className="absolute -rotate-90">
             <defs>
               <linearGradient id="timer-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="var(--timer-1)" />
@@ -245,9 +262,9 @@ export default function Focus() {
               </linearGradient>
             </defs>
 
-            <circle cx="200" cy="200" r={R} fill="none" stroke="var(--border)" strokeWidth="6" />
+            <circle cx="200" cy="200" r={R} fill="none" stroke="var(--border)" strokeWidth="4" />
 
-            <circle
+            <motion.circle
               cx="200"
               cy="200"
               r={R}
@@ -256,8 +273,9 @@ export default function Focus() {
               strokeWidth="12"
               strokeLinecap="round"
               strokeDasharray={C}
-              strokeDashoffset={C * (1 - progress)}
-              style={{ transition: 'stroke-dashoffset 0.95s linear' }}
+              initial={false}
+              animate={{ strokeDashoffset: C * (1 - progress) }}
+              transition={{ duration: 1.05, ease: 'linear' }}
             />
 
             {running && !celebrate && (
@@ -268,9 +286,9 @@ export default function Focus() {
                 fill="none"
                 stroke="var(--timer-2)"
                 strokeWidth="2"
-                initial={{ scale: 1, opacity: 0.35 }}
-                animate={{ scale: 1.12, opacity: 0 }}
-                transition={{ repeat: Infinity, duration: 1.6, ease: 'easeOut' }}
+                initial={{ scale: 1, opacity: 0.3 }}
+                animate={{ scale: 1.15, opacity: 0 }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: 'easeOut' }}
                 style={{ transformOrigin: '200px 200px' }}
               />
             )}
@@ -278,53 +296,111 @@ export default function Focus() {
 
           <div className="absolute z-10 flex flex-col items-center justify-center pointer-events-none">
             <TimeDisplay timeString={`${mm}:${ss}`} />
-            <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.3em] text-[var(--text-muted)]">
-              {MODE_META[mode].icon}
-              {running ? MODE_META[mode].label : `${MODE_META[mode].label} · R${round}`}
-            </p>
+            <AnimatePresence>
+              {inSession && (
+                <motion.span
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="text-[var(--text-muted)] text-sm mt-3 uppercase tracking-[0.3em] font-medium"
+                >
+                  {running ? MODE_META[mode].label : 'Paused'}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-6">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={reset}
-            aria-label="Reset"
-            className="p-4 rounded-full text-[var(--text-muted)] hover:text-[var(--text)] border border-border bg-[var(--elevated)] transition-colors"
-          >
-            <RotateCcw className="w-5 h-5" />
-          </motion.button>
+        {/* Controls — layout-swap between setup and active, per the reference */}
+        <motion.div layout className="flex flex-col items-center mt-2 min-h-[96px]">
+          <AnimatePresence mode="wait">
+            {!inSession ? (
+              <motion.div
+                key="setup-controls"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="flex items-center gap-8"
+              >
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => adjustTime(-60)}
+                  aria-label="One minute less"
+                  className="p-4 rounded-full bg-[var(--elevated)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors border border-border"
+                >
+                  <Minus className="w-6 h-6" />
+                </motion.button>
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={running ? pause : start}
-            aria-label={running ? 'Pause' : 'Start'}
-            className="p-6 rounded-full text-white flex items-center justify-center"
-            style={{
-              background: 'linear-gradient(135deg, var(--timer-1), var(--timer-2), var(--timer-3))',
-              boxShadow: '0 10px 34px -6px var(--timer-glow)',
-            }}
-          >
-            {running ? (
-              <Pause className="w-8 h-8" fill="currentColor" />
+                <motion.button
+                  whileHover={{ scale: 1.05, boxShadow: '0 0 30px color-mix(in srgb, var(--timer-glow) 45%, transparent)' }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={start}
+                  className="px-12 py-5 rounded-full text-white font-bold tracking-[0.2em] uppercase"
+                  style={{ background: 'linear-gradient(90deg, var(--timer-1), var(--timer-2), var(--timer-3))' }}
+                >
+                  Start {MODE_META[mode].label}
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => adjustTime(60)}
+                  aria-label="One minute more"
+                  className="p-4 rounded-full bg-[var(--elevated)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors border border-border"
+                >
+                  <Plus className="w-6 h-6" />
+                </motion.button>
+              </motion.div>
             ) : (
-              <Play className="w-8 h-8 ml-1" fill="currentColor" />
-            )}
-          </motion.button>
+              <motion.div
+                key="active-controls"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="flex items-center gap-8"
+              >
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={reset}
+                  aria-label="Stop"
+                  className="p-5 rounded-full bg-[var(--elevated)] text-[var(--text)] transition-colors border border-border"
+                >
+                  <Square className="w-6 h-6" fill="currentColor" />
+                </motion.button>
 
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={skip}
-            aria-label="Skip"
-            className="p-4 rounded-full text-[var(--text-muted)] hover:text-[var(--text)] border border-border bg-[var(--elevated)] transition-colors"
-          >
-            <SkipForward className="w-5 h-5" />
-          </motion.button>
-        </div>
+                <motion.button
+                  whileHover={{ scale: 1.05, boxShadow: '0 0 30px color-mix(in srgb, var(--timer-glow) 45%, transparent)' }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={running ? pause : start}
+                  aria-label={running ? 'Pause' : 'Resume'}
+                  className="p-8 rounded-full text-white flex items-center justify-center"
+                  style={{
+                    background: 'linear-gradient(90deg, var(--timer-1), var(--timer-2), var(--timer-3))',
+                    boxShadow: '0 12px 38px -8px var(--timer-glow)',
+                  }}
+                >
+                  {running ? (
+                    <Pause className="w-9 h-9" fill="currentColor" />
+                  ) : (
+                    <Play className="w-9 h-9 ml-1" fill="currentColor" />
+                  )}
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={skip}
+                  aria-label="Skip"
+                  className="p-5 rounded-full bg-[var(--elevated)] text-[var(--text)] transition-colors border border-border"
+                >
+                  <SkipForward className="w-6 h-6" />
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
 
         {mode === 'focus' && (
           <div className="w-full max-w-sm mt-6 space-y-2">
@@ -375,17 +451,20 @@ export default function Focus() {
 }
 
 // One flip-in digit — springs up from below with a soft blur as it changes.
+// The reference's flip digit, verbatim: a spring rise with a blur that
+// resolves as the digit lands. The blur animates on one small text span —
+// cheap to paint, unlike the SVG-wide filter that was removed.
 function Digit({ char }: { char: string }) {
   return (
-    <div className="relative flex justify-center items-center w-[52px] h-[84px] overflow-hidden">
+    <div className="relative flex justify-center items-center w-[64px] h-[100px] overflow-hidden">
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.span
           key={char}
-          initial={{ y: '55%', opacity: 0 }}
-          animate={{ y: '0%', opacity: 1 }}
-          exit={{ y: '-55%', opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 320, damping: 30, mass: 0.8 }}
-          className="absolute text-7xl font-bold tracking-tighter text-[var(--text)] font-mono tabular-nums will-change-transform"
+          initial={{ y: 60, opacity: 0, scale: 0.8, filter: 'blur(8px)' }}
+          animate={{ y: 0, opacity: 1, scale: 1, filter: 'blur(0px)' }}
+          exit={{ y: -60, opacity: 0, scale: 0.8, filter: 'blur(8px)' }}
+          transition={{ type: 'spring', stiffness: 200, damping: 20, mass: 1 }}
+          className="absolute text-8xl font-bold tracking-tighter text-[var(--text)] font-mono tabular-nums"
         >
           {char}
         </motion.span>
@@ -399,7 +478,7 @@ function TimeDisplay({ timeString }: { timeString: string }) {
     <div className="flex items-center justify-center">
       {timeString.split('').map((char, i) =>
         char === ':' ? (
-          <span key={`c-${i}`} className="text-6xl font-bold text-[var(--text-subtle)] mx-0.5 -mt-4">
+          <span key={`c-${i}`} className="text-7xl font-bold text-[var(--text-subtle)] mx-1 -mt-4">
             :
           </span>
         ) : (

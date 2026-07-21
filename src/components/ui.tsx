@@ -39,22 +39,16 @@ export function PageHeader({
   icon?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
+  void icon; // kept for call-site compatibility; the header is type-led now
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4 mb-8">
-      <div className="flex items-start gap-3">
-        {icon && (
-          <div className="mt-1 w-9 h-9 rounded-lg bg-elevated border border-border flex items-center justify-center text-ink-muted">
-            {icon}
-          </div>
-        )}
-        <div>
-          <h1 className="text-2xl sm:text-[28px] font-bold tracking-[-0.02em] text-ink">
-            {title}
-          </h1>
-          {subtitle && <p className="text-sm text-ink-muted mt-1">{subtitle}</p>}
-        </div>
+    <header className="flex flex-wrap items-end justify-between gap-4 mb-10">
+      <div className="max-w-2xl">
+        <h1 className="font-display text-[32px] sm:text-[42px] font-bold tracking-[-0.025em] leading-[1.05] text-ink">
+          {title}
+        </h1>
+        {subtitle && <p className="text-[15px] text-ink-muted mt-2.5">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
     </header>
   );
 }

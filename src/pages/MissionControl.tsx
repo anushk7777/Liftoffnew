@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { motion } from 'framer-motion';
 import { Check, Clock, ChevronRight, Target, Map } from 'lucide-react';
+import { stagger, rise, useReducedMotion } from '../lib/motion';
 import { useStore } from '../store/useStore';
 import { getBriefing } from '../lib/coach';
 import type { CoachState } from '../lib/coach';
@@ -57,6 +59,7 @@ const Label = ({ children }: { children: React.ReactNode }) => (
 
 export default function MissionControl() {
   const navigate = useNavigate();
+  const rm = useReducedMotion();
   const {
     mission, targetDate, phases, tasks, setTaskStatus, toggleRoadmapTask,
     focusSessions, ideas, activityHistory, streak, pomodoro, habits, habitLog, journeyStart,
@@ -93,12 +96,17 @@ export default function MissionControl() {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto flex flex-col gap-6 pb-10">
+    <motion.div
+      variants={stagger}
+      initial={rm ? false : 'hidden'}
+      animate="show"
+      className="w-full max-w-2xl mx-auto flex flex-col gap-6 pb-10"
+    >
       {/* top row */}
-      <div className="flex items-center justify-between pt-1">
+      <motion.div variants={rise} className="flex items-center justify-between pt-1">
         <Label>Today</Label>
         <span className="text-xs text-[var(--text-subtle)]" style={tnum}>{format(now, 'EEE, MMM d')}</span>
-      </div>
+      </motion.div>
 
       {/* mission statement */}
       {editing ? (
@@ -125,7 +133,7 @@ export default function MissionControl() {
       )}
 
       {/* trajectory */}
-      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
+      <motion.section variants={rise} className="lift rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
         <div className="flex items-center justify-between mb-4">
           <Label>Progress</Label>
           <span className="text-[12.5px] font-semibold flex items-center gap-1.5" style={{ color: tone.color }}>
@@ -169,10 +177,10 @@ export default function MissionControl() {
             <ChevronRight className="w-5 h-5 text-[var(--text-subtle)] group-hover:translate-x-0.5 transition-transform" />
           </button>
         )}
-      </section>
+      </motion.section>
 
       {/* next objective */}
-      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
+      <motion.section variants={rise} className="lift rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
         <div className="flex items-center justify-between mb-3">
           <Label>Up next</Label>
           {step?.context && <span className="text-xs text-[var(--text-subtle)]">{step.context}</span>}
@@ -191,10 +199,10 @@ export default function MissionControl() {
         ) : (
           <p className="text-[15px] text-[var(--text-muted)]">Nothing queued. <button onClick={() => navigate('/roadmap')} className="font-semibold" style={{ color: 'var(--cozy)' }}>Add your next step →</button></p>
         )}
-      </section>
+      </motion.section>
 
       {/* telemetry */}
-      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] grid grid-cols-3" style={{ boxShadow: 'var(--shadow-sm)' }}>
+      <motion.section variants={rise} className="lift rounded-2xl bg-[var(--surface)] border border-[var(--border)] grid grid-cols-3" style={{ boxShadow: 'var(--shadow-sm)' }}>
         {[
           { n: String(daysLeft), s: '', l: 'Days left' },
           { n: String(streak), s: ' day', l: 'Streak' },
@@ -205,10 +213,10 @@ export default function MissionControl() {
             <div className="text-[11px] text-[var(--text-subtle)] mt-1">{c.l}</div>
           </div>
         ))}
-      </section>
+      </motion.section>
 
       {/* launch log */}
-      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
+      <motion.section variants={rise} className="lift rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
         <h4 className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)] mb-4 flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5" /> Recent wins
         </h4>
@@ -227,7 +235,7 @@ export default function MissionControl() {
         ) : (
           <p className="text-sm text-[var(--text-subtle)]">Your completed steps will appear here.</p>
         )}
-      </section>
-    </div>
+      </motion.section>
+    </motion.div>
   );
 }
