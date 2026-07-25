@@ -242,7 +242,13 @@ function PreviewTemplate() {
   );
 }
 
-export default function ClientPortal() {
+/**
+ * @param embedded Rendered inside the main Liftoff shell (the "Trainer" tab)
+ *   rather than as the standalone /coaching page. Invited clients can use
+ *   either: the tab in their own Liftoff, or just the portal installed as its
+ *   own PWA for check-ins only.
+ */
+export default function ClientPortal({ embedded = false }: { embedded?: boolean } = {}) {
   const preview = new URLSearchParams(window.location.search).has('preview');
   const { email, loading: authLoading } = useSessionEmail();
   const [client, setClient] = useState<CoachClient | null>(null);
@@ -258,8 +264,10 @@ export default function ClientPortal() {
   const signedOut = !authLoading && !email;
 
   const ready = state === 'ready' && !!client;
-  useSmoothScroll(ready || preview);
-  const installGuide = useInstallGuide(ready);
+  // Embedded: the app shell owns scrolling, and the install guide belongs to
+  // the standalone portal (Liftoff has its own install prompt).
+  useSmoothScroll(!embedded && (ready || preview));
+  const installGuide = useInstallGuide(ready && !embedded);
 
   // Notify on a new coach reply (only for messages that arrive while open).
   const seenIds = useRef<Set<string>>(new Set());
@@ -424,11 +432,17 @@ export default function ClientPortal() {
   const todayDue = client ? reminderDueToday(scheduleNow, indexByDay(metrics)) : { due: false, kind: null };
   const checkinDue = todayDue.due ? daysSinceCheckin(metrics) : undefined;
 
-  const shell = (children: React.ReactNode) => (
-    <div className="focus-daylight min-h-screen" style={{ background: 'var(--bg)' }}>
-      {children}
-    </div>
-  );
+  // Embedded lives inside the app's own scroll container, so it must not claim
+  // a full viewport or repaint the page background.
+  const shell = (children: React.ReactNode) =>
+    embedded ? (
+      <div className="w-full">{children}</div>
+    ) : (
+      <div className="focus-daylight min-h-screen" style={{ background: 'var(--bg)' }}>
+        {children}
+      </div>
+    );
+  const pad = embedded ? 'py-12' : 'min-h-screen';
 
   if (preview) {
     return shell(
@@ -445,13 +459,13 @@ export default function ClientPortal() {
 
   if (authLoading) {
     return shell(
-      <div className="min-h-screen flex items-center justify-center text-[var(--text-subtle)] animate-pulse">Loading…</div>,
+      <div className={`${pad} flex items-center justify-center text-[var(--text-subtle)] animate-pulse`}>Loading…</div>,
     );
   }
 
   if (signedOut) {
     return shell(
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
+      <div className={`${pad} flex flex-col items-center justify-center p-8 text-center`}>
         <motion.div
           initial={{ scale: 0.85, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -485,21 +499,25 @@ export default function ClientPortal() {
 
   if (state === 'loading') {
     return shell(
-      <div className="min-h-screen flex items-center justify-center text-[var(--text-subtle)] animate-pulse">Loading…</div>,
+      <div className={`${pad} flex items-center justify-center text-[var(--text-subtle)] animate-pulse`}>Loading…</div>,
     );
   }
 
   if (state === 'not-enrolled') {
     return shell(
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
+      <div className={`${pad} flex flex-col items-center justify-center p-8 text-center`}>
         <h1 className="font-display text-[28px] font-bold text-[var(--text)]">Almost there</h1>
         <p className="mt-3 max-w-sm text-[15px] text-[var(--text-muted)]">
           You're signed in as <b className="text-[var(--text)]">{email}</b>, but this email isn't on your
           coach's roster yet. Ask your coach to add it, then reload.
         </p>
-        <button onClick={signOut} className="mt-6 text-sm font-semibold" style={{ color: 'var(--accent)' }}>
-          Use a different account
-        </button>
+        {/* Embedded, this would sign them out of all of Liftoff — not just the
+            coaching page — so the escape hatch stays on the standalone portal. */}
+        {!embedded && (
+          <button onClick={signOut} className="mt-6 text-sm font-semibold" style={{ color: 'var(--accent)' }}>
+            Use a different account
+          </button>
+        )}
       </div>,
     );
   }
@@ -527,8 +545,8 @@ export default function ClientPortal() {
         onLog={log}
         onSend={send}
         onProfile={saveProfile}
-        onSignOut={signOut}
-        onInstall={installGuide.reopen}
+        onSignOut={embedded ? undefined : signOut}
+        onInstall={embedded ? undefined : installGuide.reopen}
         editDate={editDate}
         onEditDate={setEditDate}
         onAlarm={saveAlarm}

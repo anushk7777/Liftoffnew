@@ -19,6 +19,7 @@ import { enablePush, disablePush, isPushSupported, isPushConfigured, pushPermiss
 import { getApiKey, setApiKey, getModel, setModel, AI_MODELS } from '../lib/aicoach';
 import type { AiModelId } from '../lib/aicoach';
 import { useAppMode } from '../afterburn/mode';
+import { useSessionEmail, isCoach } from '../coaching/api';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
 import { DateTimePicker } from '../components/DateTimePicker';
@@ -41,6 +42,9 @@ export default function Settings() {
   } = useStore();
 
   const setAppMode = useAppMode((s) => s.setMode);
+  // Templates is the coaching workspace: coach's account only.
+  const { email } = useSessionEmail();
+  const coach = isCoach(email);
   const [importStatus, setImportStatus] = useState('');
   const [reminders, setReminders] = useState(() => notificationPermission() === 'granted');
   const [push, setPush] = useState(() => isPushConfigured() && pushPermission() === 'granted');
@@ -99,6 +103,11 @@ export default function Settings() {
               <button onClick={() => setAppMode('afterburn')} className="btn btn-secondary !py-1.5 !px-3 text-xs">
                 Afterburn
               </button>
+              {coach && (
+                <button onClick={() => setAppMode('templates')} className="btn btn-secondary !py-1.5 !px-3 text-xs">
+                  Templates
+                </button>
+              )}
               <button onClick={() => setAppMode(null)} className="btn btn-secondary !py-1.5 !px-3 text-xs">
                 Picker
               </button>

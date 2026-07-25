@@ -1,9 +1,14 @@
-import { Rocket, Flame, Sparkles } from 'lucide-react';
+import { Rocket, Flame, Sparkles, ClipboardList } from 'lucide-react';
 import { useAppMode } from './mode';
+import { useSessionEmail, isCoach } from '../coaching/api';
 
 // Shown right after login when no workspace is chosen yet.
 export default function ProfilePicker() {
   const setMode = useAppMode((s) => s.setMode);
+  // Templates is the coaching workspace — private to the coach's own account,
+  // so it isn't offered to anyone else.
+  const { email } = useSessionEmail();
+  const coach = isCoach(email);
 
   return (
     <div className="min-h-screen bg-background text-ink flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -14,7 +19,9 @@ export default function ProfilePicker() {
           <p className="text-ink-muted mt-1">Pick your workspace — switch any time.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        {/* Three workspaces sit best across a row; the coach's fourth card
+            would orphan there, so pair them up two-by-two instead. */}
+        <div className={coach ? 'grid grid-cols-1 sm:grid-cols-2 gap-5' : 'grid grid-cols-1 sm:grid-cols-3 gap-5'}>
           <button
             onClick={() => setMode('focus')}
             className="card p-7 text-left hover:border-accent/50 hover:bg-hover transition-colors group"
@@ -53,6 +60,21 @@ export default function ProfilePicker() {
               Your private diary of moments — capture the instant, with a photo if you like, and meet it again on its anniversaries.
             </p>
           </button>
+
+          {coach && (
+            <button
+              onClick={() => setMode('templates')}
+              className="card p-7 text-left hover:border-[var(--border-strong)] hover:bg-hover transition-colors group"
+            >
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform" style={{ background: 'var(--accent-soft)' }}>
+                <ClipboardList className="w-6 h-6" style={{ color: 'var(--accent)' }} />
+              </div>
+              <h2 className="font-display text-xl font-bold">Liftoff Templates</h2>
+              <p className="text-sm text-ink-muted mt-1">
+                Your coaching roster — each client gets a private page for check-ins, progress photos, plans and a direct line to you.
+              </p>
+            </button>
+          )}
         </div>
       </div>
     </div>
