@@ -7,6 +7,7 @@ import { cn } from '../lib/utils';
 import { bmiOf, bmiBand, type Metric, type MetricInput } from './api';
 import Chart from '../afterburn/Chart';
 import { PhotoSlots } from './photos';
+import { DayWheel } from './DayWheel';
 
 const tnum = { fontVariantNumeric: 'tabular-nums' } as const;
 
@@ -141,6 +142,9 @@ export function MetricsForm({
   saving,
   recentMeasurement,
   previous,
+  day,
+  onDayChange,
+  loggedDays,
   dailyWeight = true,
   showCycle = false,
   existing,
@@ -153,6 +157,10 @@ export function MetricsForm({
   recentMeasurement?: { daysSince: number | null; tooSoon: boolean };
   /** Last recorded value per field, shown as the placeholder. */
   previous?: Partial<Record<keyof MetricInput, number>>;
+  /** The day being logged (yyyy-mm-dd) and its picker. */
+  day?: string;
+  onDayChange?: (d: string) => void;
+  loggedDays?: Set<string>;
   dailyWeight?: boolean;
   /** Offer the period toggle (shown to clients who aren't recorded as male). */
   showCycle?: boolean;
@@ -246,6 +254,14 @@ export function MetricsForm({
           )}
         </span>
       </div>
+      {/* Which day is being logged — kept beside the fields, not buried in a
+          calendar further down the page. */}
+      {day && onDayChange && (
+        <div className="mt-3">
+          <DayWheel value={day} onChange={onDayChange} logged={loggedDays} />
+        </div>
+      )}
+
       {/* Segmented switch — the daily number, or the occasional full set. */}
       <div
         className="relative grid grid-cols-2 gap-1 p-1 mt-3 rounded-xl"
