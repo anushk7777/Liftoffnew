@@ -473,6 +473,32 @@ export async function photoUrl(path: string | null): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
+/**
+ * Remove one progress photo: the stored file, then the reference on the row.
+ *
+ * Order matters. Clearing the column first would orphan the file with nothing
+ * left pointing at it; this way a failed storage delete leaves the row intact
+ * and the photo still visible, which is recoverable. Storage errors are not
+ * fatal — a file that is already gone (or was never uploaded, as with the
+ * preview data) should still release its column.
+ */
+export async function deletePhoto(
+  metricId: string,
+  slot: 'front' | 'side',
+  path: string | null,
+): Promise<void> {
+  if (path && !/^(https?:|data:)/.test(path)) {
+    const { error } = await supabase.storage.from(PHOTO_BUCKET).remove([path]);
+    if (error) console.error('Photo file could not be removed', error);
+  }
+  const column = slot === 'front' ? 'photo_front' : 'photo_side';
+  const { error } = await supabase
+    .from('coaching_metrics')
+    .update({ [column]: null })
+    .eq('id', metricId);
+  if (error) throw error;
+}
+
 /** Resolve many photo paths at once, keyed by path. */
 export async function photoUrls(paths: (string | null)[]): Promise<Record<string, string>> {
   const wanted = paths.filter((p): p is string => !!p);
