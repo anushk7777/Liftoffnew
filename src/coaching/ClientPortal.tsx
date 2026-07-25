@@ -49,6 +49,9 @@ function useSmoothScroll(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    // Touch devices already have excellent momentum scrolling; running a JS
+    // rAF loop over it only costs frames, so this is desktop-only.
+    if (window.matchMedia?.('(pointer: coarse)').matches) return;
     const lenis = new Lenis({ duration: 1.05, smoothWheel: true });
     let raf = 0;
     const loop = (t: number) => {
@@ -157,7 +160,9 @@ function Template({
       </Reveal>
 
       <Reveal>
-        <ProgressPhotos metrics={metrics} />
+        <div className="defer-paint">
+          <ProgressPhotos metrics={metrics} />
+        </div>
       </Reveal>
 
       <Reveal>
@@ -165,7 +170,9 @@ function Template({
       </Reveal>
 
       <Reveal>
-        <MetricsHistory metrics={metrics} />
+        <div className="defer-paint">
+          <MetricsHistory metrics={metrics} />
+        </div>
       </Reveal>
     </div>
   );

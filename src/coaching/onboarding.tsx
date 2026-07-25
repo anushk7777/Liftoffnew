@@ -445,13 +445,19 @@ export function CoachThread({
   showRequest?: boolean;
 }) {
   const [text, setText] = useState('');
-  const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const hasPendingRequest = messages.some(
     (m) => m.kind === 'request' && !messages.some((r) => r.author === 'coach' && r.created_at > m.created_at),
   );
 
+  // Keep the thread pinned to its newest message by scrolling the LIST, never
+  // the page — scrollIntoView here used to yank the whole portal down on load.
+  const firstRun = useRef(true);
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: firstRun.current ? 'auto' : 'smooth' });
+    firstRun.current = false;
   }, [messages.length]);
 
   const send = (kind: 'note' | 'request' = 'note') => {
@@ -480,7 +486,7 @@ export function CoachThread({
         )}
       </div>
 
-      <div className="flex flex-col gap-2.5 max-h-[340px] overflow-y-auto no-scrollbar py-1">
+      <div ref={listRef} className="flex flex-col gap-2.5 max-h-[340px] overflow-y-auto overscroll-contain no-scrollbar py-1">
         {messages.length === 0 ? (
           <p className="text-sm text-[var(--text-subtle)] py-6 text-center">
             {author === 'client'
@@ -517,7 +523,6 @@ export function CoachThread({
             );
           })
         )}
-        <div ref={endRef} />
       </div>
 
       <div className="mt-3 pt-3 border-t border-[var(--border)] flex flex-col gap-2">

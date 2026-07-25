@@ -43,7 +43,7 @@ function DayCell({
     <button
       onClick={onSelect}
       className={cn(
-        'relative aspect-square rounded-xl flex items-center justify-center text-[13px] font-medium transition-colors',
+        'cal-day relative aspect-square rounded-xl flex items-center justify-center text-[13px] font-medium transition-colors',
         !inMonth && 'opacity-25',
         selected && 'ring-2 ring-offset-2',
       )}

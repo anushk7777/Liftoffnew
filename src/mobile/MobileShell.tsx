@@ -2,11 +2,12 @@ import { useState, lazy, Suspense } from 'react';
 import { Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LayoutDashboard, CheckSquare, Timer, MoreHorizontal, Plus, Search,
+  LayoutDashboard, CheckSquare, Timer, MoreHorizontal, Plus, Search, Users,
   Map, Sparkles, Repeat, Inbox, BarChart3, Settings as SettingsIcon, Moon, Sun, Flame,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useAppMode } from '../afterburn/mode';
+import { useSessionEmail, isCoach, useUnreadTotal } from '../coaching/api';
 import { cn } from '../lib/utils';
 import { pop, springSoft, useReducedMotion } from '../lib/motion';
 import { haptics } from '../lib/haptics';
@@ -22,14 +23,15 @@ import Coach from '../pages/Coach';
 import Habits from '../pages/Habits';
 import BrainDump from '../pages/BrainDump';
 import SettingsPage from '../pages/Settings';
+const CoachClients = lazy(() => import('../coaching/CoachClients'));
 import { EmptyState } from '../components/ui';
 const Stats = lazy(() => import('../pages/Stats'));
 
 const TABS = [
-  { to: '/', label: 'Mission', icon: LayoutDashboard, end: true },
-  { to: '/roadmap', label: 'Trajectory', icon: Map },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/roadmap', label: 'Roadmap', icon: Map },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { to: '/focus', label: 'Engage', icon: Timer },
+  { to: '/focus', label: 'Focus', icon: Timer },
 ];
 
 const MORE_LINKS = [
@@ -41,7 +43,7 @@ const MORE_LINKS = [
 ];
 
 const TITLES: Record<string, string> = {
-  '/': 'Mission Control', '/tasks': 'Tasks', '/focus': 'Engage', '/schedule': 'Schedule',
+  '/': 'Dashboard', '/tasks': 'Tasks', '/focus': 'Focus', '/schedule': 'Schedule', '/clients': 'Clients',
   '/roadmap': 'Trajectory', '/coach': 'Coach', '/habits': 'Habits',
   '/brain-dump': 'Brain Dump', '/stats': 'Stats', '/settings': 'Settings',
 };
@@ -58,6 +60,9 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
   const { theme, toggleTheme } = useStore();
   const setAppMode = useAppMode((s) => s.setMode);
   const [moreOpen, setMoreOpen] = useState(false);
+  const { email } = useSessionEmail();
+  const coach = isCoach(email);
+  const unread = useUnreadTotal(coach);
   const rm = useReducedMotion();
 
   const title = TITLES[location.pathname] ?? 'Liftoff';
@@ -113,6 +118,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
                   <Route path="/habits" element={<Habits />} />
                   <Route path="/brain-dump" element={<BrainDump />} />
                   <Route path="/stats" element={<Stats />} />
+                  <Route path="/clients" element={<CoachClients />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
@@ -182,6 +188,26 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
 
       <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
         <div className="grid grid-cols-3 gap-3">
+          {coach && (
+            <button
+              onClick={() => go('/clients')}
+              className={cn(
+                'card flex flex-col items-center justify-center gap-2 py-5 active:scale-95 transition-transform relative',
+                location.pathname === '/clients' && 'border-border-strong text-primary',
+              )}
+            >
+              <Users className="w-6 h-6" />
+              <span className="text-xs font-medium">Clients</span>
+              {unread > 0 && (
+                <span
+                  className="absolute top-2 right-2 min-w-[18px] h-[18px] px-1 rounded-full text-[10.5px] font-bold flex items-center justify-center"
+                  style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}
+                >
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </button>
+          )}
           {MORE_LINKS.map(({ to, label, icon: Icon }) => (
             <button
               key={to}

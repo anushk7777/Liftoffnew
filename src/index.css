@@ -881,3 +881,35 @@
   }
 }
 
+
+
+/* =========================================================================
+   Coaching portal — mobile ergonomics & scroll performance.
+   ========================================================================= */
+@layer utilities {
+  /* Skip layout/paint for sections still far offscreen. The size hint keeps
+     the scrollbar stable so this never causes jumpy scrolling. */
+  .defer-paint {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 420px;
+  }
+
+  @media (max-width: 640px) {
+    /* Comfortable thumb targets on phones (Apple/Google both say ~44px). */
+    .focus-daylight button,
+    .focus-daylight a[role='button'],
+    .focus-daylight label[class*='cursor-pointer'] {
+      min-height: 44px;
+    }
+    /* Calendar days stay square and compact — exempt from the rule above. */
+    .focus-daylight .cal-day {
+      min-height: 0;
+    }
+    /* 16px inputs stop iOS Safari zooming the page on focus. */
+    .focus-daylight input,
+    .focus-daylight textarea,
+    .focus-daylight select {
+      font-size: 16px;
+    }
+  }
+}
