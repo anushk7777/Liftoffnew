@@ -58,8 +58,11 @@ export const ageFromBirthYear = (y: number | null | undefined) =>
   y ? new Date().getFullYear() - y : null;
 
 /** True once the one-time profile questions have been answered. */
+// Gender counts as part of a complete profile: it decides whether cycle
+// tracking is offered, and a weight trend read without the cycle in view is
+// misleading. Rows saved before it was required get asked once.
 export const hasProfile = (c: CoachClient | null) =>
-  !!c && c.height_cm != null && c.birth_year != null;
+  !!c && c.height_cm != null && c.birth_year != null && !!c.sex;
 
 export interface Metric {
   id: string;

@@ -192,7 +192,14 @@ export function ProfileSetup({
   const [age, setAge] = useState('');
   const [sex, setSex] = useState<string | null>(null);
   const [goal, setGoal] = useState<string | null>(null);
-  const valid = Number(height) > 80 && Number(age) > 5 && Number(age) < 110;
+
+  // Gender is required, not a nicety: it decides whether cycle tracking appears,
+  // and weight read without the cycle in view is misleading.
+  const missing: string[] = [];
+  if (!(Number(height) > 80 && Number(height) < 260)) missing.push('height in cm');
+  if (!(Number(age) > 5 && Number(age) < 110)) missing.push('age');
+  if (!sex) missing.push('gender');
+  const valid = missing.length === 0;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-5">
@@ -245,7 +252,7 @@ export function ProfileSetup({
         </div>
 
         <div className="mt-4">
-          <span className="text-[11px] text-[var(--text-muted)]">Sex (optional)</span>
+          <span className="text-[11px] text-[var(--text-muted)]">Gender</span>
           <div className="flex gap-2 mt-1.5">
             {['Male', 'Female', 'Other'].map((s) => (
               <button
@@ -286,6 +293,21 @@ export function ProfileSetup({
           </div>
         </div>
 
+        {/* A disabled button with no explanation reads as a broken app. Say
+            exactly what is still needed. */}
+        <AnimatePresence initial={false}>
+          {!valid && (
+            <motion.p
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="text-[12.5px] text-[var(--text-muted)] mt-5 overflow-hidden"
+            >
+              Still need your <b className="text-[var(--text)] font-semibold">{missing.join(', ')}</b>.
+            </motion.p>
+          )}
+        </AnimatePresence>
+
         <motion.button
           whileHover={{ scale: valid ? 1.02 : 1 }}
           whileTap={{ scale: valid ? 0.98 : 1 }}
@@ -298,7 +320,7 @@ export function ProfileSetup({
               goal,
             })
           }
-          className="mt-7 w-full py-3.5 rounded-xl text-[15px] font-semibold text-[var(--accent-text)] disabled:opacity-40 transition-opacity"
+          className="mt-3 w-full py-3.5 rounded-xl text-[15px] font-semibold text-[var(--accent-text)] disabled:opacity-40 transition-opacity"
           style={{ background: 'var(--accent)' }}
         >
           {saving ? 'Saving…' : "Let's go"}
