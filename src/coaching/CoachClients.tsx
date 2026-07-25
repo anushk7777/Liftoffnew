@@ -147,7 +147,13 @@ function ClientDetail({
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <TrendChart title="Weight" unit="kg" points={metricPoints(metrics, 'weight_kg')} />
+            <TrendChart
+              title="Weight"
+              unit="kg"
+              points={metricPoints(metrics, 'weight_kg')}
+              marked={new Set(metrics.filter((m) => m.menstruating).map((m) => m.taken_on))}
+              markedLabel="On period — expect a temporary rise"
+            />
             <TrendChart title="Waist" unit="cm" points={metricPoints(metrics, 'waist_cm')} />
           </div>
           <ScheduleEditor schedule={scheduleOf(client)} onSave={saveSchedule} saving={savingSchedule} />

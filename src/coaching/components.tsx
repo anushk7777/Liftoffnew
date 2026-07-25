@@ -23,6 +23,7 @@ export function AnimatedGreeting({ name, subtitle }: { name: string; subtitle: s
             animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
             transition={{ delay: 0.08 * i, type: 'spring', stiffness: 220, damping: 24 }}
             className={cn(i === words.length - 1 && 'text-[var(--accent)]')}
+            style={{ willChange: 'transform, opacity, filter' }}
           >
             {w}
           </motion.span>
@@ -54,11 +55,16 @@ export function TrendChart({
   unit,
   points,
   height = 190,
+  marked,
+  markedLabel,
 }: {
   title: string;
   unit: string;
   points: { date: string; value: number }[];
   height?: number;
+  /** Dates to flag on the line (e.g. period days, where weight reads high). */
+  marked?: Set<string>;
+  markedLabel?: string;
 }) {
   const id = useId();
   const w = 100;
@@ -117,12 +123,36 @@ export function TrendChart({
               animate={{ pathLength: 1 }}
               transition={{ duration: 1, ease: [0.21, 1, 0.4, 1] }}
             />
+            {marked &&
+              points.map((p, i) =>
+                marked.has(p.date) ? (
+                  <circle
+                    key={p.date}
+                    cx={x(i)}
+                    cy={y(p.value)}
+                    r={3}
+                    fill="var(--surface)"
+                    stroke="var(--cozy)"
+                    strokeWidth={2}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ) : null,
+              )}
             <circle cx={x(points.length - 1)} cy={y(last)} r={2.4} fill="var(--accent)" />
           </svg>
           <div className="flex justify-between mt-1.5 text-[10px] text-[var(--text-subtle)]">
             <span>{points[0].date.slice(5)}</span>
             <span>{points[points.length - 1].date.slice(5)}</span>
           </div>
+          {marked && markedLabel && points.some((p) => marked.has(p.date)) && (
+            <p className="flex items-center gap-1.5 mt-2 text-[10.5px] text-[var(--text-subtle)]">
+              <span
+                className="w-2 h-2 rounded-full border-2 shrink-0"
+                style={{ borderColor: 'var(--cozy)', background: 'var(--surface)' }}
+              />
+              {markedLabel}
+            </p>
+          )}
         </>
       )}
     </div>
@@ -145,16 +175,20 @@ export function MetricsForm({
   saving,
   measureDay = true,
   dailyWeight = true,
+  showCycle = false,
 }: {
   onSubmit: (m: Partial<MetricInput>, photos: { front: File | null; side: File | null }) => void;
   saving: boolean;
   /** On a scheduled measurement day the full set is asked for; otherwise weight only. */
   measureDay?: boolean;
   dailyWeight?: boolean;
+  /** Offer the period toggle (shown to clients who aren't recorded as male). */
+  showCycle?: boolean;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<{ front: File | null; side: File | null }>({ front: null, side: null });
+  const [onPeriod, setOnPeriod] = useState(false);
   // Weight every day; the rest only on scheduled measurement days.
   const fields = useMemo(
     () => (measureDay ? FIELDS : FIELDS.filter((f) => f.key === 'weight_kg')),
@@ -179,10 +213,12 @@ export function MetricsForm({
       }
     }
     if (notes.trim()) m.notes = notes.trim();
+    if (onPeriod) m.menstruating = true;
     onSubmit(m, photos);
     setValues({});
     setNotes('');
     setPhotos({ front: null, side: null });
+    setOnPeriod(false);
   };
 
   return (
@@ -235,6 +271,36 @@ export function MetricsForm({
           </div>
         </div>
       )}
+      {showCycle && (
+        <button
+          type="button"
+          onClick={() => setOnPeriod((v) => !v)}
+          aria-pressed={onPeriod}
+          className="w-full flex items-center justify-between mt-4 p-3 rounded-xl border transition-colors text-left"
+          style={{
+            borderColor: onPeriod ? 'var(--accent)' : 'var(--border)',
+            background: onPeriod ? 'var(--accent-soft)' : 'transparent',
+          }}
+        >
+          <span className="min-w-0 pr-3">
+            <span className="block text-[13.5px] font-semibold text-[var(--text)]">On my period today</span>
+            <span className="block text-[12px] text-[var(--text-muted)]">
+              Water weight is normal — this keeps your trend honest.
+            </span>
+          </span>
+          <span
+            className="relative w-11 h-6 rounded-full shrink-0 transition-colors"
+            style={{ background: onPeriod ? 'var(--accent)' : 'var(--elevated)' }}
+          >
+            <motion.span
+              layout
+              transition={{ type: 'spring', stiffness: 500, damping: 34 }}
+              className="absolute top-0.5 w-5 h-5 rounded-full bg-white"
+              style={{ left: onPeriod ? 22 : 2 }}
+            />
+          </span>
+        </button>
+      )}
       <textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
@@ -268,6 +334,7 @@ export function MetricsHistory({ metrics }: { metrics: Metric[] }) {
           <tr className="text-left text-[11px] text-[var(--text-subtle)]">
             <th className="py-1.5 pr-3 font-medium">Date</th>
             <th className="py-1.5 pr-3 font-medium">Weight</th>
+            <th className="py-1.5 pr-3 font-medium" title="On their period">Cycle</th>
             <th className="py-1.5 pr-3 font-medium">Waist</th>
             <th className="py-1.5 pr-3 font-medium">Chest</th>
             <th className="py-1.5 font-medium">Notes</th>
@@ -278,6 +345,17 @@ export function MetricsHistory({ metrics }: { metrics: Metric[] }) {
             <tr key={m.id} className="border-t border-[var(--border)] text-[var(--text)]">
               <td className="py-2 pr-3 text-[var(--text-muted)]">{m.taken_on.slice(5)}</td>
               <td className="py-2 pr-3">{m.weight_kg ?? '—'}</td>
+              <td className="py-2 pr-3">
+                {m.menstruating ? (
+                  <span
+                    className="inline-block w-2 h-2 rounded-full border-2"
+                    style={{ borderColor: 'var(--cozy)' }}
+                    title="On their period"
+                  />
+                ) : (
+                  <span className="text-[var(--text-subtle)]">·</span>
+                )}
+              </td>
               <td className="py-2 pr-3">{m.waist_cm ?? '—'}</td>
               <td className="py-2 pr-3">{m.chest_cm ?? '—'}</td>
               <td className="py-2 text-[var(--text-muted)] max-w-[220px] truncate">{m.notes ?? ''}</td>

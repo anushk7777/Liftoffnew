@@ -913,3 +913,36 @@
     }
   }
 }
+
+
+/* =========================================================================
+   High-refresh (90/120Hz+) headroom.
+   At 120Hz a frame is 8.3ms, half the 60Hz budget, so anything that animates
+   must stay on the compositor (transform/opacity) and never trigger layout.
+   ========================================================================= */
+@layer utilities {
+  /* Elements that animate continuously get their own layer up front, so the
+     compositor doesn't have to promote them mid-animation (which is what
+     causes the first-frame stutter people read as "choppy"). */
+  .focus-daylight .cal-day,
+  .focus-daylight .lift,
+  .focus-fab {
+    backface-visibility: hidden;
+  }
+
+  /* Scroll containers hint the compositor rather than repainting the page. */
+  .focus-daylight .overscroll-contain {
+    will-change: scroll-position;
+  }
+}
+
+/* Honour the OS setting everywhere, including the coaching portal. */
+@media (prefers-reduced-motion: reduce) {
+  .focus-daylight *,
+  .focus-daylight *::before,
+  .focus-daylight *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

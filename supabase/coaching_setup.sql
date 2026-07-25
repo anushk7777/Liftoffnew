@@ -239,3 +239,11 @@ alter table public.coaching_clients
 -- Whether the daily weight log is expected at all.
 alter table public.coaching_clients
   add column if not exists daily_weight boolean not null default true;
+
+-- =========================================================================
+-- v5 — cycle context on a check-in.
+-- Weight fluctuates during menstruation; flagging it keeps the trend
+-- honest and tells the coach why a reading jumped. Safe to re-run.
+-- =========================================================================
+alter table public.coaching_metrics
+  add column if not exists menstruating boolean not null default false;

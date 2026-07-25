@@ -465,6 +465,7 @@ function Digit({ char }: { char: string }) {
           exit={{ y: -60, opacity: 0, scale: 0.8, filter: 'blur(8px)' }}
           transition={{ type: 'spring', stiffness: 200, damping: 20, mass: 1 }}
           className="absolute text-8xl font-bold tracking-tighter text-[var(--text)] font-mono tabular-nums"
+          style={{ willChange: 'transform, opacity, filter', backfaceVisibility: 'hidden' }}
         >
           {char}
         </motion.span>

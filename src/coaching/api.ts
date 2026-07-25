@@ -60,6 +60,9 @@ export interface Metric {
   notes: string | null;
   photo_front: string | null;
   photo_side: string | null;
+  /** Client-flagged: on their period that day. Weight reads high — context
+   *  for the coach so a spike isn't mistaken for lost progress. */
+  menstruating: boolean;
 }
 
 export interface Plan {

@@ -24,19 +24,24 @@ import { InstallGuide, ProfileSetup, ProfileCard, CoachThread } from './onboardi
 
 // Sample data so the coach can preview the exact template at /coaching?preview=1.
 const SAMPLE_CLIENT: CoachClient = {
-  id: 'p', name: 'Aarav Sharma', email: 'aarav@example.com', user_id: 'p',
-  created_at: '', height_cm: 178, birth_year: 1998, sex: 'Male', goal: 'Lose fat',
+  id: 'p', name: 'Priya Sharma', email: 'priya@example.com', user_id: 'p',
+  created_at: '', height_cm: 165, birth_year: 1998, sex: 'Female', goal: 'Lose fat',
 };
 const SAMPLE_METRICS: Metric[] = [
-  { id: 'p1', client_id: 'p', taken_on: '2026-06-02', weight_kg: 84.2, height_cm: null, chest_cm: 104, waist_cm: 92, hips_cm: 101, arm_cm: 36, thigh_cm: 58, notes: null, photo_front: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=600&q=70', photo_side: null },
-  { id: 'p2', client_id: 'p', taken_on: '2026-06-16', weight_kg: 82.8, height_cm: null, chest_cm: 104, waist_cm: 90, hips_cm: 100, arm_cm: 36.4, thigh_cm: 58, notes: 'Slept better', photo_front: null, photo_side: null },
-  { id: 'p3', client_id: 'p', taken_on: '2026-06-30', weight_kg: 81.5, height_cm: null, chest_cm: 105, waist_cm: 88.5, hips_cm: 99, arm_cm: 36.8, thigh_cm: 58.5, notes: null, photo_front: null, photo_side: null },
-  { id: 'p4', client_id: 'p', taken_on: '2026-07-14', weight_kg: 80.6, height_cm: null, chest_cm: 105, waist_cm: 87, hips_cm: 98.5, arm_cm: 37.2, thigh_cm: 59, notes: 'PR on squats', photo_front: 'https://images.unsplash.com/photo-1594381898411-846e7d193883?w=600&q=70', photo_side: null },
+  { id: 'p1', client_id: 'p', taken_on: '2026-06-02', weight_kg: 84.2, height_cm: null, chest_cm: 104, waist_cm: 92, hips_cm: 101, arm_cm: 36, thigh_cm: 58, notes: null, photo_front: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=600&q=70', photo_side: null, menstruating: false },
+  { id: 'p2', client_id: 'p', taken_on: '2026-06-16', weight_kg: 82.8, height_cm: null, chest_cm: 104, waist_cm: 90, hips_cm: 100, arm_cm: 36.4, thigh_cm: 58, notes: 'Slept better', photo_front: null, photo_side: null, menstruating: true },
+  { id: 'p3', client_id: 'p', taken_on: '2026-06-30', weight_kg: 81.5, height_cm: null, chest_cm: 105, waist_cm: 88.5, hips_cm: 99, arm_cm: 36.8, thigh_cm: 58.5, notes: null, photo_front: null, photo_side: null, menstruating: false },
+  { id: 'p4', client_id: 'p', taken_on: '2026-07-14', weight_kg: 80.6, height_cm: null, chest_cm: 105, waist_cm: 87, hips_cm: 98.5, arm_cm: 37.2, thigh_cm: 59, notes: 'PR on squats', photo_front: 'https://images.unsplash.com/photo-1594381898411-846e7d193883?w=600&q=70', photo_side: null, menstruating: false },
 ];
 const SAMPLE_MESSAGES: CoachMessage[] = [
   { id: 'm1', client_id: 'p', author: 'client', kind: 'request', body: 'Requesting a diet plan, please.', read_at: null, created_at: '2026-07-10T09:00:00Z' },
   { id: 'm2', client_id: 'p', author: 'coach', kind: 'note', body: "On it — sending your plan tonight. Keep protein at 1.8g/kg until then.", read_at: null, created_at: '2026-07-10T12:30:00Z' },
 ];
+
+/** Dates the client flagged as period days, for chart markers. */
+function cycleDays(metrics: Metric[]): Set<string> {
+  return new Set(metrics.filter((m) => m.menstruating).map((m) => m.taken_on));
+}
 
 function metricPoints(metrics: Metric[], key: keyof Metric) {
   return metrics
@@ -141,6 +146,7 @@ function Template({
           saving={saving}
           measureDay={isMeasureDay(new Date(), schedule)}
           dailyWeight={schedule.dailyWeight}
+          showCycle={client.sex !== 'Male'}
         />
       </Reveal>
 
@@ -150,7 +156,13 @@ function Template({
 
       <Reveal>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <TrendChart title="Weight" unit="kg" points={metricPoints(metrics, 'weight_kg')} />
+          <TrendChart
+            title="Weight"
+            unit="kg"
+            points={metricPoints(metrics, 'weight_kg')}
+            marked={cycleDays(metrics)}
+            markedLabel="On period — water weight is normal"
+          />
           <TrendChart title="Waist" unit="cm" points={metricPoints(metrics, 'waist_cm')} />
         </div>
       </Reveal>
