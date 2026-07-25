@@ -162,6 +162,9 @@ function Template({
             editDate ? new Date(`${editDate}T12:00:00`) : new Date(),
           )}
           previous={lastKnownValues(metrics, editDate ?? todayKey())}
+          day={editDate ?? todayKey()}
+          onDayChange={(d) => onEditDate(d === todayKey() ? null : d)}
+          loggedDays={new Set(metrics.map((m) => m.taken_on))}
           dailyWeight={schedule.dailyWeight}
           showCycle={!!client.sex && client.sex !== 'Male'}
           editingDate={editDate ?? undefined}
