@@ -154,9 +154,6 @@ function Template({
         <MetricsForm
           onSubmit={onLog}
           saving={saving}
-          // Always open. Measurements are the client's call — there is no
-          // schedule deciding which days are allowed.
-          measureDay
           recentMeasurement={measuredRecently(
             byDay,
             editDate ? new Date(`${editDate}T12:00:00`) : new Date(),

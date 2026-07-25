@@ -21,12 +21,19 @@ export default function Chart({
   height = 200,
   accent = 'var(--ember)',
   format: fmtValue,
+  marked,
+  markedLabel,
+  emptyHint = 'Log at least two entries to see your trend.',
 }: {
   points: ChartPoint[];
   unit?: string;
   height?: number;
   accent?: string;
   format?: (v: number) => string;
+  /** Dates to ring on the line — e.g. period days, where weight reads high. */
+  marked?: Set<string>;
+  markedLabel?: string;
+  emptyHint?: string;
 }) {
   const gid = useId();
   const rm = useReducedMotion();
@@ -38,9 +45,7 @@ export default function Chart({
 
   if (points.length < 2) {
     return (
-      <div className="card p-6 text-center text-sm text-ink-subtle">
-        Log at least two entries to see your trend.
-      </div>
+      <div className="card p-6 text-center text-sm text-ink-subtle">{emptyHint}</div>
     );
   }
 
@@ -169,6 +174,26 @@ export default function Chart({
           />
         ))}
 
+        {/* flagged days (e.g. on-period) get a hollow ring */}
+        {marked &&
+          points.map((p, i) =>
+            marked.has(p.date) ? (
+              <motion.circle
+                key={`mk-${i}`}
+                cx={x(i)}
+                cy={y(p.value)}
+                r={6}
+                fill="none"
+                stroke="var(--cozy)"
+                strokeWidth="2"
+                vectorEffect="non-scaling-stroke"
+                initial={rm ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.25, delay: rm ? 0 : 0.5 }}
+              />
+            ) : null,
+          )}
+
         {/* crosshair + active dot while scrubbing */}
         {ap && (
           <g>
@@ -193,6 +218,16 @@ export default function Chart({
         <span>{format(new Date(points[0].date), 'MMM d')}</span>
         <span>{format(new Date(points[n - 1].date), 'MMM d')}</span>
       </div>
+
+      {marked && markedLabel && points.some((p) => marked.has(p.date)) && (
+        <p className="flex items-center gap-1.5 mt-2 text-[10.5px] text-ink-subtle">
+          <span
+            className="w-2.5 h-2.5 rounded-full border-2 shrink-0"
+            style={{ borderColor: 'var(--cozy)' }}
+          />
+          {markedLabel}
+        </p>
+      )}
     </div>
   );
 }

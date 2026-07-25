@@ -1,11 +1,11 @@
 // Coaching micro-app — shared presentation pieces (used by both the client
 // portal and the coach's dashboard so the "template" looks identical).
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Bell, X, Volume2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { bmiOf, bmiBand, type Metric, type MetricInput } from './api';
-import { useElementWidth } from '../lib/useElementWidth';
+import Chart from '../afterburn/Chart';
 import { PhotoSlots } from './photos';
 
 const tnum = { fontVariantNumeric: 'tabular-nums' } as const;
@@ -19,18 +19,26 @@ export function AnimatedGreeting({ name, subtitle }: { name: string; subtitle: s
   // phrase now holds together and the name gets its own line at any width.
   const words = ['Welcome', 'back,'];
   return (
+    // Everything here is inline-block rather than flex, so the greeting simply
+    // follows whatever text-align its parent sets. Flex ignores text-align, so
+    // a flex row inside the centred sign-in column pinned "Welcome back," hard
+    // left while the name and rule centred — the lines disagreed with each
+    // other and with the page. Left on the template, centred on sign-in, from
+    // one component and no alignment prop.
     <div>
       <h1 className="font-display text-[26px] sm:text-[34px] md:text-[44px] font-bold tracking-[-0.025em] leading-[1.12] text-[var(--text)]">
-        <span className="flex flex-wrap gap-x-[0.28em] gap-y-1">
+        <span className="block">
           {words.map((w, i) => (
             <motion.span
               key={i}
               initial={{ y: 26, opacity: 0, filter: 'blur(6px)' }}
               animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
               transition={{ delay: 0.08 * i, type: 'spring', stiffness: 220, damping: 24 }}
+              className="inline-block"
               style={{ willChange: 'transform, opacity, filter' }}
             >
               {w}
+              {i < words.length - 1 && ' '}
             </motion.span>
           ))}
         </span>
@@ -45,13 +53,19 @@ export function AnimatedGreeting({ name, subtitle }: { name: string; subtitle: s
           {name}
         </motion.span>
       </h1>
-      <motion.div
-        initial={{ scaleX: 0 }}
-        animate={{ scaleX: 1 }}
-        transition={{ delay: 0.08 * words.length + 0.1, duration: 0.5, ease: [0.21, 1, 0.4, 1] }}
-        className="origin-left mt-3 h-[3px] w-24 rounded-full"
-        style={{ background: 'linear-gradient(90deg, var(--timer-1), var(--timer-3))' }}
-      />
+      {/* inline-block in a block wrapper, so the rule tracks the text alignment */}
+      <span className="block mt-3">
+        <motion.span
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ delay: 0.08 * words.length + 0.1, duration: 0.5, ease: [0.21, 1, 0.4, 1] }}
+          className="inline-block h-[3px] w-24 rounded-full align-middle"
+          style={{
+            background: 'linear-gradient(90deg, var(--timer-1), var(--timer-3))',
+            transformOrigin: 'center',
+          }}
+        />
+      </span>
       <motion.p
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -65,12 +79,16 @@ export function AnimatedGreeting({ name, subtitle }: { name: string; subtitle: s
 }
 
 // ---- Trend chart ---------------------------------------------------------
-// Dependency-free SVG line chart with an area fill and end-point glow.
+// One chart, shared with Afterburn. The coaching side used to have its own,
+// weaker copy — no gridlines, no value labels, no scrubbing, and a 100x100
+// viewBox stretched with preserveAspectRatio="none" that squashed the marker
+// dots into ellipses. This is the same component the workout app uses, in the
+// coaching accent, wrapped in the card the portal expects.
 export function TrendChart({
   title,
   unit,
   points,
-  height = 190,
+  height = 200,
   marked,
   markedLabel,
 }: {
@@ -82,112 +100,27 @@ export function TrendChart({
   marked?: Set<string>;
   markedLabel?: string;
 }) {
-  const id = useId();
-  // Drawn at real pixel width, measured from the card.
-  //
-  // This used to be a fixed 100x100 viewBox stretched with
-  // preserveAspectRatio="none", which scales x and y by different factors: the
-  // marker dots came out as ellipses whose distortion changed with the window
-  // width, so the chart visibly deformed as it resized.
-  const [wrapRef, w] = useElementWidth<HTMLDivElement>(320);
-  const h = height;
-  const pad = 10;
-  const values = points.map((p) => p.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const x = (i: number) => (points.length <= 1 ? w / 2 : pad + (i / (points.length - 1)) * (w - pad * 2));
-  const y = (v: number) => h - pad - ((v - min) / range) * (h - pad * 2);
-  // Replaying the draw on a data change needs a new element; framer only runs
-  // `initial` on mount, so without this a fresh entry appeared with no line.
-  const drawKey = `${points.length}:${points[points.length - 1]?.date ?? ''}`;
-  const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(2)},${y(p.value).toFixed(2)}`).join(' ');
-  const area = `${path} L${x(points.length - 1)},${h} L${x(0)},${h} Z`;
-  const first = values[0];
-  const last = values[values.length - 1];
-  const delta = last - first;
-
   return (
-    <div className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
-      <div className="flex items-baseline justify-between mb-3">
-        <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">{title}</span>
-        {points.length > 1 && (
-          <span
-            className="text-[12px] font-semibold"
-            style={{ color: delta <= 0 ? 'var(--success)' : 'var(--warning)', ...tnum }}
-          >
-            {delta > 0 ? '+' : ''}{delta.toFixed(1)} {unit}
-          </span>
-        )}
-      </div>
-      {points.length === 0 ? (
-        <p className="text-sm text-[var(--text-subtle)] py-8 text-center">No entries yet.</p>
-      ) : (
-        <>
-          <div className="flex items-baseline gap-1.5 mb-2">
-            <span className="text-[26px] font-bold tracking-tight text-[var(--text)]" style={tnum}>{last}</span>
-            <span className="text-[13px] text-[var(--text-muted)]">{unit}</span>
-          </div>
-          <div ref={wrapRef} className="w-full">
-          <svg
-            width={w}
-            height={h}
-            viewBox={`0 0 ${w} ${h}`}
-            style={{ width: '100%', height, display: 'block', overflow: 'visible' }}
-          >
-            <defs>
-              <linearGradient id={`tc-${id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.22} />
-                <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <path d={area} fill={`url(#tc-${id})`} />
-            <motion.path
-              key={drawKey}
-              d={path}
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: 1, ease: [0.21, 1, 0.4, 1] }}
-            />
-            {marked &&
-              points.map((p, i) =>
-                marked.has(p.date) ? (
-                  <circle
-                    key={p.date}
-                    cx={x(i)}
-                    cy={y(p.value)}
-                    r={4}
-                    fill="var(--surface)"
-                    stroke="var(--cozy)"
-                    strokeWidth={2}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                ) : null,
-              )}
-            <circle cx={x(points.length - 1)} cy={y(last)} r={3.5} fill="var(--accent)" />
-          </svg>
-          </div>
-          <div className="flex justify-between mt-1.5 text-[10px] text-[var(--text-subtle)]">
-            <span>{points[0].date.slice(5)}</span>
-            <span>{points[points.length - 1].date.slice(5)}</span>
-          </div>
-          {marked && markedLabel && points.some((p) => marked.has(p.date)) && (
-            <p className="flex items-center gap-1.5 mt-2 text-[10.5px] text-[var(--text-subtle)]">
-              <span
-                className="w-2 h-2 rounded-full border-2 shrink-0"
-                style={{ borderColor: 'var(--cozy)', background: 'var(--surface)' }}
-              />
-              {markedLabel}
-            </p>
-          )}
-        </>
-      )}
+    <div
+      className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-5"
+      style={{ boxShadow: 'var(--shadow-sm)' }}
+    >
+      <span className="block text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)] mb-3">
+        {title}
+      </span>
+      <Chart
+        points={points}
+        unit={unit}
+        height={height}
+        accent="var(--accent)"
+        marked={marked}
+        markedLabel={markedLabel}
+        emptyHint={
+          points.length === 0
+            ? 'No entries yet — your first check-in starts the trend.'
+            : 'One entry so far. Log another to see the trend.'
+        }
+      />
     </div>
   );
 }
@@ -206,7 +139,6 @@ const FIELDS: { key: keyof MetricInput; label: string; unit: string }[] = [
 export function MetricsForm({
   onSubmit,
   saving,
-  measureDay = true,
   recentMeasurement,
   dailyWeight = true,
   showCycle = false,
@@ -216,8 +148,6 @@ export function MetricsForm({
 }: {
   onSubmit: (m: Partial<MetricInput>, photos: { front: File | null; side: File | null }) => void;
   saving: boolean;
-  /** On a scheduled measurement day the full set is asked for; otherwise weight only. */
-  measureDay?: boolean;
   /** How long since the last measurements, for the "give it time" note. */
   recentMeasurement?: { daysSince: number | null; tooSoon: boolean };
   dailyWeight?: boolean;
@@ -229,6 +159,11 @@ export function MetricsForm({
   editingDate?: string;
   onCancelEdit?: () => void;
 }) {
+  // Two jobs, two tabs. Weight is a daily ten-second thing; measurements are
+  // occasional and involve tape and photos. One combined form meant opening a
+  // six-field sheet to type a single number, so the daily habit felt like a
+  // chore. Weight leads because it is the one done most often.
+  const [tab, setTab] = useState<'weight' | 'measure'>('weight');
   const [values, setValues] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<{ front: File | null; side: File | null }>({ front: null, side: null });
@@ -248,10 +183,10 @@ export function MetricsForm({
     setOnPeriod(!!existing?.menstruating);
     setPhotos({ front: null, side: null });
   }, [existing, editingDate]);
-  // Weight every day; the rest only on scheduled measurement days.
+  const measuring = tab === 'measure';
   const fields = useMemo(
-    () => (measureDay ? FIELDS : FIELDS.filter((f) => f.key === 'weight_kg')),
-    [measureDay],
+    () => (measuring ? FIELDS.filter((f) => f.key !== 'weight_kg') : FIELDS.filter((f) => f.key === 'weight_kg')),
+    [measuring],
   );
   const canSave = useMemo(
     () => Object.values(values).some((v) => v.trim() !== '') || !!photos.front || !!photos.side,
@@ -288,12 +223,12 @@ export function MetricsForm({
       className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6"
       style={{ boxShadow: 'var(--shadow-sm)' }}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">
           {editingDate
             ? `Editing ${new Date(`${editingDate}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}`
-            : measureDay
-              ? "Today's full check-in"
+            : measuring
+              ? 'Measurements'
               : "Today's weigh-in"}
         </span>
         <span className="flex items-center gap-2">
@@ -308,16 +243,53 @@ export function MetricsForm({
           )}
         </span>
       </div>
-      {!measureDay && (
-        <p className="text-[12.5px] text-[var(--text-muted)] mt-1">
-          {dailyWeight ? 'Just your weight today.' : 'Log your measurements whenever you like.'}
+      {/* Segmented switch — the daily number, or the occasional full set. */}
+      <div
+        className="relative grid grid-cols-2 gap-1 p-1 mt-3 rounded-xl"
+        style={{ background: 'var(--elevated)' }}
+        role="tablist"
+      >
+        {([
+          { id: 'weight', label: 'Weight', hint: 'daily' },
+          { id: 'measure', label: 'Measurements', hint: 'now and then' },
+        ] as const).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className="relative py-2 rounded-lg text-[13px] font-semibold transition-colors"
+            style={{ color: tab === t.id ? 'var(--accent-text)' : 'var(--text-muted)' }}
+          >
+            {tab === t.id && (
+              <motion.span
+                layoutId="checkin-tab"
+                transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                className="absolute inset-0 rounded-lg"
+                style={{ background: 'var(--accent)' }}
+              />
+            )}
+            <span className="relative">
+              {t.label}
+              <span className="block text-[10px] font-medium opacity-70">{t.hint}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {!measuring && (
+        <p className="text-[12.5px] text-[var(--text-muted)] mt-3">
+          {dailyWeight
+            ? 'Type it and go — that is the whole check-in.'
+            : 'Just your weight. Type it and go.'}
         </p>
       )}
 
       {/* The only measurement prompt there is: you measured a few days ago and
           are about to again. Advice, not a gate — the form stays fully usable. */}
       <AnimatePresence initial={false}>
-        {measureDay && recentMeasurement?.tooSoon && (
+        {measuring && recentMeasurement?.tooSoon && (
           <motion.p
             initial={{ opacity: 0, y: -4, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
@@ -339,7 +311,7 @@ export function MetricsForm({
           </motion.p>
         )}
       </AnimatePresence>
-      <div className={cn('grid gap-3 mt-4', measureDay ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2')}>
+      <div className={cn('grid gap-3 mt-4', measuring ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-1')}>
         {fields.map((f) => (
           <label key={f.key} className="block">
             <span className="text-[11px] text-[var(--text-muted)]">{f.label} ({f.unit})</span>
@@ -355,7 +327,7 @@ export function MetricsForm({
           </label>
         ))}
       </div>
-      {measureDay && (
+      {measuring && (
         <div className="mt-4">
           <span className="text-[11px] text-[var(--text-muted)]">Progress photos (optional)</span>
           <div className="mt-1.5">
@@ -409,7 +381,7 @@ export function MetricsForm({
         style={{ background: 'var(--accent)' }}
       >
         <Plus className="w-4 h-4" />{' '}
-        {saving ? 'Saving…' : existing ? 'Update entry' : measureDay ? 'Save check-in' : 'Save weight'}
+        {saving ? 'Saving…' : existing ? 'Update entry' : measuring ? 'Save measurements' : 'Save weight'}
       </motion.button>
     </form>
   );
