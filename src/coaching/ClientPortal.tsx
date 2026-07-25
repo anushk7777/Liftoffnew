@@ -16,7 +16,9 @@ import {
 } from './api';
 import {
   AnimatedGreeting, TrendChart, MetricsForm, MetricsHistory, CheckinDueBanner, BmiCard,
+  AlarmCard, AlarmRinging,
 } from './components';
+import { startAlarm, stopAlarm, testAlarm, alarmDue, markAlarmFired, primeAlarmAudio } from './alarm';
 import { ProgressPhotos } from './photos';
 import { CheckinCalendar } from './Calendar';
 import { scheduleOf, isMeasureDay, indexByDay, reminderDueToday, scheduleLabel } from './schedule';
@@ -37,6 +39,10 @@ const SAMPLE_MESSAGES: CoachMessage[] = [
   { id: 'm1', client_id: 'p', author: 'client', kind: 'request', body: 'Requesting a diet plan, please.', read_at: null, created_at: '2026-07-10T09:00:00Z' },
   { id: 'm2', client_id: 'p', author: 'coach', kind: 'note', body: "On it — sending your plan tonight. Keep protein at 1.8g/kg until then.", read_at: null, created_at: '2026-07-10T12:30:00Z' },
 ];
+
+const dayKeyLocal = (d: Date) =>
+  `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
+const todayKey = () => dayKeyLocal(new Date());
 
 /** Dates the client flagged as period days, for chart markers. */
 function cycleDays(metrics: Metric[]): Set<string> {
@@ -87,7 +93,7 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 
 function Template({
   client, metrics, messages, saving, sending, dueDays, onDismissDue,
-  onLog, onSend, onProfile, onSignOut, onInstall,
+  onLog, onSend, onProfile, onSignOut, onInstall, editDate, onEditDate, onAlarm,
 }: {
   client: CoachClient;
   metrics: Metric[];
@@ -97,6 +103,9 @@ function Template({
   dueDays?: number | null;
   onDismissDue?: () => void;
   onLog: (m: Partial<MetricInput>, photos: { front: File | null; side: File | null }) => void;
+  editDate: string | null;
+  onEditDate: (d: string | null) => void;
+  onAlarm: (p: { alarm_time: string | null; alarm_enabled: boolean }) => void;
   onSend: (body: string, kind?: 'note' | 'request') => void;
   onProfile: (p: { height_cm: number; birth_year: number; goal: string | null }) => void;
   onSignOut?: () => void;
@@ -144,14 +153,36 @@ function Template({
         <MetricsForm
           onSubmit={onLog}
           saving={saving}
-          measureDay={isMeasureDay(new Date(), schedule)}
+          // First ever entry is always the full set — that's the baseline every
+          // later measurement is compared against. After that, the schedule rules.
+          measureDay={
+            metrics.length === 0 ||
+            isMeasureDay(editDate ? new Date(`${editDate}T12:00:00`) : new Date(), schedule)
+          }
           dailyWeight={schedule.dailyWeight}
           showCycle={client.sex !== 'Male'}
+          editingDate={editDate ?? undefined}
+          existing={metrics.find((m) => m.taken_on === (editDate ?? todayKey()))}
+          onCancelEdit={editDate ? () => onEditDate(null) : undefined}
         />
       </Reveal>
 
       <Reveal>
-        <CheckinCalendar metrics={metrics} schedule={schedule} />
+        <CheckinCalendar
+          metrics={metrics}
+          schedule={schedule}
+          onPickDay={(d) => onEditDate(dayKeyLocal(d))}
+        />
+      </Reveal>
+
+      <Reveal>
+        <AlarmCard
+          time={client.alarm_time ?? null}
+          enabled={client.alarm_enabled ?? false}
+          onSave={onAlarm}
+          onTest={testAlarm}
+          saving={saving}
+        />
       </Reveal>
 
       <Reveal>
@@ -190,6 +221,27 @@ function Template({
   );
 }
 
+/** The template with sample data and working local interactions, so the coach
+ *  can actually try the calendar/edit flow at /coaching?preview=1. */
+function PreviewTemplate() {
+  const [editDate, setEditDate] = useState<string | null>(null);
+  return (
+    <Template
+      client={SAMPLE_CLIENT}
+      metrics={SAMPLE_METRICS}
+      messages={SAMPLE_MESSAGES}
+      saving={false}
+      sending={false}
+      onLog={() => {}}
+      onSend={() => {}}
+      onProfile={() => {}}
+      editDate={editDate}
+      onEditDate={setEditDate}
+      onAlarm={() => {}}
+    />
+  );
+}
+
 export default function ClientPortal() {
   const preview = new URLSearchParams(window.location.search).has('preview');
   const { email, loading: authLoading } = useSessionEmail();
@@ -200,6 +252,8 @@ export default function ClientPortal() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [dueDismissed, setDueDismissed] = useState(false);
+  const [editDate, setEditDate] = useState<string | null>(null);
+  const [ringing, setRinging] = useState(false);
   const remindedRef = useRef(false);
   const signedOut = !authLoading && !email;
 
@@ -269,6 +323,28 @@ export default function ClientPortal() {
     );
   }, [state, preview, metrics, client]);
 
+  // Check every 30s whether the alarm time has arrived. Only rings while the
+  // page is open — stated plainly in the UI rather than over-promised.
+  useEffect(() => {
+    if (state !== 'ready' || preview || !client?.alarm_enabled) return;
+    const tick = () => {
+      if (alarmDue(client.alarm_time)) {
+        markAlarmFired();
+        setRinging(true);
+        startAlarm(30);
+        void notify('Time to weigh in', 'Same time, same scale, before breakfast.', 'weigh-alarm');
+      }
+    };
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, [state, preview, client]);
+
+  const dismissAlarm = () => {
+    stopAlarm();
+    setRinging(false);
+  };
+
   const signIn = () =>
     supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -290,6 +366,7 @@ export default function ClientPortal() {
       if (photos.side) withPhotos.photo_side = await uploadPhoto(client.id, photos.side, 'side');
       await addMetric(client.id, withPhotos);
       setDueDismissed(true);
+      setEditDate(null);
       await refresh(client);
     } catch (e) {
       console.error('Failed to save check-in', e);
@@ -308,6 +385,19 @@ export default function ClientPortal() {
       console.error('Failed to send message', e);
     } finally {
       setSending(false);
+    }
+  };
+
+  const saveAlarm = async (p: { alarm_time: string | null; alarm_enabled: boolean }) => {
+    if (!client) return;
+    primeAlarmAudio(); // this click is our chance to unlock audio for later
+    setSaving(true);
+    try {
+      setClient(await updateProfile(client.id, p));
+    } catch (e) {
+      console.error('Failed to save alarm', e);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -348,16 +438,7 @@ export default function ClientPortal() {
             Template preview — sample data
           </span>
         </div>
-        <Template
-          client={SAMPLE_CLIENT}
-          metrics={SAMPLE_METRICS}
-          messages={SAMPLE_MESSAGES}
-          saving={false}
-          sending={false}
-          onLog={() => {}}
-          onSend={() => {}}
-          onProfile={() => {}}
-        />
+        <PreviewTemplate />
       </>,
     );
   }
@@ -448,7 +529,11 @@ export default function ClientPortal() {
         onProfile={saveProfile}
         onSignOut={signOut}
         onInstall={installGuide.reopen}
+        editDate={editDate}
+        onEditDate={setEditDate}
+        onAlarm={saveAlarm}
       />
+      <AnimatePresence>{ringing && <AlarmRinging onDismiss={dismissAlarm} />}</AnimatePresence>
     </>,
   );
 }

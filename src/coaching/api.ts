@@ -21,6 +21,9 @@ export interface CoachClient {
   measure_cadence?: 'weekly' | 'biweekly';
   measure_anchor?: string | null;
   daily_weight?: boolean;
+  /** Local "HH:MM" for the daily weigh-in alarm. */
+  alarm_time?: string | null;
+  alarm_enabled?: boolean;
   // One-time profile details — asked once, edited from Profile, never on a
   // per-check-in basis.
   height_cm: number | null;
@@ -158,14 +161,27 @@ export async function listMetrics(clientId: string): Promise<Metric[]> {
   return data ?? [];
 }
 
-export async function addMetric(clientId: string, m: Partial<MetricInput>): Promise<Metric> {
+/**
+ * Save a check-in for a day. Saving the same day again EDITS that entry
+ * instead of creating a duplicate, so clients can always correct a mistake.
+ */
+export async function saveMetric(clientId: string, m: Partial<MetricInput>): Promise<Metric> {
+  const day = m.taken_on ?? new Date().toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from('coaching_metrics')
-    .insert({ client_id: clientId, ...m })
+    .upsert({ client_id: clientId, ...m, taken_on: day }, { onConflict: 'client_id,taken_on' })
     .select()
     .single();
   if (error) throw error;
   return data;
+}
+
+/** Back-compat alias — same upsert behaviour. */
+export const addMetric = saveMetric;
+
+export async function deleteMetric(id: string): Promise<void> {
+  const { error } = await supabase.from('coaching_metrics').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ---- Plan ----------------------------------------------------------------
@@ -197,7 +213,8 @@ export async function updateProfile(
   clientId: string,
   patch: Partial<Pick<CoachClient,
     'height_cm' | 'birth_year' | 'sex' | 'goal' | 'name' |
-    'measure_weekday' | 'measure_cadence' | 'measure_anchor' | 'daily_weight'>>,
+    'measure_weekday' | 'measure_cadence' | 'measure_anchor' | 'daily_weight' |
+    'alarm_time' | 'alarm_enabled'>>,
 ): Promise<CoachClient> {
   const { data, error } = await supabase
     .from('coaching_clients')

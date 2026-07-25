@@ -247,3 +247,34 @@ alter table public.coaching_clients
 -- =========================================================================
 alter table public.coaching_metrics
   add column if not exists menstruating boolean not null default false;
+
+-- =========================================================================
+-- v6 — editable check-ins + a weigh-in alarm.
+-- Clients may correct any entry they own, and set a daily alarm time.
+-- Safe to re-run.
+-- =========================================================================
+
+-- Clients can fix their own past entries (they could only insert before).
+drop policy if exists client_update_metrics on public.coaching_metrics;
+create policy client_update_metrics on public.coaching_metrics
+  for update using (
+    client_id in (select id from public.coaching_clients where user_id = auth.uid())
+  )
+  with check (
+    client_id in (select id from public.coaching_clients where user_id = auth.uid())
+  );
+
+-- …and remove one they logged by mistake.
+drop policy if exists client_delete_metrics on public.coaching_metrics;
+create policy client_delete_metrics on public.coaching_metrics
+  for delete using (
+    client_id in (select id from public.coaching_clients where user_id = auth.uid())
+  );
+
+-- One entry per client per day keeps edits unambiguous.
+create unique index if not exists coaching_metrics_one_per_day
+  on public.coaching_metrics (client_id, taken_on);
+
+-- Daily weigh-in alarm, set by the client (local "HH:MM").
+alter table public.coaching_clients add column if not exists alarm_time text;
+alter table public.coaching_clients add column if not exists alarm_enabled boolean not null default false;

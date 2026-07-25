@@ -1,8 +1,8 @@
 // Coaching micro-app — shared presentation pieces (used by both the client
 // portal and the coach's dashboard so the "template" looks identical).
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Bell, X } from 'lucide-react';
+import { Plus, Bell, X, Volume2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { bmiOf, bmiBand, type Metric, type MetricInput } from './api';
 import { PhotoSlots } from './photos';
@@ -176,6 +176,9 @@ export function MetricsForm({
   measureDay = true,
   dailyWeight = true,
   showCycle = false,
+  existing,
+  editingDate,
+  onCancelEdit,
 }: {
   onSubmit: (m: Partial<MetricInput>, photos: { front: File | null; side: File | null }) => void;
   saving: boolean;
@@ -184,11 +187,31 @@ export function MetricsForm({
   dailyWeight?: boolean;
   /** Offer the period toggle (shown to clients who aren't recorded as male). */
   showCycle?: boolean;
+  /** The entry already saved for this date — pre-fills so it can be corrected. */
+  existing?: Metric;
+  /** yyyy-mm-dd being edited; defaults to today. */
+  editingDate?: string;
+  onCancelEdit?: () => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<{ front: File | null; side: File | null }>({ front: null, side: null });
   const [onPeriod, setOnPeriod] = useState(false);
+
+  // Re-seed whenever the day (or its saved entry) changes, so switching days
+  // in the calendar loads that day's numbers instead of stale ones.
+  useEffect(() => {
+    const seed: Record<string, string> = {};
+    for (const f of FIELDS) {
+      const v = existing?.[f.key as keyof Metric];
+      if (typeof v === 'number') seed[f.key] = String(v);
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the form to the selected day's saved entry
+    setValues(seed);
+    setNotes(existing?.notes ?? '');
+    setOnPeriod(!!existing?.menstruating);
+    setPhotos({ front: null, side: null });
+  }, [existing, editingDate]);
   // Weight every day; the rest only on scheduled measurement days.
   const fields = useMemo(
     () => (measureDay ? FIELDS : FIELDS.filter((f) => f.key === 'weight_kg')),
@@ -203,7 +226,9 @@ export function MetricsForm({
     e.preventDefault();
     if (!canSave || saving) return;
     const d = new Date();
-    const local = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
+    const local =
+      editingDate ??
+      `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
     const m: Partial<MetricInput> = { taken_on: local };
     for (const f of fields) {
       const raw = values[f.key]?.trim();
@@ -213,7 +238,7 @@ export function MetricsForm({
       }
     }
     if (notes.trim()) m.notes = notes.trim();
-    if (onPeriod) m.menstruating = true;
+    m.menstruating = onPeriod;
     onSubmit(m, photos);
     setValues({});
     setNotes('');
@@ -229,16 +254,31 @@ export function MetricsForm({
     >
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">
-          {measureDay ? "Today's full check-in" : "Today's weigh-in"}
+          {editingDate
+            ? `Editing ${new Date(`${editingDate}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}`
+            : measureDay
+              ? "Today's full check-in"
+              : "Today's weigh-in"}
         </span>
-        {measureDay && (
-          <span
-            className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ color: 'var(--accent)', background: 'var(--accent-soft)' }}
-          >
-            Measurement day
-          </span>
-        )}
+        <span className="flex items-center gap-2">
+          {measureDay && !editingDate && (
+            <span
+              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ color: 'var(--accent)', background: 'var(--accent-soft)' }}
+            >
+              Measurement day
+            </span>
+          )}
+          {onCancelEdit && (
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              className="text-[12px] font-semibold text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+            >
+              Back to today
+            </button>
+          )}
+        </span>
       </div>
       {!measureDay && (
         <p className="text-[12.5px] text-[var(--text-muted)] mt-1">
@@ -289,7 +329,7 @@ export function MetricsForm({
             </span>
           </span>
           <span
-            className="relative w-11 h-6 rounded-full shrink-0 transition-colors"
+            className="switch-track relative w-11 h-6 rounded-full shrink-0 transition-colors"
             style={{ background: onPeriod ? 'var(--accent)' : 'var(--elevated)' }}
           >
             <motion.span
@@ -316,7 +356,8 @@ export function MetricsForm({
         className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl py-3 text-[15px] font-semibold text-[var(--accent-text)] disabled:opacity-40 transition-opacity"
         style={{ background: 'var(--accent)' }}
       >
-        <Plus className="w-4 h-4" /> {saving ? 'Saving…' : measureDay ? 'Save check-in' : 'Save weight'}
+        <Plus className="w-4 h-4" />{' '}
+        {saving ? 'Saving…' : existing ? 'Update entry' : measureDay ? 'Save check-in' : 'Save weight'}
       </motion.button>
     </form>
   );
@@ -450,6 +491,132 @@ export function BmiCard({ metrics, heightCm }: { metrics: Metric[]; heightCm: nu
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// ---- Weigh-in alarm settings --------------------------------------------
+export function AlarmCard({
+  time,
+  enabled,
+  onSave,
+  onTest,
+  saving,
+}: {
+  time: string | null;
+  enabled: boolean;
+  onSave: (p: { alarm_time: string | null; alarm_enabled: boolean }) => void;
+  onTest: () => void;
+  saving: boolean;
+}) {
+  const [t, setT] = useState(time ?? '07:30');
+  const [on, setOn] = useState(enabled);
+  const dirty = t !== (time ?? '07:30') || on !== enabled;
+
+  return (
+    <section
+      className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5"
+      style={{ boxShadow: 'var(--shadow-sm)' }}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">
+          Weigh-in alarm
+        </span>
+        <button
+          onClick={() => setOn((v) => !v)}
+          aria-pressed={on}
+          className="switch-track relative w-11 h-6 rounded-full shrink-0 transition-colors"
+          style={{ background: on ? 'var(--accent)' : 'var(--elevated)' }}
+          aria-label="Toggle alarm"
+        >
+          <motion.span
+            layout
+            transition={{ type: 'spring', stiffness: 500, damping: 34 }}
+            className="absolute top-0.5 w-5 h-5 rounded-full bg-white"
+            style={{ left: on ? 22 : 2 }}
+          />
+        </button>
+      </div>
+
+      <p className="text-[12.5px] text-[var(--text-muted)] mt-1.5">
+        A loud alarm at the same time daily, so weighing in becomes automatic.
+      </p>
+
+      <div className="flex items-center gap-2 mt-4">
+        <input
+          type="time"
+          value={t}
+          onChange={(e) => setT(e.target.value)}
+          className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-[15px] font-semibold text-[var(--text)] outline-none focus:border-[var(--accent)]"
+          style={{ fontVariantNumeric: 'tabular-nums' }}
+        />
+        <button
+          onClick={onTest}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg border border-[var(--border)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--border-strong)] transition-colors"
+        >
+          <Volume2 className="w-4 h-4" /> Test
+        </button>
+      </div>
+
+      <motion.button
+        whileHover={{ scale: dirty ? 1.02 : 1 }}
+        whileTap={{ scale: dirty ? 0.98 : 1 }}
+        disabled={!dirty || saving}
+        onClick={() => onSave({ alarm_time: t, alarm_enabled: on })}
+        className="mt-3 w-full py-2.5 rounded-xl text-[14px] font-semibold text-[var(--accent-text)] disabled:opacity-40 transition-opacity"
+        style={{ background: 'var(--accent)' }}
+      >
+        {saving ? 'Saving…' : dirty ? 'Save alarm' : 'Alarm saved'}
+      </motion.button>
+
+      <p className="text-[11px] text-[var(--text-subtle)] mt-2.5">
+        Rings while the app is open. Install it to your home screen so it can reach you reliably.
+      </p>
+    </section>
+  );
+}
+
+// ---- Ringing overlay -----------------------------------------------------
+export function AlarmRinging({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[140] flex items-center justify-center p-6">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0"
+        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
+      />
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+        className="relative w-full max-w-sm rounded-3xl border border-[var(--border)] p-8 text-center"
+        style={{ background: 'var(--surface)', boxShadow: 'var(--shadow-lg)' }}
+      >
+        <motion.div
+          animate={{ scale: [1, 1.12, 1] }}
+          transition={{ repeat: Infinity, duration: 1 }}
+          className="w-20 h-20 rounded-full mx-auto flex items-center justify-center"
+          style={{ background: 'var(--accent)' }}
+        >
+          <Bell className="w-10 h-10" style={{ color: 'var(--accent-text)' }} />
+        </motion.div>
+        <h2 className="font-display text-[26px] font-bold tracking-tight text-[var(--text)] mt-5">
+          Time to weigh in
+        </h2>
+        <p className="text-[14px] text-[var(--text-muted)] mt-1.5">
+          Same time, same scale, before breakfast — that's what makes the trend readable.
+        </p>
+        <button
+          onClick={onDismiss}
+          className="mt-6 w-full py-3.5 rounded-xl text-[15px] font-semibold text-[var(--accent-text)]"
+          style={{ background: 'var(--accent)' }}
+        >
+          Stop alarm
+        </button>
+      </motion.div>
     </div>
   );
 }

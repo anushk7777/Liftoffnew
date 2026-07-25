@@ -329,7 +329,7 @@ export function ScheduleEditor({
           <span className="block text-[12px] text-[var(--text-muted)]">Ask for weight every day</span>
         </span>
         <span
-          className="relative w-11 h-6 rounded-full transition-colors shrink-0"
+          className="switch-track relative w-11 h-6 rounded-full transition-colors shrink-0"
           style={{ background: daily ? 'var(--accent)' : 'var(--elevated)' }}
         >
           <motion.span

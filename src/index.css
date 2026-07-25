@@ -901,8 +901,10 @@
     .focus-daylight label[class*='cursor-pointer'] {
       min-height: 44px;
     }
-    /* Calendar days stay square and compact — exempt from the rule above. */
-    .focus-daylight .cal-day {
+    /* Calendar days and switch tracks keep their own size — the 44px rule is
+       for the tappable row, not the small control drawn inside it. */
+    .focus-daylight .cal-day,
+    .focus-daylight .switch-track {
       min-height: 0;
     }
     /* 16px inputs stop iOS Safari zooming the page on focus. */
