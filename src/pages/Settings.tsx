@@ -43,6 +43,8 @@ export default function Settings() {
   } = useStore();
 
   const setAppMode = useAppMode((s) => s.setMode);
+  const resetIntros = useAppMode((s) => s.resetIntros);
+  const [introStatus, setIntroStatus] = useState('');
   // Templates is the coaching workspace: coach's account only.
   const { email } = useSessionEmail();
   const coach = isCoach(email);
@@ -141,6 +143,21 @@ export default function Settings() {
           </Row>
           <Row label="Disable animations" desc="Turns off all motion everywhere — Liftoff and Afterburn.">
             <Toggle checked={reduceMotion} onChange={setReduceMotion} />
+          </Row>
+          <Row
+            label="Workspace intros"
+            desc="Each workspace plays its opening animation once. Replay them all."
+          >
+            <button
+              onClick={() => {
+                resetIntros();
+                setIntroStatus('Intros will play again.');
+                setTimeout(() => setIntroStatus(''), 4000);
+              }}
+              className="btn btn-secondary !py-1.5 !px-3 text-xs"
+            >
+              {introStatus || 'Play again'}
+            </button>
           </Row>
         </Section>
 
