@@ -37,6 +37,9 @@ const CommandPalette = lazy(() => import('./components/CommandPalette'));
 // in with Google there); the coach dashboard rides inside the desktop shell.
 const ClientPortal = lazy(() => import('./coaching/ClientPortal'));
 const CoachClients = lazy(() => import('./coaching/CoachClients'));
+// Templates: the coaching micro-app as its own workspace, alongside Afterburn
+// and Kairos. Keeps a route to the roster even when the /clients tab is hidden.
+const Templates = lazy(() => import('./coaching/Templates'));
 import SettingsPage from './pages/Settings';
 import Schedule from './pages/Schedule';
 import Login from './pages/Login';
@@ -68,12 +71,23 @@ function Shell() {
   const [authChecking, setAuthChecking] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setAuthChecking(false);
-      if (!session && location.pathname !== '/login' && !location.pathname.startsWith('/coaching')) {
-        navigate('/login');
-      }
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setAuthChecking(false);
+        if (!session && location.pathname !== '/login' && !location.pathname.startsWith('/coaching')) {
+          navigate('/login');
+        }
+      })
+      // Never leave the app stuck on the loading splash: if the auth service
+      // can't be reached, fall through to the login screen instead.
+      .catch((err) => {
+        console.error('Could not read the auth session:', err);
+        setAuthChecking(false);
+        if (location.pathname !== '/login' && !location.pathname.startsWith('/coaching')) {
+          navigate('/login');
+        }
+      });
 
     const {
       data: { subscription },
@@ -182,6 +196,19 @@ function Shell() {
         <AlarmOverlay />
       </>
     );
+  if (appMode === 'templates')
+    return (
+      <>
+        <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center text-ink-subtle animate-pulse">Loading…</div>}>
+          <Templates />
+        </Suspense>
+        {/* Keep the PWA update path reachable here too. */}
+        <OfflineBanner />
+        <PWAPrompt />
+        <InstallPrompt />
+        <AlarmOverlay />
+      </>
+    );
   if (appMode === 'kairos')
     return (
       <>
@@ -223,6 +250,15 @@ function Shell() {
         element={
           <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-subtle animate-pulse">Loading…</div>}>
             <CoachClients />
+          </Suspense>
+        }
+      />
+      {/* An invited client's own check-in template, inside their Liftoff. */}
+      <Route
+        path="/trainer"
+        element={
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-subtle animate-pulse">Loading…</div>}>
+            <ClientPortal embedded />
           </Suspense>
         }
       />

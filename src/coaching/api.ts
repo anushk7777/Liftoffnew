@@ -2,10 +2,22 @@
 // Access control lives in RLS (supabase/coaching_setup.sql); everything here
 // just queries and lets the database decide what each account may see.
 import { useEffect, useRef, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
-/** The coach's account. Only this login sees the roster & plan editors. */
-export const COACH_EMAIL = 'anushkdua2508@gmail.com';
+/**
+ * The coach's account(s). Only these logins see the roster & plan editors.
+ *
+ * Set `VITE_COACH_EMAIL` to override (comma-separated for more than one coach).
+ * Vite bakes env vars in at BUILD time, so changing it on the host needs a
+ * redeploy. The fallback keeps existing deployments working untouched.
+ */
+const COACH_EMAILS: string[] = (import.meta.env.VITE_COACH_EMAIL || 'anushkdua2508@gmail.com')
+  .split(',')
+  .map((e: string) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+/** Primary coach address — used for copy ("sign in as …"). */
+export const COACH_EMAIL = COACH_EMAILS[0] ?? '';
 
 export interface CoachClient {
   id: string;
@@ -78,26 +90,48 @@ export interface Plan {
 
 export type MetricInput = Omit<Metric, 'id' | 'client_id'>;
 
-/** Session email, live-updated on auth changes. null = signed out. */
-export function useSessionEmail(): { email: string | null; loading: boolean } {
+/**
+ * Session email, live-updated on auth changes. null = signed out.
+ *
+ * `getSession()` is wrapped: a rejection (offline, unusable refresh token,
+ * Supabase unreachable) must never leave `loading` stuck true, or every
+ * coach-gated surface would silently disappear with no way to tell why.
+ */
+export function useSessionEmail(): { email: string | null; loading: boolean; error: string | null } {
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setEmail(session?.user?.email ?? null);
-      setLoading(false);
-    });
+    let alive = true;
+    supabase.auth
+      .getSession()
+      .then(({ data: { session }, error: err }) => {
+        if (!alive) return;
+        if (err) setError(err.message);
+        setEmail(session?.user?.email ?? null);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (!alive) return;
+        console.error('Coaching: could not read the auth session', err);
+        setError(err instanceof Error ? err.message : 'Could not reach the auth service.');
+        setLoading(false);
+      });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (!alive) return;
       setEmail(session?.user?.email ?? null);
       setLoading(false);
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      alive = false;
+      subscription.unsubscribe();
+    };
   }, []);
-  return { email, loading };
+  return { email, loading, error };
 }
 
 export const isCoach = (email: string | null) =>
-  (email ?? '').toLowerCase() === COACH_EMAIL.toLowerCase();
+  !!email && COACH_EMAILS.includes(email.trim().toLowerCase());
 
 // ---- Coach: roster ------------------------------------------------------
 export async function listClients(): Promise<CoachClient[]> {
@@ -148,6 +182,41 @@ export async function getMyClientRecord(): Promise<CoachClient | null> {
     return claimed ?? { ...data, user_id: uid };
   }
   return data;
+}
+
+/**
+ * Whether the signed-in account is on the coach's roster.
+ *
+ * Drives the in-app "Trainer" tab: a client the coach invited gets their
+ * check-in template inside their own Liftoff, without having to use the
+ * standalone /coaching portal. Both routes stay open — the portal is still
+ * there for clients who'd rather install just that as a PWA.
+ *
+ * Skipped entirely for the coach's own account (`enabled: false`) so it costs
+ * nothing on the roster side.
+ */
+export function useIsClient(email: string | null, enabled = true): { isClient: boolean; loading: boolean } {
+  const active = enabled && !!email && isSupabaseConfigured;
+  // Answer is stamped with the address it was resolved for, so signing in as
+  // someone else can never leave the previous account's tab on screen.
+  const [res, setRes] = useState<{ email: string; isClient: boolean } | null>(null);
+  useEffect(() => {
+    if (!active || !email) return;
+    let alive = true;
+    getMyClientRecord()
+      .then((c) => {
+        if (alive) setRes({ email, isClient: !!c });
+      })
+      .catch((e: unknown) => {
+        console.error('Could not check coaching enrolment', e);
+        if (alive) setRes({ email, isClient: false });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [active, email]);
+  const known = res && res.email === email ? res : null;
+  return { isClient: active && !!known?.isClient, loading: active && !known };
 }
 
 // ---- Metrics -------------------------------------------------------------

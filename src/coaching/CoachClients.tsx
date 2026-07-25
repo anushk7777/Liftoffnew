@@ -2,9 +2,9 @@
 // gate here; the real enforcement is the RLS policies in Supabase).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserPlus, Users, Send, Trash2, ChevronLeft } from 'lucide-react';
+import { UserPlus, Users, Send, Trash2, ChevronLeft, ShieldAlert } from 'lucide-react';
 import { PageHeader } from '../components/ui';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import {
   useSessionEmail, isCoach, listClients, addClient, removeClient,
   listMetrics, listMessages, sendMessage, subscribeClient, ageFromBirthYear, notify, ensureNotificationPermission, updateProfile,
@@ -168,8 +168,68 @@ function ClientDetail({
   );
 }
 
-export default function CoachClients() {
-  const { email, loading } = useSessionEmail();
+/**
+ * Why the roster isn't showing. This screen replaces what used to be a bare
+ * "Coach access only" card — the roster could disappear for three quite
+ * different reasons and none of them said which, so it just looked deleted.
+ */
+function CoachGateNotice({ email, error }: { email: string | null; error: string | null }) {
+  const signIn = () =>
+    void supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+
+  return (
+    <div className="mx-auto max-w-lg py-12 text-center">
+      <span
+        className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center"
+        style={{ background: 'var(--warning-soft, color-mix(in srgb, var(--warning) 14%, transparent))' }}
+      >
+        <ShieldAlert className="w-6 h-6" style={{ color: 'var(--warning)' }} />
+      </span>
+      <h1 className="font-display text-[26px] font-bold text-ink mt-4">Coach account required</h1>
+
+      {!isSupabaseConfigured ? (
+        <p className="text-sm text-ink-muted mt-2">
+          Supabase isn't configured in this build, so there's no account to check. Set{' '}
+          <code className="text-ink">VITE_SUPABASE_URL</code> and{' '}
+          <code className="text-ink">VITE_SUPABASE_ANON_KEY</code> on the host and redeploy — Vite
+          bakes these in at build time, so a redeploy is required for them to take effect.
+        </p>
+      ) : error ? (
+        <p className="text-sm text-ink-muted mt-2">
+          Couldn't read your sign-in session ({error}). Check your connection and reload — the
+          roster is still here, it just can't verify who you are right now.
+        </p>
+      ) : email ? (
+        // Deliberately does not name the coach address — anyone signed in can
+        // reach this screen, and the roster is meant to stay private.
+        <p className="text-sm text-ink-muted mt-2">
+          You're signed in as <b className="text-ink">{email}</b>, which isn't the coach account.
+          Switch to the coach account to manage your roster.
+        </p>
+      ) : (
+        <p className="text-sm text-ink-muted mt-2">
+          You're signed out. Sign in with the coach account to manage your roster.
+        </p>
+      )}
+
+      {isSupabaseConfigured && (
+        <button
+          onClick={signIn}
+          className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-[var(--accent-text)] transition-transform active:scale-95"
+          style={{ background: 'var(--accent)' }}
+        >
+          Sign in with Google
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function CoachClients({ embedded = false }: { embedded?: boolean } = {}) {
+  const { email, loading, error: authError } = useSessionEmail();
   const [clients, setClients] = useState<CoachClient[]>([]);
   const [selected, setSelected] = useState<CoachClient | null>(null);
   const [name, setName] = useState('');
@@ -197,14 +257,10 @@ export default function CoachClients() {
     void ensureNotificationPermission();
   }, [email, refresh]);
 
-  if (!loading && !isCoach(email)) {
-    return (
-      <div className="py-20 text-center">
-        <h1 className="font-display text-[28px] font-bold text-ink">Coach access only</h1>
-        <p className="text-sm text-ink-muted mt-2">This area belongs to the coach's account.</p>
-      </div>
-    );
+  if (loading) {
+    return <p className="py-20 text-center text-sm text-ink-subtle animate-pulse">Checking your account…</p>;
   }
+  if (!isCoach(email)) return <CoachGateNotice email={email} error={authError} />;
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,10 +291,13 @@ export default function CoachClients() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <PageHeader
-        title="Clients"
-        subtitle="Your coaching roster — each client gets a private template page."
-      />
+      {/* Inside the Templates workspace the shell already names the page. */}
+      {!embedded && (
+        <PageHeader
+          title="Clients"
+          subtitle="Your coaching roster — each client gets a private template page."
+        />
+      )}
 
       {!isSupabaseConfigured && (
         <div className="mb-6 rounded-xl border p-4 text-sm" style={{ borderColor: 'var(--warning)', color: 'var(--warning)' }}>

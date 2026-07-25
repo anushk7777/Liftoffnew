@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, CheckSquare, Timer, MoreHorizontal, Plus, Search, Users,
   Map, Sparkles, Repeat, Inbox, BarChart3, Settings as SettingsIcon, Moon, Sun, Flame,
+  ClipboardList,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useAppMode } from '../afterburn/mode';
-import { useSessionEmail, isCoach, useUnreadTotal } from '../coaching/api';
+import { useSessionEmail, isCoach, useUnreadTotal, useIsClient } from '../coaching/api';
 import { cn } from '../lib/utils';
 import { pop, springSoft, useReducedMotion } from '../lib/motion';
 import { haptics } from '../lib/haptics';
@@ -24,6 +25,7 @@ import Habits from '../pages/Habits';
 import BrainDump from '../pages/BrainDump';
 import SettingsPage from '../pages/Settings';
 const CoachClients = lazy(() => import('../coaching/CoachClients'));
+const ClientPortal = lazy(() => import('../coaching/ClientPortal'));
 import { EmptyState } from '../components/ui';
 const Stats = lazy(() => import('../pages/Stats'));
 
@@ -44,6 +46,7 @@ const MORE_LINKS = [
 
 const TITLES: Record<string, string> = {
   '/': 'Dashboard', '/tasks': 'Tasks', '/focus': 'Focus', '/schedule': 'Schedule', '/clients': 'Clients',
+  '/trainer': 'Trainer',
   '/roadmap': 'Trajectory', '/coach': 'Coach', '/habits': 'Habits',
   '/brain-dump': 'Brain Dump', '/stats': 'Stats', '/settings': 'Settings',
 };
@@ -62,6 +65,8 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
   const [moreOpen, setMoreOpen] = useState(false);
   const { email } = useSessionEmail();
   const coach = isCoach(email);
+  // Invited clients get their own check-in tab in the More sheet.
+  const { isClient } = useIsClient(email, !coach);
   const unread = useUnreadTotal(coach);
   const rm = useReducedMotion();
 
@@ -119,6 +124,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
                   <Route path="/brain-dump" element={<BrainDump />} />
                   <Route path="/stats" element={<Stats />} />
                   <Route path="/clients" element={<CoachClients />} />
+                  <Route path="/trainer" element={<ClientPortal embedded />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
@@ -208,6 +214,18 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
               )}
             </button>
           )}
+          {isClient && (
+            <button
+              onClick={() => go('/trainer')}
+              className={cn(
+                'card flex flex-col items-center justify-center gap-2 py-5 active:scale-95 transition-transform',
+                location.pathname === '/trainer' && 'border-border-strong text-primary',
+              )}
+            >
+              <ClipboardList className="w-6 h-6" />
+              <span className="text-xs font-medium">Trainer</span>
+            </button>
+          )}
           {MORE_LINKS.map(({ to, label, icon: Icon }) => (
             <button
               key={to}
@@ -221,6 +239,17 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
               <span className="text-xs font-medium">{label}</span>
             </button>
           ))}
+          {/* Templates is the coaching workspace: coach's account only. */}
+          {coach && (
+            <button
+              onClick={() => { setMoreOpen(false); haptics.tap(); setAppMode('templates'); }}
+              className="card flex flex-col items-center justify-center gap-2 py-5 active:scale-95 transition-transform"
+              style={{ color: 'var(--accent)' }}
+            >
+              <ClipboardList className="w-6 h-6" />
+              <span className="text-xs font-medium">Templates</span>
+            </button>
+          )}
           <button
             onClick={() => { setMoreOpen(false); haptics.tap(); setAppMode('afterburn'); }}
             className="card flex flex-col items-center justify-center gap-2 py-5 active:scale-95 transition-transform text-[var(--text-muted)] border-[var(--border)]"

@@ -1,7 +1,7 @@
 // Liftoff Afterburn — workout logger types.
 export type ExerciseSource = 'powerbuilding' | 'arms' | 'custom';
 export type WeightUnit = 'kg' | 'lb';
-export type AppMode = 'focus' | 'afterburn' | 'kairos';
+export type AppMode = 'focus' | 'afterburn' | 'kairos' | 'templates';
 
 /** A prescribed exercise in the program (the plan, as written). */
 export interface ProgramExercise {

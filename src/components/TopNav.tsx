@@ -14,10 +14,11 @@ import {
   Search,
   Plus,
   Users,
+  ClipboardList,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useAppMode } from '../afterburn/mode';
-import { useSessionEmail, isCoach, useUnreadTotal } from '../coaching/api';
+import { useSessionEmail, isCoach, useUnreadTotal, useIsClient } from '../coaching/api';
 import { cn } from '../lib/utils';
 
 const NAV = [
@@ -30,6 +31,8 @@ const NAV = [
 ];
 
 const CLIENTS_ITEM = { to: '/clients', label: 'Clients', icon: Users, end: false };
+/** An invited client's own check-in page — never shown to the coach. */
+const TRAINER_ITEM = { to: '/trainer', label: 'Trainer', icon: ClipboardList, end: false };
 
 export default function TopNav({
   onOpenSearch,
@@ -42,8 +45,11 @@ export default function TopNav({
   const setAppMode = useAppMode((s) => s.setMode);
   const { email } = useSessionEmail();
   const coach = isCoach(email);
+  // Invited clients get their own check-in tab; only look this up for accounts
+  // that aren't the coach.
+  const { isClient } = useIsClient(email, !coach);
   // The coaching roster is visible only to the coach's own account.
-  const navItems = coach ? [...NAV, CLIENTS_ITEM] : NAV;
+  const navItems = coach ? [...NAV, CLIENTS_ITEM] : isClient ? [...NAV, TRAINER_ITEM] : NAV;
   const unread = useUnreadTotal(coach);
 
   return (
@@ -117,6 +123,18 @@ export default function TopNav({
       {/* Right cluster */}
       <div className="flex items-center gap-1.5 shrink-0">
         {/* World switchers — keep their own signature colours */}
+        {/* Templates is the coaching workspace: coach's account only. */}
+        {coach && (
+          <button
+            onClick={() => setAppMode('templates')}
+            title="Enter Templates"
+            className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold transition-[transform,filter,box-shadow] hover:scale-105 hover:brightness-110 active:scale-95"
+            style={{ color: 'var(--accent)', background: 'var(--accent-soft)' }}
+          >
+            <ClipboardList className="w-4 h-4" />
+            Templates
+          </button>
+        )}
         <button
           onClick={() => setAppMode('afterburn')}
           title="Enter Afterburn"
