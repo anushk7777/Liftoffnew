@@ -383,6 +383,10 @@ interface AfterburnState {
   currentWeekId: string;
   setCurrentWeek: (id: string) => void;
   _cloudLoaded: boolean;
+  /** Which account this device's training log belongs to. See loadWorkouts. */
+  ownerId: string | null;
+  /** Wipe this device's training log — used when the signed-in account changes. */
+  resetTraining: () => void;
   loadWorkouts: () => Promise<void>;
   loadProgram: (program: WorkoutProgram) => void;
   startDay: (dayId: string) => void;
@@ -424,6 +428,21 @@ export const useAfterburn = create<AfterburnState>()(
       currentWeekId: '',
       setCurrentWeek: (id) => set({ currentWeekId: id }),
       _cloudLoaded: false,
+      ownerId: null,
+
+      resetTraining: () => {
+        const fresh = useAfterburn.getInitialState();
+        setMarker('1970-01-01T00:00:00.000Z');
+        set({
+          program: fresh.program,
+          currentWeekId: fresh.currentWeekId,
+          sessions: fresh.sessions,
+          bodyweight: fresh.bodyweight,
+          recovery: fresh.recovery,
+          nutrition: fresh.nutrition,
+          ownerId: null,
+        });
+      },
 
       // Pull from the cloud (recency-guarded) when entering the workout app.
       loadWorkouts: async () => {
@@ -439,10 +458,19 @@ export const useAfterburn = create<AfterburnState>()(
             set({ _cloudLoaded: true });
             return;
           }
+          // A different account on this browser: the local training log belongs
+          // to the previous one. Without this, an older/absent cloud row leaves
+          // their program and logged sessions in place for the new account —
+          // and the next save uploads it into that account's row.
+          const id = session.user.id;
+          const prevOwner = get().ownerId;
+          if (prevOwner && prevOwner !== id) get().resetTraining();
+          set({ ownerId: id });
+
           const { data, error } = await supabase
             .from('workout_data')
             .select('data, updated_at')
-            .eq('id', session.user.id)
+            .eq('id', id)
             .single();
           if (error && error.code !== 'PGRST116') console.error('Afterburn cloud load failed', error);
           const cloudTs = data?.updated_at ?? '';

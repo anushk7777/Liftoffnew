@@ -20,6 +20,7 @@ import { getApiKey, setApiKey, getModel, setModel, AI_MODELS } from '../lib/aico
 import type { AiModelId } from '../lib/aicoach';
 import { useAppMode } from '../afterburn/mode';
 import { useSessionEmail, isCoach } from '../coaching/api';
+import { AccountRow } from '../components/AccountMenu';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
 import { DateTimePicker } from '../components/DateTimePicker';
@@ -96,6 +97,17 @@ export default function Settings() {
       />
 
       <div className="space-y-8">
+        {/* Account — which Google account this Liftoff is signed in to. The
+            coaching tabs key off this address, so it needs to be visible. */}
+        <Section title="Account" icon={<SettingsIcon className="w-4 h-4" />}>
+          <div className="py-2">
+            <AccountRow />
+            <p className="text-xs text-ink-subtle mt-2">
+              The Clients and Trainer tabs depend on which Google account you're signed in with.
+            </p>
+          </div>
+        </Section>
+
         {/* Workspace */}
         <Section title="Workspace" icon={<Flame className="w-4 h-4" />}>
           <Row label="Switch app" desc="Jump to Liftoff Afterburn (workout logger) or the profile picker.">

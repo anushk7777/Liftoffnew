@@ -19,6 +19,7 @@ import {
 import { useStore } from '../store/useStore';
 import { useAppMode } from '../afterburn/mode';
 import { useSessionEmail, isCoach, useUnreadTotal, useIsClient } from '../coaching/api';
+import AccountMenu from './AccountMenu';
 import { cn } from '../lib/utils';
 
 const NAV = [
@@ -197,6 +198,9 @@ export default function TopNav({
         >
           <Settings className="w-[18px] h-[18px]" />
         </NavLink>
+
+        {/* Which account am I on, and how do I switch? */}
+        <AccountMenu />
       </div>
     </motion.header>
   );
