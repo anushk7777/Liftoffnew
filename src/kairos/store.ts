@@ -56,8 +56,12 @@ export type MomentEdit = Partial<Pick<Moment, 'text' | 'mood' | 'photo' | 'place
 
 interface KairosState {
   moments: Moment[];
+  /** Which account this device's diary belongs to. See loadMoments. */
+  ownerId: string | null;
   _cloudLoaded: boolean;
   loadMoments: () => Promise<void>;
+  /** Wipe this device's diary — used when the signed-in account changes. */
+  resetDiary: () => void;
   /** Capture a moment. The timestamp is locked here, at the instant of capture. */
   addMoment: (m: NewMoment) => Moment;
   /** Refine an existing moment's words/mood/song/place. createdAt stays locked. */
@@ -98,7 +102,13 @@ export const useKairos = create<KairosState>()(
   persist(
     (set, get) => ({
       moments: [],
+      ownerId: null,
       _cloudLoaded: false,
+
+      resetDiary: () => {
+        setMarker(EPOCH);
+        set({ moments: [], ownerId: null });
+      },
 
       loadMoments: async () => {
         if (!isSupabaseConfigured) {
@@ -113,10 +123,19 @@ export const useKairos = create<KairosState>()(
             set({ _cloudLoaded: true });
             return;
           }
+          // A different account on this browser: the local diary belongs to the
+          // previous one. Clearing it first is essential — the branch below
+          // UPLOADS local moments the cloud doesn't have, which would write one
+          // person's private diary into another's account.
+          const id = session.user.id;
+          const prevOwner = get().ownerId;
+          if (prevOwner && prevOwner !== id) get().resetDiary();
+          set({ ownerId: id });
+
           const { data, error } = await supabase
             .from('journal_data')
             .select('data, updated_at')
-            .eq('id', session.user.id)
+            .eq('id', id)
             .single();
           if (error && error.code !== 'PGRST116') console.error('Kairos cloud load failed', error);
           const cloudTs = data?.updated_at ?? '';
@@ -196,7 +215,9 @@ export const useKairos = create<KairosState>()(
     {
       name: 'liftoff-kairos',
       version: 1,
-      partialize: (s) => ({ moments: s.moments }),
+      // ownerId is persisted so an account switch is detectable across reloads;
+      // it is never part of the cloud payload (which sends only `moments`).
+      partialize: (s) => ({ moments: s.moments, ownerId: s.ownerId }),
     },
   ),
 );
