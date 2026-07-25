@@ -44,53 +44,77 @@ function daysBetween(a: Date, b: Date): number {
   return Math.round((B - A) / DAY_MS);
 }
 
-/** Is this date a scheduled measurement day? */
-export function isMeasureDay(date: Date, s: Schedule): boolean {
-  if (date.getDay() !== s.measureWeekday) return false;
-  if (s.cadence === 'weekly') return true;
-  // Biweekly: every other occurrence counted from the anchor.
-  const anchor = s.anchor ? parseDay(s.anchor) : null;
-  if (!anchor) return true; // no anchor set yet — treat every week as due
-  const weeks = Math.round(daysBetween(anchor, date) / 7);
-  return weeks % 2 === 0;
+/**
+ * How often we SUGGEST full measurements. It is a recommendation and nothing
+ * more: no day is ever "due", nothing is ever "missed", and measurements can be
+ * logged on any day. A day becomes a measurement day because it was logged.
+ */
+export const RECOMMENDED_GAP_DAYS = 14;
+
+/** Does this entry carry real measurements (not just a weight)? */
+export function hasMeasurements(m: Metric | undefined): boolean {
+  return (
+    !!m &&
+    (m.waist_cm != null || m.chest_cm != null || m.hips_cm != null ||
+      m.arm_cm != null || m.thigh_cm != null || !!m.photo_front || !!m.photo_side)
+  );
 }
 
-/** The next scheduled measurement day on or after `from`. */
-export function nextMeasureDay(from: Date, s: Schedule): Date {
-  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  for (let i = 0; i < 30; i++) {
-    if (isMeasureDay(d, s)) return d;
-    d.setDate(d.getDate() + 1);
+/** The most recent day with measurements, or null if there has never been one. */
+export function lastMeasurementDay(byDay: Map<string, Metric>): Date | null {
+  let latest: Date | null = null;
+  for (const [key, m] of byDay) {
+    if (!hasMeasurements(m)) continue;
+    const d = parseDay(key);
+    if (!latest || d > latest) latest = d;
   }
-  return d;
+  return latest;
 }
 
-export type DayState = 'measure-done' | 'measure-missed' | 'measure-due' | 'weight-done' | 'none';
-
-/** What happened (or should happen) on a given day, for the calendar. */
-export function dayState(date: Date, s: Schedule, byDay: Map<string, Metric>): DayState {
-  const key = dayKey(date);
-  const m = byDay.get(key);
-  const today = new Date();
-  const isFuture = daysBetween(today, date) > 0;
-  const isToday = dayKey(today) === key;
-
-  if (isMeasureDay(date, s)) {
-    // A measurement day counts as done once any measurement (not just weight) exists.
-    const logged = m && (m.waist_cm != null || m.chest_cm != null || m.hips_cm != null ||
-      m.arm_cm != null || m.thigh_cm != null || m.photo_front || m.photo_side);
-    if (logged) return 'measure-done';
-    if (isFuture || isToday) return 'measure-due';
-    return 'measure-missed';
+/**
+ * The one and only measurement prompt: you measured recently and are about to
+ * do it again. Tape and scale noise swamps real change over a few days, so
+ * back-to-back numbers mislead more than they inform.
+ *
+ * This never fires for going a long time without measuring — waiting is fine,
+ * and being told off for it is exactly the nagging we do not want. It is advice
+ * on a day the user chose, and it never blocks the save.
+ */
+export function measuredRecently(
+  byDay: Map<string, Metric>,
+  forDate = new Date(),
+): { daysSince: number | null; tooSoon: boolean } {
+  const forKey = dayKey(forDate);
+  let latest: Date | null = null;
+  for (const [key, m] of byDay) {
+    // Editing the entry you are already looking at is not measuring again.
+    if (key === forKey || !hasMeasurements(m)) continue;
+    const d = parseDay(key);
+    if (d <= forDate && (!latest || d > latest)) latest = d;
   }
+  if (!latest) return { daysSince: null, tooSoon: false };
+  const daysSince = daysBetween(latest, forDate);
+  return { daysSince, tooSoon: daysSince < RECOMMENDED_GAP_DAYS };
+}
+
+export type DayState = 'measure-done' | 'weight-done' | 'none';
+
+/**
+ * Purely a record of what happened. Days are not marked in advance and nothing
+ * is ever flagged as missed: a day is a measurement day because it was measured.
+ */
+export function dayState(date: Date, byDay: Map<string, Metric>): DayState {
+  const m = byDay.get(dayKey(date));
+  if (hasMeasurements(m)) return 'measure-done';
   if (m?.weight_kg != null) return 'weight-done';
   return 'none';
 }
 
-/** Human summary, e.g. "Every Monday" / "Every other Monday". */
+/** Human summary of how the check-in works now. */
 export function scheduleLabel(s: Schedule): string {
-  const day = WEEKDAYS_LONG[s.measureWeekday] ?? 'Monday';
-  return s.cadence === 'biweekly' ? `Every other ${day}` : `Every ${day}`;
+  return s.dailyWeight
+    ? 'Log whenever you like · weight daily'
+    : 'Log whenever you like';
 }
 
 /** Build the 6×7 grid of dates covering a month, Monday-first. */
@@ -117,13 +141,9 @@ export function reminderDueToday(
   s: Schedule,
   byDay: Map<string, Metric>,
 ): { due: boolean; kind: 'measure' | 'weight' | null } {
-  const today = new Date();
-  const key = dayKey(today);
-  const m = byDay.get(key);
-  if (isMeasureDay(today, s)) {
-    const done = m && (m.waist_cm != null || m.chest_cm != null || m.photo_front || m.photo_side);
-    if (!done) return { due: true, kind: 'measure' };
-  }
+  // Measurements are never "due" — the user picks their own days, so there is
+  // nothing to chase. Only the daily weigh-in, and only if they opted into it.
+  const m = byDay.get(dayKey(new Date()));
   if (s.dailyWeight && m?.weight_kg == null) return { due: true, kind: 'weight' };
   return { due: false, kind: null };
 }

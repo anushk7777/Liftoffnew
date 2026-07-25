@@ -8,6 +8,22 @@
    ========================================================================= */
 
 @layer base {
+  /* Placeholders must never read as entered text.
+     Most inputs here don't use the .input class, so they were falling back to
+     the browser default — bright enough on dark backgrounds to look like a real
+     value. Someone who thinks a field is already filled just sees a dead submit
+     button and a broken app. Dim and clearly secondary, everywhere. */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--text-subtle);
+    /* Set explicitly: Firefox applies its own default opacity otherwise. */
+    opacity: 0.5;
+  }
+  input:focus::placeholder,
+  textarea:focus::placeholder {
+    opacity: 0.32;
+  }
+
   /* Light theme — paper (warm off-white, ink) */
   :root {
     --bg: #f6f5f3;
@@ -320,6 +336,7 @@
   }
   .input::placeholder {
     color: var(--text-subtle);
+    opacity: 0.5;
   }
   .input:focus {
     outline: none;

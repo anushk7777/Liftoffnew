@@ -3,7 +3,7 @@
 // roster, their account links up and they land on their template: a one-time
 // profile setup, then check-ins, progress graphs, and a direct line to their
 // coach (including "request a diet plan").
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Lenis from 'lenis';
 import { LogOut, Sparkles, Smartphone } from 'lucide-react';
@@ -21,7 +21,7 @@ import {
 import { startAlarm, stopAlarm, testAlarm, alarmDue, markAlarmFired, primeAlarmAudio } from './alarm';
 import { ProgressPhotos } from './photos';
 import { CheckinCalendar } from './Calendar';
-import { scheduleOf, isMeasureDay, indexByDay, reminderDueToday, scheduleLabel } from './schedule';
+import { scheduleOf, indexByDay, reminderDueToday, scheduleLabel, measuredRecently } from './schedule';
 import { InstallGuide, ProfileSetup, ProfileCard, CoachThread } from './onboarding';
 
 // Sample data so the coach can preview the exact template at /coaching?preview=1.
@@ -112,12 +112,13 @@ function Template({
   onInstall?: () => void;
 }) {
   const schedule = scheduleOf(client);
+  const byDay = useMemo(() => indexByDay(metrics), [metrics]);
   return (
     <div className="mx-auto w-full max-w-3xl px-5 sm:px-8 py-10 pb-28 flex flex-col gap-5">
       <div className="flex items-start justify-between gap-4">
         <AnimatedGreeting
           name={client.name.split(' ')[0]}
-          subtitle={`${scheduleLabel(schedule)} for measurements${schedule.dailyWeight ? ' · weight daily' : ''}.`}
+          subtitle={`${scheduleLabel(schedule)}. Measure on whichever days suit you.`}
         />
         <div className="flex items-center gap-1 shrink-0 mt-2">
           {onInstall && !isStandalone() && (
@@ -153,14 +154,15 @@ function Template({
         <MetricsForm
           onSubmit={onLog}
           saving={saving}
-          // First ever entry is always the full set — that's the baseline every
-          // later measurement is compared against. After that, the schedule rules.
-          measureDay={
-            metrics.length === 0 ||
-            isMeasureDay(editDate ? new Date(`${editDate}T12:00:00`) : new Date(), schedule)
-          }
+          // Always open. Measurements are the client's call — there is no
+          // schedule deciding which days are allowed.
+          measureDay
+          recentMeasurement={measuredRecently(
+            byDay,
+            editDate ? new Date(`${editDate}T12:00:00`) : new Date(),
+          )}
           dailyWeight={schedule.dailyWeight}
-          showCycle={client.sex !== 'Male'}
+          showCycle={!!client.sex && client.sex !== 'Male'}
           editingDate={editDate ?? undefined}
           existing={metrics.find((m) => m.taken_on === (editDate ?? todayKey()))}
           onCancelEdit={editDate ? () => onEditDate(null) : undefined}

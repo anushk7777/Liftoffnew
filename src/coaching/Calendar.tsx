@@ -1,23 +1,22 @@
 // A check-in calendar built from scratch — no date library, no UI kit.
-// Month grid with per-day state rings: scheduled measurement days get an accent
-// ring, completed days fill in, missed days show a hollow warning ring, and
-// plain weight logs get a small dot.
+//
+// It records, it does not prescribe. Nothing is marked in advance and nothing
+// is ever "missed": days you logged measurements fill in, weight-only days get
+// a small dot, and every other day is simply blank and available.
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Camera, Ruler, Scale } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { Metric } from './api';
 import {
-  WEEKDAYS, dayKey, dayState, indexByDay, isMeasureDay, monthGrid,
-  nextMeasureDay, scheduleLabel, type DayState, type Schedule,
+  WEEKDAYS, dayKey, dayState, indexByDay, monthGrid,
+  scheduleLabel, RECOMMENDED_GAP_DAYS, type DayState, type Schedule,
 } from './schedule';
 
 const tnum = { fontVariantNumeric: 'tabular-nums' } as const;
 
 const STATE_STYLE: Record<DayState, { ring?: string; fill?: string; dot?: string }> = {
   'measure-done': { fill: 'var(--accent)' },
-  'measure-due': { ring: 'var(--accent)' },
-  'measure-missed': { ring: 'var(--warning)' },
   'weight-done': { dot: 'var(--text-subtle)' },
   none: {},
 };
@@ -92,7 +91,6 @@ export function CheckinCalendar({
 
   const byDay = useMemo(() => indexByDay(metrics), [metrics]);
   const grid = useMemo(() => monthGrid(cursor.getFullYear(), cursor.getMonth()), [cursor]);
-  const next = useMemo(() => nextMeasureDay(today, schedule), [schedule, today]);
 
   const move = (delta: number) =>
     setCursor((c) => new Date(c.getFullYear(), c.getMonth() + delta, 1));
@@ -132,12 +130,7 @@ export function CheckinCalendar({
       </div>
 
       <p className="text-[12.5px] text-[var(--text-muted)] mb-4">
-        {scheduleLabel(schedule)} · next{' '}
-        <b className="text-[var(--text)] font-semibold">
-          {dayKey(next) === dayKey(today)
-            ? 'today'
-            : next.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-        </b>
+        {scheduleLabel(schedule)} · measurements suggested every {RECOMMENDED_GAP_DAYS} days
       </p>
 
       {/* Weekday header (Monday-first) */}
@@ -145,10 +138,7 @@ export function CheckinCalendar({
         {[1, 2, 3, 4, 5, 6, 0].map((d) => (
           <div
             key={d}
-            className={cn(
-              'text-center text-[10.5px] font-semibold uppercase tracking-wider py-1',
-              d === schedule.measureWeekday ? 'text-[var(--accent)]' : 'text-[var(--text-subtle)]',
-            )}
+            className="text-center text-[10.5px] font-semibold uppercase tracking-wider py-1 text-[var(--text-subtle)]"
           >
             {WEEKDAYS[d]}
           </div>
@@ -170,7 +160,7 @@ export function CheckinCalendar({
               key={key}
               date={d}
               inMonth={d.getMonth() === cursor.getMonth()}
-              state={dayState(d, schedule, byDay)}
+              state={dayState(d, byDay)}
               isToday={key === dayKey(today)}
               selected={key === selected}
               onSelect={() => {
@@ -185,13 +175,7 @@ export function CheckinCalendar({
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 text-[11px] text-[var(--text-muted)]">
         <span className="inline-flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-md" style={{ background: 'var(--accent)' }} /> Logged
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-md" style={{ boxShadow: 'inset 0 0 0 1.5px var(--accent)' }} /> Due
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-md" style={{ boxShadow: 'inset 0 0 0 1.5px var(--warning)' }} /> Missed
+          <span className="w-3 h-3 rounded-md" style={{ background: 'var(--accent)' }} /> Measured
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--text-subtle)' }} /> Weight only
@@ -212,7 +196,7 @@ export function CheckinCalendar({
                 <span className="text-[13px] font-semibold text-[var(--text)]">
                   {selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
                 </span>
-                {isMeasureDay(selectedDate, schedule) && (
+                {dayState(selectedDate, byDay) === 'measure-done' && (
                   <span
                     className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
                     style={{ color: 'var(--accent)', background: 'var(--accent-soft)' }}
@@ -245,7 +229,7 @@ export function CheckinCalendar({
                   )}
                 </div>
               ) : (
-                <p className="text-[13px] text-[var(--text-subtle)] mt-2">Nothing logged this day.</p>
+                <p className="text-[13px] text-[var(--text-subtle)] mt-2">Nothing logged this day — tap the form above to add it.</p>
               )}
             </div>
           </motion.div>
@@ -255,7 +239,14 @@ export function CheckinCalendar({
   );
 }
 
-/** Coach-side control for when a client's measurement check-ins land. */
+/**
+ * Coach-side check-in options.
+ *
+ * The weekday and cadence pickers are gone on purpose. Prescribing a day meant
+ * the calendar marked days in advance and flagged the rest as missed, which
+ * turned a progress tracker into a chore list. Clients measure when they want;
+ * all that is left to decide is whether to ask for a daily weight.
+ */
 export function ScheduleEditor({
   schedule,
   onSave,
@@ -265,12 +256,8 @@ export function ScheduleEditor({
   onSave: (s: { measure_weekday: number; measure_cadence: 'weekly' | 'biweekly'; measure_anchor: string | null; daily_weight: boolean }) => void;
   saving: boolean;
 }) {
-  const [weekday, setWeekday] = useState(schedule.measureWeekday);
-  const [cadence, setCadence] = useState<'weekly' | 'biweekly'>(schedule.cadence);
   const [daily, setDaily] = useState(schedule.dailyWeight);
-
-  const dirty =
-    weekday !== schedule.measureWeekday || cadence !== schedule.cadence || daily !== schedule.dailyWeight;
+  const dirty = daily !== schedule.dailyWeight;
 
   return (
     <section
@@ -278,51 +265,19 @@ export function ScheduleEditor({
       style={{ boxShadow: 'var(--shadow-sm)' }}
     >
       <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">
-        Check-in schedule
+        Check-ins
       </span>
 
       <p className="text-[12.5px] text-[var(--text-muted)] mt-1.5">
-        Measurements and photos are asked for on these days only. Reminders follow this schedule.
+        Measurements and photos can be logged on any day. We suggest leaving about{' '}
+        {RECOMMENDED_GAP_DAYS} days between them — closer together and normal
+        fluctuation hides the actual change.
       </p>
-
-      {/* Weekday picker */}
-      <div className="flex gap-1.5 mt-4">
-        {[1, 2, 3, 4, 5, 6, 0].map((d) => (
-          <button
-            key={d}
-            onClick={() => setWeekday(d)}
-            className={cn(
-              'flex-1 py-2 rounded-lg text-[12px] font-semibold transition-colors',
-              weekday === d ? 'text-[var(--accent-text)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]',
-            )}
-            style={weekday === d ? { background: 'var(--accent)' } : { background: 'var(--elevated)' }}
-          >
-            {WEEKDAYS[d]}
-          </button>
-        ))}
-      </div>
-
-      {/* Cadence */}
-      <div className="flex gap-2 mt-3">
-        {(['weekly', 'biweekly'] as const).map((c) => (
-          <button
-            key={c}
-            onClick={() => setCadence(c)}
-            className={cn(
-              'flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-colors',
-              cadence === c ? 'text-[var(--accent-text)] border-transparent' : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]',
-            )}
-            style={cadence === c ? { background: 'var(--accent)' } : undefined}
-          >
-            {c === 'weekly' ? 'Every week' : 'Every other week'}
-          </button>
-        ))}
-      </div>
 
       {/* Daily weight toggle */}
       <button
         onClick={() => setDaily((v) => !v)}
-        className="w-full flex items-center justify-between mt-3 p-3 rounded-xl border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors"
+        className="w-full flex items-center justify-between mt-4 p-3 rounded-xl border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors"
       >
         <span className="text-left">
           <span className="block text-[13.5px] font-semibold text-[var(--text)]">Daily weight log</span>
@@ -347,19 +302,17 @@ export function ScheduleEditor({
         disabled={!dirty || saving}
         onClick={() =>
           onSave({
-            measure_weekday: weekday,
-            measure_cadence: cadence,
-            // Anchor biweekly cycles to the next occurrence of the chosen day.
-            measure_anchor: cadence === 'biweekly'
-              ? dayKey(nextMeasureDay(new Date(), { measureWeekday: weekday, cadence: 'weekly', anchor: null, dailyWeight: daily }))
-              : null,
+            // Kept so stored rows stay valid; nothing reads them any more.
+            measure_weekday: schedule.measureWeekday,
+            measure_cadence: schedule.cadence,
+            measure_anchor: schedule.anchor,
             daily_weight: daily,
           })
         }
         className="mt-4 w-full py-3 rounded-xl text-[14.5px] font-semibold text-[var(--accent-text)] disabled:opacity-40 transition-opacity"
         style={{ background: 'var(--accent)' }}
       >
-        {saving ? 'Saving…' : dirty ? 'Save schedule' : 'Schedule saved'}
+        {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
       </motion.button>
     </section>
   );

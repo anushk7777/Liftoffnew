@@ -12,9 +12,24 @@ import type { AppMode } from './types';
 interface ModeState {
   mode: AppMode | null;
   setMode: (m: AppMode | null) => void;
+  /** Workspaces whose intro animation has already played on this device. */
+  seenIntros: AppMode[];
+  markIntroSeen: (m: AppMode) => void;
+  /** Play every intro again (Settings → Appearance). */
+  resetIntros: () => void;
 }
 
 /** Which app is active. `null` => show the profile picker. */
 export const useAppMode = create<ModeState>()(
-  persist((set) => ({ mode: null, setMode: (mode) => set({ mode }) }), { name: 'liftoff-app-mode' }),
+  persist(
+    (set) => ({
+      mode: null,
+      setMode: (mode) => set({ mode }),
+      seenIntros: [],
+      markIntroSeen: (m) =>
+        set((s) => (s.seenIntros.includes(m) ? s : { ...s, seenIntros: [...s.seenIntros, m] })),
+      resetIntros: () => set({ seenIntros: [] }),
+    }),
+    { name: 'liftoff-app-mode' },
+  ),
 );

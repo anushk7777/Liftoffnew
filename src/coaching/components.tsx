@@ -1,10 +1,11 @@
 // Coaching micro-app — shared presentation pieces (used by both the client
 // portal and the coach's dashboard so the "template" looks identical).
 import { useEffect, useId, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Bell, X, Volume2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { bmiOf, bmiBand, type Metric, type MetricInput } from './api';
+import { useElementWidth } from '../lib/useElementWidth';
 import { PhotoSlots } from './photos';
 
 const tnum = { fontVariantNumeric: 'tabular-nums' } as const;
@@ -12,22 +13,37 @@ const tnum = { fontVariantNumeric: 'tabular-nums' } as const;
 // ---- Animated greeting ---------------------------------------------------
 // Words rise in one-by-one with a soft blur; an accent underline sweeps in.
 export function AnimatedGreeting({ name, subtitle }: { name: string; subtitle: string }) {
-  const words = `Welcome back, ${name}`.split(' ');
+  // "Welcome back," and the name are separate lines rather than one wrapping
+  // run of words. At phone widths a long name used to break the greeting into
+  // three ragged lines mid-phrase ("Welcome" / "back," / "Priyadarshini"); the
+  // phrase now holds together and the name gets its own line at any width.
+  const words = ['Welcome', 'back,'];
   return (
     <div>
-      <h1 className="font-display text-[34px] sm:text-[44px] font-bold tracking-[-0.025em] leading-[1.08] text-[var(--text)] flex flex-wrap gap-x-[0.28em]">
-        {words.map((w, i) => (
-          <motion.span
-            key={i}
-            initial={{ y: 26, opacity: 0, filter: 'blur(6px)' }}
-            animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
-            transition={{ delay: 0.08 * i, type: 'spring', stiffness: 220, damping: 24 }}
-            className={cn(i === words.length - 1 && 'text-[var(--accent)]')}
-            style={{ willChange: 'transform, opacity, filter' }}
-          >
-            {w}
-          </motion.span>
-        ))}
+      <h1 className="font-display text-[26px] sm:text-[34px] md:text-[44px] font-bold tracking-[-0.025em] leading-[1.12] text-[var(--text)]">
+        <span className="flex flex-wrap gap-x-[0.28em] gap-y-1">
+          {words.map((w, i) => (
+            <motion.span
+              key={i}
+              initial={{ y: 26, opacity: 0, filter: 'blur(6px)' }}
+              animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
+              transition={{ delay: 0.08 * i, type: 'spring', stiffness: 220, damping: 24 }}
+              style={{ willChange: 'transform, opacity, filter' }}
+            >
+              {w}
+            </motion.span>
+          ))}
+        </span>
+        <motion.span
+          initial={{ y: 26, opacity: 0, filter: 'blur(6px)' }}
+          animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
+          transition={{ delay: 0.08 * words.length, type: 'spring', stiffness: 220, damping: 24 }}
+          // Long single-word names must wrap rather than run off the screen.
+          className="block text-[var(--accent)] break-words"
+          style={{ willChange: 'transform, opacity, filter' }}
+        >
+          {name}
+        </motion.span>
       </h1>
       <motion.div
         initial={{ scaleX: 0 }}
@@ -67,15 +83,24 @@ export function TrendChart({
   markedLabel?: string;
 }) {
   const id = useId();
-  const w = 100;
-  const h = 100;
-  const pad = 8;
+  // Drawn at real pixel width, measured from the card.
+  //
+  // This used to be a fixed 100x100 viewBox stretched with
+  // preserveAspectRatio="none", which scales x and y by different factors: the
+  // marker dots came out as ellipses whose distortion changed with the window
+  // width, so the chart visibly deformed as it resized.
+  const [wrapRef, w] = useElementWidth<HTMLDivElement>(320);
+  const h = height;
+  const pad = 10;
   const values = points.map((p) => p.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
   const x = (i: number) => (points.length <= 1 ? w / 2 : pad + (i / (points.length - 1)) * (w - pad * 2));
   const y = (v: number) => h - pad - ((v - min) / range) * (h - pad * 2);
+  // Replaying the draw on a data change needs a new element; framer only runs
+  // `initial` on mount, so without this a fresh entry appeared with no line.
+  const drawKey = `${points.length}:${points[points.length - 1]?.date ?? ''}`;
   const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(2)},${y(p.value).toFixed(2)}`).join(' ');
   const area = `${path} L${x(points.length - 1)},${h} L${x(0)},${h} Z`;
   const first = values[0];
@@ -103,7 +128,13 @@ export function TrendChart({
             <span className="text-[26px] font-bold tracking-tight text-[var(--text)]" style={tnum}>{last}</span>
             <span className="text-[13px] text-[var(--text-muted)]">{unit}</span>
           </div>
-          <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: '100%', height, display: 'block' }}>
+          <div ref={wrapRef} className="w-full">
+          <svg
+            width={w}
+            height={h}
+            viewBox={`0 0 ${w} ${h}`}
+            style={{ width: '100%', height, display: 'block', overflow: 'visible' }}
+          >
             <defs>
               <linearGradient id={`tc-${id}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.22} />
@@ -112,6 +143,7 @@ export function TrendChart({
             </defs>
             <path d={area} fill={`url(#tc-${id})`} />
             <motion.path
+              key={drawKey}
               d={path}
               fill="none"
               stroke="var(--accent)"
@@ -130,7 +162,7 @@ export function TrendChart({
                     key={p.date}
                     cx={x(i)}
                     cy={y(p.value)}
-                    r={3}
+                    r={4}
                     fill="var(--surface)"
                     stroke="var(--cozy)"
                     strokeWidth={2}
@@ -138,8 +170,9 @@ export function TrendChart({
                   />
                 ) : null,
               )}
-            <circle cx={x(points.length - 1)} cy={y(last)} r={2.4} fill="var(--accent)" />
+            <circle cx={x(points.length - 1)} cy={y(last)} r={3.5} fill="var(--accent)" />
           </svg>
+          </div>
           <div className="flex justify-between mt-1.5 text-[10px] text-[var(--text-subtle)]">
             <span>{points[0].date.slice(5)}</span>
             <span>{points[points.length - 1].date.slice(5)}</span>
@@ -174,6 +207,7 @@ export function MetricsForm({
   onSubmit,
   saving,
   measureDay = true,
+  recentMeasurement,
   dailyWeight = true,
   showCycle = false,
   existing,
@@ -184,6 +218,8 @@ export function MetricsForm({
   saving: boolean;
   /** On a scheduled measurement day the full set is asked for; otherwise weight only. */
   measureDay?: boolean;
+  /** How long since the last measurements, for the "give it time" note. */
+  recentMeasurement?: { daysSince: number | null; tooSoon: boolean };
   dailyWeight?: boolean;
   /** Offer the period toggle (shown to clients who aren't recorded as male). */
   showCycle?: boolean;
@@ -261,14 +297,6 @@ export function MetricsForm({
               : "Today's weigh-in"}
         </span>
         <span className="flex items-center gap-2">
-          {measureDay && !editingDate && (
-            <span
-              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-              style={{ color: 'var(--accent)', background: 'var(--accent-soft)' }}
-            >
-              Measurement day
-            </span>
-          )}
           {onCancelEdit && (
             <button
               type="button"
@@ -282,11 +310,35 @@ export function MetricsForm({
       </div>
       {!measureDay && (
         <p className="text-[12.5px] text-[var(--text-muted)] mt-1">
-          {dailyWeight
-            ? 'Just your weight today — measurements and photos come on your scheduled day.'
-            : 'Measurements come on your scheduled day.'}
+          {dailyWeight ? 'Just your weight today.' : 'Log your measurements whenever you like.'}
         </p>
       )}
+
+      {/* The only measurement prompt there is: you measured a few days ago and
+          are about to again. Advice, not a gate — the form stays fully usable. */}
+      <AnimatePresence initial={false}>
+        {measureDay && recentMeasurement?.tooSoon && (
+          <motion.p
+            initial={{ opacity: 0, y: -4, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -4, height: 0 }}
+            transition={{ duration: 0.24, ease: [0.2, 0.7, 0.2, 1] }}
+            className="text-[12.5px] mt-2 overflow-hidden"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            You measured{' '}
+            <b className="text-[var(--text)] font-semibold">
+              {recentMeasurement.daysSince === 0
+                ? 'earlier today'
+                : recentMeasurement.daysSince === 1
+                  ? 'yesterday'
+                  : `${recentMeasurement.daysSince} days ago`}
+            </b>
+            . Around two weeks apart shows real change — day-to-day swings are mostly
+            water and food. Log it anyway if you want to.
+          </motion.p>
+        )}
+      </AnimatePresence>
       <div className={cn('grid gap-3 mt-4', measureDay ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2')}>
         {fields.map((f) => (
           <label key={f.key} className="block">
