@@ -33,6 +33,10 @@ const Stats = lazy(() => import('./pages/Stats'));
 const Afterburn = lazy(() => import('./afterburn/Afterburn'));
 const Kairos = lazy(() => import('./kairos/Kairos'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
+// Coaching micro-app: client portal is a public standalone page (clients sign
+// in with Google there); the coach dashboard rides inside the desktop shell.
+const ClientPortal = lazy(() => import('./coaching/ClientPortal'));
+const CoachClients = lazy(() => import('./coaching/CoachClients'));
 import SettingsPage from './pages/Settings';
 import Schedule from './pages/Schedule';
 import Login from './pages/Login';
@@ -66,7 +70,7 @@ function Shell() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setAuthChecking(false);
-      if (!session && location.pathname !== '/login') {
+      if (!session && location.pathname !== '/login' && !location.pathname.startsWith('/coaching')) {
         navigate('/login');
       }
     });
@@ -74,7 +78,7 @@ function Shell() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session && location.pathname !== '/login') {
+      if (!session && location.pathname !== '/login' && !location.pathname.startsWith('/coaching')) {
         navigate('/login');
       }
     });
@@ -145,6 +149,16 @@ function Shell() {
     );
   }
 
+  // Client coaching portal — full-bleed, handles its own Google sign-in, and
+  // never enters the workspace picker (clients only ever see their template).
+  if (location.pathname.startsWith('/coaching')) {
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-ink-subtle animate-pulse">Loading…</div>}>
+        <ClientPortal />
+      </Suspense>
+    );
+  }
+
   // ---- Workspace gate (after login): choose Focus vs Afterburn. ----
   if (appMode === null) return <ProfilePicker />;
   if (appMode === 'afterburn')
@@ -204,6 +218,14 @@ function Shell() {
       <Route path="/brain-dump" element={<BrainDump />} />
       <Route path="/roadmap" element={<Roadmap />} />
       <Route path="/schedule" element={<Schedule />} />
+      <Route
+        path="/clients"
+        element={
+          <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-subtle animate-pulse">Loading…</div>}>
+            <CoachClients />
+          </Suspense>
+        }
+      />
       <Route
         path="/stats"
         element={

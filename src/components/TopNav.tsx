@@ -13,9 +13,11 @@ import {
   Flame,
   Search,
   Plus,
+  Users,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useAppMode } from '../afterburn/mode';
+import { useSessionEmail, isCoach } from '../coaching/api';
 import { cn } from '../lib/utils';
 
 const NAV = [
@@ -27,6 +29,8 @@ const NAV = [
   { to: '/stats', label: 'Stats', icon: BarChart3 },
 ];
 
+const CLIENTS_ITEM = { to: '/clients', label: 'Clients', icon: Users, end: false };
+
 export default function TopNav({
   onOpenSearch,
   onQuickAdd,
@@ -36,6 +40,9 @@ export default function TopNav({
 }) {
   const { theme, toggleTheme } = useStore();
   const setAppMode = useAppMode((s) => s.setMode);
+  const { email } = useSessionEmail();
+  // The coaching roster is visible only to the coach's own account.
+  const navItems = isCoach(email) ? [...NAV, CLIENTS_ITEM] : NAV;
 
   return (
     <motion.header
@@ -62,7 +69,7 @@ export default function TopNav({
 
       {/* Primary nav */}
       <nav className="self-stretch flex items-stretch flex-1 justify-center gap-0.5 overflow-x-auto no-scrollbar">
-        {NAV.map(({ to, label, icon: Icon, end }) => (
+        {navItems.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}
