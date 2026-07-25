@@ -2,9 +2,9 @@
 // portal and the coach's dashboard so the "template" looks identical).
 import { useId, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Flame, Beef, Save, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
-import type { Metric, MetricInput, Plan } from './api';
+import type { Metric, MetricInput } from './api';
 
 const tnum = { fontVariantNumeric: 'tabular-nums' } as const;
 
@@ -128,61 +128,10 @@ export function TrendChart({
   );
 }
 
-// ---- Plan card (client-facing; the coach writes it) ----------------------
-export function PlanCard({ plan, updatedLive }: { plan: Plan | null; updatedLive?: boolean }) {
-  return (
-    <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6" style={{ boxShadow: 'var(--shadow-sm)' }}>
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">Your plan</span>
-        {updatedLive && (
-          <motion.span
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ color: 'var(--accent)', background: 'var(--accent-soft)' }}
-          >
-            Updated just now
-          </motion.span>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        <div className="rounded-xl border border-[var(--border)] p-4 flex items-center gap-3">
-          <Flame className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-          <div>
-            <div className="text-[20px] font-bold text-[var(--text)]" style={tnum}>
-              {plan?.calorie_target ?? '—'}
-            </div>
-            <div className="text-[11px] text-[var(--text-subtle)]">kcal / day</div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-[var(--border)] p-4 flex items-center gap-3">
-          <Beef className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-          <div>
-            <div className="text-[20px] font-bold text-[var(--text)]" style={tnum}>
-              {plan?.protein_target ?? '—'}
-            </div>
-            <div className="text-[11px] text-[var(--text-subtle)]">g protein / day</div>
-          </div>
-        </div>
-      </div>
-      {plan?.diet_plan ? (
-        <div className="text-[14.5px] leading-relaxed text-[var(--text)] whitespace-pre-wrap">{plan.diet_plan}</div>
-      ) : (
-        <p className="text-sm text-[var(--text-subtle)]">Your coach hasn't posted a plan yet — check back soon.</p>
-      )}
-      {plan?.updated_at && (
-        <p className="text-[11px] text-[var(--text-subtle)] mt-4">
-          Last updated {new Date(plan.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-        </p>
-      )}
-    </section>
-  );
-}
-
 // ---- Measurement form ----------------------------------------------------
+// Height/age deliberately absent — they live on the profile and are asked once.
 const FIELDS: { key: keyof MetricInput; label: string; unit: string }[] = [
   { key: 'weight_kg', label: 'Weight', unit: 'kg' },
-  { key: 'height_cm', label: 'Height', unit: 'cm' },
   { key: 'chest_cm', label: 'Chest', unit: 'cm' },
   { key: 'waist_cm', label: 'Waist', unit: 'cm' },
   { key: 'hips_cm', label: 'Hips', unit: 'cm' },
@@ -241,7 +190,7 @@ export function MetricsForm({ onSubmit, saving }: { onSubmit: (m: Partial<Metric
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         rows={2}
-        placeholder="Notes for your coach (sleep, energy, soreness…)"
+        placeholder="How did the week feel? (sleep, energy, soreness…)"
         className="mt-3 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors resize-none"
       />
       <motion.button
@@ -287,69 +236,6 @@ export function MetricsHistory({ metrics }: { metrics: Metric[] }) {
           ))}
         </tbody>
       </table>
-    </section>
-  );
-}
-
-// ---- Coach plan editor ---------------------------------------------------
-export function PlanEditor({
-  plan,
-  onSave,
-  saving,
-}: {
-  plan: Plan | null;
-  onSave: (p: { diet_plan: string; calorie_target: number | null; protein_target: number | null }) => void;
-  saving: boolean;
-}) {
-  const [diet, setDiet] = useState(plan?.diet_plan ?? '');
-  const [cal, setCal] = useState(plan?.calorie_target?.toString() ?? '');
-  const [protein, setProtein] = useState(plan?.protein_target?.toString() ?? '');
-  return (
-    <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6" style={{ boxShadow: 'var(--shadow-sm)' }}>
-      <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">
-        Plan (what the client sees)
-      </span>
-      <div className="grid grid-cols-2 gap-3 mt-4">
-        <label className="block">
-          <span className="text-[11px] text-[var(--text-muted)]">Calories / day</span>
-          <input
-            type="number"
-            value={cal}
-            onChange={(e) => setCal(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
-          />
-        </label>
-        <label className="block">
-          <span className="text-[11px] text-[var(--text-muted)]">Protein g / day</span>
-          <input
-            type="number"
-            value={protein}
-            onChange={(e) => setProtein(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
-          />
-        </label>
-      </div>
-      <textarea
-        value={diet}
-        onChange={(e) => setDiet(e.target.value)}
-        rows={10}
-        placeholder={'Breakfast — 4 eggs, oats…\nLunch — …\nDinner — …'}
-        className="mt-3 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-sm leading-relaxed text-[var(--text)] outline-none focus:border-[var(--accent)] resize-y"
-      />
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={() => onSave({
-          diet_plan: diet,
-          calorie_target: cal.trim() ? Number(cal) : null,
-          protein_target: protein.trim() ? Number(protein) : null,
-        })}
-        disabled={saving}
-        className="mt-4 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-[var(--accent-text)] disabled:opacity-50"
-        style={{ background: 'var(--accent)' }}
-      >
-        <Save className="w-4 h-4" /> {saving ? 'Publishing…' : 'Publish to client'}
-      </motion.button>
     </section>
   );
 }

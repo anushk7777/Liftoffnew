@@ -1,16 +1,17 @@
 // Coach dashboard — only the coach's account can use this page (client-side
 // gate here; the real enforcement is the RLS policies in Supabase).
-import { useCallback, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { UserPlus, Users, Link as LinkIcon, Trash2, ChevronLeft, Check } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+import { UserPlus, Users, Link as LinkIcon, Trash2, ChevronLeft } from 'lucide-react';
 import { PageHeader } from '../components/ui';
 import { isSupabaseConfigured } from '../lib/supabase';
 import {
   useSessionEmail, isCoach, listClients, addClient, removeClient,
-  listMetrics, getPlan, upsertPlan, subscribeClient,
-  type CoachClient, type Metric, type Plan,
+  listMetrics, listMessages, sendMessage, subscribeClient, ageFromBirthYear, notify, ensureNotificationPermission,
+  type CoachClient, type CoachMessage, type Metric,
 } from './api';
-import { TrendChart, MetricsHistory, PlanEditor } from './components';
+import { TrendChart, MetricsHistory } from './components';
+import { CoachThread } from './onboarding';
 
 function metricPoints(metrics: Metric[], key: keyof Metric) {
   return metrics
@@ -20,17 +21,28 @@ function metricPoints(metrics: Metric[], key: keyof Metric) {
 
 function ClientDetail({ client, onBack }: { client: CoachClient; onBack: () => void }) {
   const [metrics, setMetrics] = useState<Metric[]>([]);
-  const [plan, setPlan] = useState<Plan | null>(null);
+  const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [savedFlash, setSavedFlash] = useState(false);
+  const [sending, setSending] = useState(false);
+  const seenIds = useRef<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
-    const [m, p] = await Promise.all([listMetrics(client.id), getPlan(client.id)]);
+    const [m, msgs] = await Promise.all([listMetrics(client.id), listMessages(client.id)]);
     setMetrics(m);
-    setPlan(p);
+    // Ping the coach when the client sends something new while this is open.
+    const fresh = msgs.filter((x) => x.author === 'client' && !seenIds.current.has(x.id));
+    if (seenIds.current.size > 0 && fresh.length) {
+      const last = fresh[fresh.length - 1];
+      void notify(
+        last.kind === 'request' ? `${client.name} requested a diet plan` : `${client.name} sent a message`,
+        last.body.slice(0, 120),
+        `client-${client.id}`,
+      );
+    }
+    msgs.forEach((x) => seenIds.current.add(x.id));
+    setMessages(msgs);
     setLoaded(true);
-  }, [client.id]);
+  }, [client.id, client.name]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; state is set only after await
@@ -38,19 +50,19 @@ function ClientDetail({ client, onBack }: { client: CoachClient; onBack: () => v
     return subscribeClient(client.id, () => void refresh());
   }, [client.id, refresh]);
 
-  const savePlan = async (p: { diet_plan: string; calorie_target: number | null; protein_target: number | null }) => {
-    setSaving(true);
+  const reply = async (body: string) => {
+    setSending(true);
     try {
-      setPlan(await upsertPlan(client.id, p));
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 2500);
+      await sendMessage(client.id, 'coach', body);
+      await refresh();
     } catch (e) {
-      console.error('Failed to publish plan', e);
+      console.error('Failed to reply', e);
     } finally {
-      setSaving(false);
+      setSending(false);
     }
   };
 
+  const age = ageFromBirthYear(client.birth_year);
   const inviteLink = `${window.location.origin}/coaching`;
 
   return (
@@ -81,6 +93,18 @@ function ClientDetail({ client, onBack }: { client: CoachClient; onBack: () => v
       <div>
         <h2 className="font-display text-[26px] font-bold tracking-tight text-[var(--text)]">{client.name}</h2>
         <p className="text-[13px] text-[var(--text-muted)] mt-0.5">{client.email}</p>
+        <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3 text-[13px] text-[var(--text-muted)]">
+          {client.height_cm != null && (
+            <span><b className="text-[var(--text)] font-semibold">{client.height_cm}</b> cm</span>
+          )}
+          {age != null && <span><b className="text-[var(--text)] font-semibold">{age}</b> yrs</span>}
+          {client.sex && <span>{client.sex}</span>}
+          {client.goal && (
+            <span className="px-2 py-0.5 rounded-full text-[12px] font-medium" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
+              {client.goal}
+            </span>
+          )}
+        </div>
       </div>
 
       {!loaded ? (
@@ -91,23 +115,8 @@ function ClientDetail({ client, onBack }: { client: CoachClient; onBack: () => v
             <TrendChart title="Weight" unit="kg" points={metricPoints(metrics, 'weight_kg')} />
             <TrendChart title="Waist" unit="cm" points={metricPoints(metrics, 'waist_cm')} />
           </div>
+          <CoachThread messages={messages} author="coach" onSend={reply} sending={sending} />
           <MetricsHistory metrics={metrics} />
-          <div className="relative">
-            <PlanEditor key={plan?.updated_at ?? 'new'} plan={plan} onSave={savePlan} saving={saving} />
-            <AnimatePresence>
-              {savedFlash && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute top-5 right-5 inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full"
-                  style={{ color: 'var(--success)', background: 'color-mix(in srgb, var(--success) 14%, transparent)' }}
-                >
-                  <Check className="w-3.5 h-3.5" /> Live on the client's page
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
         </>
       )}
     </motion.div>
@@ -132,8 +141,11 @@ export default function CoachClients() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; state is set only after await
-    if (isCoach(email)) void refresh();
+    if (!isCoach(email)) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; state set after await
+    void refresh();
+    // So client requests can ping the coach even when this tab is in the back.
+    void ensureNotificationPermission();
   }, [email, refresh]);
 
   if (!loading && !isCoach(email)) {

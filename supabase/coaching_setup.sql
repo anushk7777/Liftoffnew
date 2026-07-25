@@ -108,3 +108,61 @@ exception when duplicate_object then null; end $$;
 do $$ begin
   alter publication supabase_realtime add table public.coaching_metrics;
 exception when duplicate_object then null; end $$;
+
+-- =========================================================================
+-- v2 — profile fields, messaging, and notification tokens.
+-- Safe to re-run: everything below is idempotent.
+-- =========================================================================
+
+-- ---- One-time profile details (asked once, edited in Profile) ------------
+alter table public.coaching_clients add column if not exists height_cm numeric;
+alter table public.coaching_clients add column if not exists birth_year int;
+alter table public.coaching_clients add column if not exists sex text;
+alter table public.coaching_clients add column if not exists goal text;
+
+-- Height lives on the profile now, not on every check-in.
+alter table public.coaching_metrics alter column height_cm drop not null;
+
+-- ---- Coach ↔ client thread (requests, notes, replies) --------------------
+create table if not exists public.coaching_messages (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.coaching_clients (id) on delete cascade,
+  -- 'client' | 'coach'
+  author text not null check (author in ('client', 'coach')),
+  -- 'note' for free text, 'request' when the client asks for a diet plan
+  kind text not null default 'note' check (kind in ('note', 'request')),
+  body text not null,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists coaching_messages_client_created
+  on public.coaching_messages (client_id, created_at);
+
+alter table public.coaching_messages enable row level security;
+
+drop policy if exists coach_all_messages on public.coaching_messages;
+create policy coach_all_messages on public.coaching_messages
+  for all using (public.is_coach()) with check (public.is_coach());
+
+drop policy if exists client_read_messages on public.coaching_messages;
+create policy client_read_messages on public.coaching_messages
+  for select using (
+    client_id in (select id from public.coaching_clients where user_id = auth.uid())
+  );
+
+-- Clients may only post as themselves.
+drop policy if exists client_write_messages on public.coaching_messages;
+create policy client_write_messages on public.coaching_messages
+  for insert with check (
+    author = 'client'
+    and client_id in (select id from public.coaching_clients where user_id = auth.uid())
+  );
+
+-- Clients may update their own profile fields (height/age/goal).
+drop policy if exists client_update_profile on public.coaching_clients;
+create policy client_update_profile on public.coaching_clients
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+do $$ begin
+  alter publication supabase_realtime add table public.coaching_messages;
+exception when duplicate_object then null; end $$;

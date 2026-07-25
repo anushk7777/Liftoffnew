@@ -1,31 +1,36 @@
 // Client-facing coaching portal — a standalone full-bleed page at /coaching.
 // A client signs in with Google; if their coach added their email to the
-// roster, their account links up and they land on their template: check-in
-// form, progress graphs, and the plan the coach publishes (updates live).
-import { useCallback, useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { LogOut, Sparkles } from 'lucide-react';
+// roster, their account links up and they land on their template: a one-time
+// profile setup, then check-ins, progress graphs, and a direct line to their
+// coach (including "request a diet plan").
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import Lenis from 'lenis';
+import { LogOut, Sparkles, Smartphone } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
-  useSessionEmail, getMyClientRecord, listMetrics, addMetric, getPlan, subscribeClient,
-  type CoachClient, type Metric, type MetricInput, type Plan,
+  useSessionEmail, getMyClientRecord, listMetrics, addMetric, listMessages, sendMessage,
+  updateProfile, subscribeClient, hasProfile, notify, ensureNotificationPermission, useInstallGuide, isStandalone,
+  type CoachClient, type CoachMessage, type Metric, type MetricInput,
 } from './api';
-import { AnimatedGreeting, TrendChart, PlanCard, MetricsForm, MetricsHistory } from './components';
+import { AnimatedGreeting, TrendChart, MetricsForm, MetricsHistory } from './components';
+import { InstallGuide, ProfileSetup, ProfileCard, CoachThread } from './onboarding';
 
 // Sample data so the coach can preview the exact template at /coaching?preview=1.
-const SAMPLE_METRICS: Metric[] = [
-  { id: 'p1', client_id: 'p', taken_on: '2026-06-02', weight_kg: 84.2, height_cm: 178, chest_cm: 104, waist_cm: 92, hips_cm: 101, arm_cm: 36, thigh_cm: 58, notes: null },
-  { id: 'p2', client_id: 'p', taken_on: '2026-06-16', weight_kg: 82.8, height_cm: 178, chest_cm: 104, waist_cm: 90, hips_cm: 100, arm_cm: 36.4, thigh_cm: 58, notes: 'Slept better' },
-  { id: 'p3', client_id: 'p', taken_on: '2026-06-30', weight_kg: 81.5, height_cm: 178, chest_cm: 105, waist_cm: 88.5, hips_cm: 99, arm_cm: 36.8, thigh_cm: 58.5, notes: null },
-  { id: 'p4', client_id: 'p', taken_on: '2026-07-14', weight_kg: 80.6, height_cm: 178, chest_cm: 105, waist_cm: 87, hips_cm: 98.5, arm_cm: 37.2, thigh_cm: 59, notes: 'PR on squats' },
-];
-const SAMPLE_PLAN: Plan = {
-  client_id: 'p',
-  diet_plan: 'Breakfast — 4 egg whites + 2 whole eggs, oats with berries\nLunch — 200g chicken breast, rice, salad\nSnack — Greek yogurt + almonds\nDinner — Paneer / fish, vegetables, roti x2\nHydration — 3.5L water minimum',
-  calorie_target: 2200,
-  protein_target: 160,
-  updated_at: new Date().toISOString(),
+const SAMPLE_CLIENT: CoachClient = {
+  id: 'p', name: 'Aarav Sharma', email: 'aarav@example.com', user_id: 'p',
+  created_at: '', height_cm: 178, birth_year: 1998, sex: 'Male', goal: 'Lose fat',
 };
+const SAMPLE_METRICS: Metric[] = [
+  { id: 'p1', client_id: 'p', taken_on: '2026-06-02', weight_kg: 84.2, height_cm: null, chest_cm: 104, waist_cm: 92, hips_cm: 101, arm_cm: 36, thigh_cm: 58, notes: null },
+  { id: 'p2', client_id: 'p', taken_on: '2026-06-16', weight_kg: 82.8, height_cm: null, chest_cm: 104, waist_cm: 90, hips_cm: 100, arm_cm: 36.4, thigh_cm: 58, notes: 'Slept better' },
+  { id: 'p3', client_id: 'p', taken_on: '2026-06-30', weight_kg: 81.5, height_cm: null, chest_cm: 105, waist_cm: 88.5, hips_cm: 99, arm_cm: 36.8, thigh_cm: 58.5, notes: null },
+  { id: 'p4', client_id: 'p', taken_on: '2026-07-14', weight_kg: 80.6, height_cm: null, chest_cm: 105, waist_cm: 87, hips_cm: 98.5, arm_cm: 37.2, thigh_cm: 59, notes: 'PR on squats' },
+];
+const SAMPLE_MESSAGES: CoachMessage[] = [
+  { id: 'm1', client_id: 'p', author: 'client', kind: 'request', body: 'Requesting a diet plan, please.', read_at: null, created_at: '2026-07-10T09:00:00Z' },
+  { id: 'm2', client_id: 'p', author: 'coach', kind: 'note', body: "On it — sending your plan tonight. Keep protein at 1.8g/kg until then.", read_at: null, created_at: '2026-07-10T12:30:00Z' },
+];
 
 function metricPoints(metrics: Metric[], key: keyof Metric) {
   return metrics
@@ -33,53 +38,104 @@ function metricPoints(metrics: Metric[], key: keyof Metric) {
     .map((m) => ({ date: m.taken_on, value: m[key] as number }));
 }
 
+/** Premium inertial scrolling — the whole portal glides instead of jumping. */
+function useSmoothScroll(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const lenis = new Lenis({ duration: 1.05, smoothWheel: true });
+    let raf = 0;
+    const loop = (t: number) => {
+      lenis.raf(t);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      lenis.destroy();
+    };
+  }, [enabled]);
+}
+
+/** Fades + lifts a section into view as it enters the viewport. */
+function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 22 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={{ delay, duration: 0.55, ease: [0.21, 1, 0.4, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 function Template({
-  client, metrics, plan, saving, updatedLive, onLog, onSignOut,
+  client, metrics, messages, saving, sending, onLog, onSend, onProfile, onSignOut, onInstall,
 }: {
-  client: { name: string };
+  client: CoachClient;
   metrics: Metric[];
-  plan: Plan | null;
+  messages: CoachMessage[];
   saving: boolean;
-  updatedLive: boolean;
+  sending: boolean;
   onLog: (m: Partial<MetricInput>) => void;
+  onSend: (body: string, kind?: 'note' | 'request') => void;
+  onProfile: (p: { height_cm: number; birth_year: number; goal: string | null }) => void;
   onSignOut?: () => void;
+  onInstall?: () => void;
 }) {
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 sm:px-8 py-10 pb-24 flex flex-col gap-6">
+    <div className="mx-auto w-full max-w-3xl px-5 sm:px-8 py-10 pb-28 flex flex-col gap-5">
       <div className="flex items-start justify-between gap-4">
-        <AnimatedGreeting name={client.name.split(' ')[0]} subtitle="Log today's check-in and see how far you've come." />
-        {onSignOut && (
-          <button
-            onClick={onSignOut}
-            className="shrink-0 mt-2 p-2.5 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition-colors"
-            title="Sign out"
-          >
-            <LogOut className="w-[18px] h-[18px]" />
-          </button>
-        )}
+        <AnimatedGreeting
+          name={client.name.split(' ')[0]}
+          subtitle="Log today's check-in and see how far you've come."
+        />
+        <div className="flex items-center gap-1 shrink-0 mt-2">
+          {onInstall && !isStandalone() && (
+            <button
+              onClick={onInstall}
+              className="p-2.5 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition-colors"
+              title="Install as an app"
+            >
+              <Smartphone className="w-[18px] h-[18px]" />
+            </button>
+          )}
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              className="p-2.5 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="w-[18px] h-[18px]" />
+            </button>
+          )}
+        </div>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-        <PlanCard plan={plan} updatedLive={updatedLive} />
-      </motion.div>
+      <Reveal delay={0.45}>
+        <ProfileCard client={client} onSave={onProfile} saving={saving} />
+      </Reveal>
 
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.62 }}>
+      <Reveal delay={0.05}>
         <MetricsForm onSubmit={onLog} saving={saving} />
-      </motion.div>
+      </Reveal>
 
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.74 }}
-        className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-      >
-        <TrendChart title="Weight" unit="kg" points={metricPoints(metrics, 'weight_kg')} />
-        <TrendChart title="Waist" unit="cm" points={metricPoints(metrics, 'waist_cm')} />
-      </motion.div>
+      <Reveal>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <TrendChart title="Weight" unit="kg" points={metricPoints(metrics, 'weight_kg')} />
+          <TrendChart title="Waist" unit="cm" points={metricPoints(metrics, 'waist_cm')} />
+        </div>
+      </Reveal>
 
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.86 }}>
+      <Reveal>
+        <CoachThread messages={messages} author="client" onSend={onSend} sending={sending} />
+      </Reveal>
+
+      <Reveal>
         <MetricsHistory metrics={metrics} />
-      </motion.div>
+      </Reveal>
     </div>
   );
 }
@@ -89,18 +145,29 @@ export default function ClientPortal() {
   const { email, loading: authLoading } = useSessionEmail();
   const [client, setClient] = useState<CoachClient | null>(null);
   const [metrics, setMetrics] = useState<Metric[]>([]);
-  const [plan, setPlan] = useState<Plan | null>(null);
+  const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [state, setState] = useState<'loading' | 'not-enrolled' | 'ready'>('loading');
   const [saving, setSaving] = useState(false);
-  const [updatedLive, setUpdatedLive] = useState(false);
-  // Signed-out is derived, never set: the auth listener flips `email` and the
-  // render below picks the right screen.
+  const [sending, setSending] = useState(false);
   const signedOut = !authLoading && !email;
 
+  const ready = state === 'ready' && !!client;
+  useSmoothScroll(ready || preview);
+  const installGuide = useInstallGuide(ready);
+
+  // Notify on a new coach reply (only for messages that arrive while open).
+  const seenIds = useRef<Set<string>>(new Set());
+
   const refresh = useCallback(async (c: CoachClient) => {
-    const [m, p] = await Promise.all([listMetrics(c.id), getPlan(c.id)]);
+    const [m, msgs] = await Promise.all([listMetrics(c.id), listMessages(c.id)]);
     setMetrics(m);
-    setPlan(p);
+    const fresh = msgs.filter((x) => x.author === 'coach' && !seenIds.current.has(x.id));
+    if (seenIds.current.size > 0 && fresh.length) {
+      const last = fresh[fresh.length - 1];
+      void notify('Your coach replied', last.body.slice(0, 120), 'coach-reply');
+    }
+    msgs.forEach((x) => seenIds.current.add(x.id));
+    setMessages(msgs);
   }, []);
 
   useEffect(() => {
@@ -127,14 +194,10 @@ export default function ClientPortal() {
     };
   }, [preview, email, authLoading, refresh]);
 
-  // Live updates: when the coach publishes a plan, it appears immediately.
+  // Live updates: coach replies / plan changes land immediately.
   useEffect(() => {
     if (!client || preview) return;
-    return subscribeClient(client.id, () => {
-      void refresh(client);
-      setUpdatedLive(true);
-      setTimeout(() => setUpdatedLive(false), 5000);
-    });
+    return subscribeClient(client.id, () => void refresh(client));
   }, [client, preview, refresh]);
 
   const signIn = () =>
@@ -146,7 +209,7 @@ export default function ClientPortal() {
   const signOut = async () => {
     await supabase.auth.signOut();
     setClient(null);
-    setState('loading'); // the derived signedOut flag takes over the render
+    setState('loading');
   };
 
   const log = async (m: Partial<MetricInput>) => {
@@ -157,6 +220,37 @@ export default function ClientPortal() {
       await refresh(client);
     } catch (e) {
       console.error('Failed to save check-in', e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const send = async (body: string, kind: 'note' | 'request' = 'note') => {
+    if (!client) return;
+    setSending(true);
+    try {
+      await sendMessage(client.id, 'client', body, kind);
+      await refresh(client);
+    } catch (e) {
+      console.error('Failed to send message', e);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const saveProfile = async (p: {
+    height_cm: number;
+    birth_year: number;
+    sex?: string | null;
+    goal: string | null;
+  }) => {
+    if (!client) return;
+    setSaving(true);
+    try {
+      setClient(await updateProfile(client.id, p));
+      void ensureNotificationPermission();
+    } catch (e) {
+      console.error('Failed to save profile', e);
     } finally {
       setSaving(false);
     }
@@ -177,12 +271,14 @@ export default function ClientPortal() {
           </span>
         </div>
         <Template
-          client={{ name: 'Aarav' }}
+          client={SAMPLE_CLIENT}
           metrics={SAMPLE_METRICS}
-          plan={SAMPLE_PLAN}
+          messages={SAMPLE_MESSAGES}
           saving={false}
-          updatedLive={false}
+          sending={false}
           onLog={() => {}}
+          onSend={() => {}}
+          onProfile={() => {}}
         />
       </>,
     );
@@ -249,17 +345,30 @@ export default function ClientPortal() {
     );
   }
 
+  if (!client) return shell(null);
+
+  // One-time questions — height/age are asked here and never again.
+  if (!hasProfile(client)) {
+    return shell(<ProfileSetup name={client.name} onSave={saveProfile} saving={saving} />);
+  }
+
   return shell(
-    client && (
+    <>
+      <AnimatePresence>
+        {installGuide.open && <InstallGuide onClose={installGuide.close} />}
+      </AnimatePresence>
       <Template
         client={client}
         metrics={metrics}
-        plan={plan}
+        messages={messages}
         saving={saving}
-        updatedLive={updatedLive}
+        sending={sending}
         onLog={log}
+        onSend={send}
+        onProfile={saveProfile}
         onSignOut={signOut}
+        onInstall={installGuide.reopen}
       />
-    ),
+    </>,
   );
 }
