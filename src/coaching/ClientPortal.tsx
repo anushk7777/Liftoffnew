@@ -94,6 +94,7 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 function Template({
   client, metrics, messages, saving, sending, dueDays, onDismissDue,
   onLog, onSend, onProfile, onSignOut, onInstall, editDate, onEditDate, onAlarm,
+  onPhotosChanged,
 }: {
   client: CoachClient;
   metrics: Metric[];
@@ -110,6 +111,8 @@ function Template({
   onProfile: (p: { height_cm: number; birth_year: number; goal: string | null }) => void;
   onSignOut?: () => void;
   onInstall?: () => void;
+  /** Reload after a photo is deleted, so the archive reflects it at once. */
+  onPhotosChanged?: () => void;
 }) {
   const schedule = scheduleOf(client);
   const byDay = useMemo(() => indexByDay(metrics), [metrics]);
@@ -203,7 +206,9 @@ function Template({
 
       <Reveal>
         <div className="defer-paint">
-          <ProgressPhotos metrics={metrics} />
+          {/* The client owns these files — RLS gives the coach read-only on
+              the bucket, so delete is offered only on their own portal. */}
+          <ProgressPhotos metrics={metrics} canDelete onChanged={onPhotosChanged} />
         </div>
       </Reveal>
 
@@ -549,6 +554,7 @@ export default function ClientPortal({ embedded = false }: { embedded?: boolean 
         editDate={editDate}
         onEditDate={setEditDate}
         onAlarm={saveAlarm}
+        onPhotosChanged={() => client && void refresh(client)}
       />
       <AnimatePresence>{ringing && <AlarmRinging onDismiss={dismissAlarm} />}</AnimatePresence>
     </>,
