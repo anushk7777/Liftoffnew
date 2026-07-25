@@ -1,0 +1,339 @@
+# Instincts generated from https://github.com/anushk7777/Liftoffnew
+# Generated: 2026-07-25T19:16:55.700Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: Liftoffnew-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/anushk7777/Liftoffnew
+---
+
+# Liftoffnew Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat
+
+## Evidence
+
+- 1 commits analyzed
+- Detected conventional commit pattern
+- Examples: feat(coaching): Templates micro-app; restore a reliable route to Clients
+
+---
+id: Liftoffnew-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/anushk7777/Liftoffnew
+---
+
+# Liftoffnew Commit Length
+
+## Action
+
+Write moderate-length commit messages (~72 characters)
+
+## Evidence
+
+- Average commit message length: 72 chars
+- Based on 1 commits
+
+---
+id: Liftoffnew-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/anushk7777/Liftoffnew
+---
+
+# Liftoffnew Naming Files
+
+## Action
+
+Use PascalCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: PascalCase
+
+---
+id: Liftoffnew-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/anushk7777/Liftoffnew
+---
+
+# Liftoffnew Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: Liftoffnew-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/anushk7777/Liftoffnew
+---
+
+# Liftoffnew Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: Liftoffnew-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/anushk7777/Liftoffnew
+---
+
+# Liftoffnew Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: afterburn, coaching, components, mobile, pages
+
+---
+id: Liftoffnew-test-colocate
+trigger: "when writing tests"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/anushk7777/Liftoffnew
+---
+
+# Liftoffnew Test Colocate
+
+## Action
+
+Place test file next to the source file (e.g., Button.test.tsx next to Button.tsx)
+
+## Evidence
+
+- Colocated test pattern detected
+- Tests live alongside source files
+
+---
+id: liftoffnew-instinct-filename-pascalcase
+trigger: "When creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: anushk7777/Liftoffnew
+---
+
+# Liftoffnew Instinct Filename Pascalcase
+
+## Action
+
+Name the file using PascalCase
+
+## Evidence
+
+- Pattern in namingConventions.files
+- Files in src/ use PascalCase
+
+---
+id: liftoffnew-instinct-function-camelcase
+trigger: "When defining a new function"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: anushk7777/Liftoffnew
+---
+
+# Liftoffnew Instinct Function Camelcase
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.functions
+
+---
+id: liftoffnew-instinct-class-pascalcase
+trigger: "When declaring a new class"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: anushk7777/Liftoffnew
+---
+
+# Liftoffnew Instinct Class Pascalcase
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern in namingConventions.classes
+
+---
+id: liftoffnew-instinct-constant-screaming-snake-case
+trigger: "When defining a constant"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: anushk7777/Liftoffnew
+---
+
+# Liftoffnew Instinct Constant Screaming Snake Case
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in namingConventions.constants
+
+---
+id: liftoffnew-instinct-import-relative
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: anushk7777/Liftoffnew
+---
+
+# Liftoffnew Instinct Import Relative
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Pattern in importStyle
+
+---
+id: liftoffnew-instinct-export-named
+trigger: "When exporting modules or members"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: anushk7777/Liftoffnew
+---
+
+# Liftoffnew Instinct Export Named
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in exportStyle
+
+---
+id: liftoffnew-instinct-test-colocated
+trigger: "When writing tests for a module"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: anushk7777/Liftoffnew
+---
+
+# Liftoffnew Instinct Test Colocated
+
+## Action
+
+Place the test file in the same folder as the module (colocated)
+
+## Evidence
+
+- Pattern in architecture.testLocation
+
+---
+id: liftoffnew-instinct-commit-conventional-feat
+trigger: "When writing a commit for a new feature"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: anushk7777/Liftoffnew
+---
+
+# Liftoffnew Instinct Commit Conventional Feat
+
+## Action
+
+Use the conventional commit format: 'feat(scope): message'
+
+## Evidence
+
+- Seen in commit: 'feat(coaching): Templates micro-app; restore a reliable route to Clients'
+- Pattern in commits.prefixes
+
+---
+id: liftoffnew-instinct-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: anushk7777/Liftoffnew
+---
+
+# Liftoffnew Instinct Commit Length
+
+## Action
+
+Keep the commit message around 72 characters on average
+
+## Evidence
+
+- Pattern in commits.averageLength
+
+---
+id: liftoffnew-instinct-error-boundary
+trigger: "When handling errors in React components"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: anushk7777/Liftoffnew
+---
+
+# Liftoffnew Instinct Error Boundary
+
+## Action
+
+Use error boundaries for error handling
+
+## Evidence
+
+- Pattern in errorHandling.errorBoundaries
+
