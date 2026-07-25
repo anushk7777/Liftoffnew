@@ -11,7 +11,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
   useSessionEmail, getMyClientRecord, listMetrics, addMetric, listMessages, sendMessage,
   updateProfile, subscribeClient, hasProfile, notify, ensureNotificationPermission, useInstallGuide, isStandalone,
-  uploadPhoto, daysSinceCheckin,
+  uploadPhoto, daysSinceCheckin, lastKnownValues,
   type CoachClient, type CoachMessage, type Metric, type MetricInput,
 } from './api';
 import {
@@ -161,6 +161,7 @@ function Template({
             byDay,
             editDate ? new Date(`${editDate}T12:00:00`) : new Date(),
           )}
+          previous={lastKnownValues(metrics, editDate ?? todayKey())}
           dailyWeight={schedule.dailyWeight}
           showCycle={!!client.sex && client.sex !== 'Male'}
           editingDate={editDate ?? undefined}

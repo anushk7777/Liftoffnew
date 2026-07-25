@@ -273,6 +273,40 @@ export async function saveMetric(clientId: string, m: Partial<MetricInput>): Pro
 /** Back-compat alias — same upsert behaviour. */
 export const addMetric = saveMetric;
 
+/**
+ * The most recent value recorded for each measurement, for use as placeholders.
+ *
+ * Resolved per field rather than per entry: a weight from yesterday and a waist
+ * from three weeks ago are both "the last one you gave me", and taking a whole
+ * row would blank the tape figures on every weight-only day.
+ *
+ * `before` excludes the day being edited and anything after it, so correcting
+ * an old entry shows what preceded it rather than what came later.
+ */
+export function lastKnownValues(
+  metrics: Metric[],
+  before?: string,
+): Partial<Record<keyof MetricInput, number>> {
+  const fields: (keyof MetricInput)[] = [
+    'weight_kg', 'chest_cm', 'waist_cm', 'hips_cm', 'arm_cm', 'thigh_cm',
+  ];
+  const older = (before ? metrics.filter((m) => m.taken_on < before) : metrics)
+    .slice()
+    .sort((a, b) => a.taken_on.localeCompare(b.taken_on));
+
+  const out: Partial<Record<keyof MetricInput, number>> = {};
+  for (const f of fields) {
+    for (let i = older.length - 1; i >= 0; i--) {
+      const v = older[i][f as keyof Metric];
+      if (typeof v === 'number') {
+        out[f] = v;
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 export async function deleteMetric(id: string): Promise<void> {
   const { error } = await supabase.from('coaching_metrics').delete().eq('id', id);
   if (error) throw error;

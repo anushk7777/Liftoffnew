@@ -140,6 +140,7 @@ export function MetricsForm({
   onSubmit,
   saving,
   recentMeasurement,
+  previous,
   dailyWeight = true,
   showCycle = false,
   existing,
@@ -150,6 +151,8 @@ export function MetricsForm({
   saving: boolean;
   /** How long since the last measurements, for the "give it time" note. */
   recentMeasurement?: { daysSince: number | null; tooSoon: boolean };
+  /** Last recorded value per field, shown as the placeholder. */
+  previous?: Partial<Record<keyof MetricInput, number>>;
   dailyWeight?: boolean;
   /** Offer the period toggle (shown to clients who aren't recorded as male). */
   showCycle?: boolean;
@@ -315,10 +318,14 @@ export function MetricsForm({
         {fields.map((f) => (
           <label key={f.key} className="block">
             <span className="text-[11px] text-[var(--text-muted)]">{f.label} ({f.unit})</span>
+            {/* Last time's number as the placeholder — a reference point while
+                typing, and it leaves the field genuinely empty. Placeholders are
+                dimmed globally so this can never be mistaken for a saved value. */}
             <input
               type="number"
               step="0.1"
               inputMode="decimal"
+              placeholder={previous?.[f.key] != null ? String(previous[f.key]) : undefined}
               value={values[f.key] ?? ''}
               onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
               className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
