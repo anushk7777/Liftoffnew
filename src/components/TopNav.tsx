@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useAppMode } from '../afterburn/mode';
-import { useSessionEmail, isCoach } from '../coaching/api';
+import { useSessionEmail, isCoach, useUnreadTotal } from '../coaching/api';
 import { cn } from '../lib/utils';
 
 const NAV = [
@@ -41,8 +41,10 @@ export default function TopNav({
   const { theme, toggleTheme } = useStore();
   const setAppMode = useAppMode((s) => s.setMode);
   const { email } = useSessionEmail();
+  const coach = isCoach(email);
   // The coaching roster is visible only to the coach's own account.
-  const navItems = isCoach(email) ? [...NAV, CLIENTS_ITEM] : NAV;
+  const navItems = coach ? [...NAV, CLIENTS_ITEM] : NAV;
+  const unread = useUnreadTotal(coach);
 
   return (
     <motion.header
@@ -87,6 +89,17 @@ export default function TopNav({
               <>
                 <Icon className="w-[17px] h-[17px] shrink-0 relative z-10 transition-transform group-hover/nav:scale-110" />
                 <span className="relative z-10">{label}</span>
+                {to === '/clients' && unread > 0 && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+                    className="relative z-10 min-w-[18px] h-[18px] px-1 rounded-full text-[10.5px] font-bold flex items-center justify-center"
+                    style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}
+                  >
+                    {unread > 9 ? '9+' : unread}
+                  </motion.span>
+                )}
                 {isActive && (
                   <motion.span
                     layoutId="topnav-underline"

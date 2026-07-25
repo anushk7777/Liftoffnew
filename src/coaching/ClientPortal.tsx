@@ -11,9 +11,13 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
   useSessionEmail, getMyClientRecord, listMetrics, addMetric, listMessages, sendMessage,
   updateProfile, subscribeClient, hasProfile, notify, ensureNotificationPermission, useInstallGuide, isStandalone,
+  uploadPhoto, maybeRemindCheckin, daysSinceCheckin,
   type CoachClient, type CoachMessage, type Metric, type MetricInput,
 } from './api';
-import { AnimatedGreeting, TrendChart, MetricsForm, MetricsHistory } from './components';
+import {
+  AnimatedGreeting, TrendChart, MetricsForm, MetricsHistory, CheckinDueBanner, BmiCard,
+} from './components';
+import { ProgressPhotos } from './photos';
 import { InstallGuide, ProfileSetup, ProfileCard, CoachThread } from './onboarding';
 
 // Sample data so the coach can preview the exact template at /coaching?preview=1.
@@ -22,10 +26,10 @@ const SAMPLE_CLIENT: CoachClient = {
   created_at: '', height_cm: 178, birth_year: 1998, sex: 'Male', goal: 'Lose fat',
 };
 const SAMPLE_METRICS: Metric[] = [
-  { id: 'p1', client_id: 'p', taken_on: '2026-06-02', weight_kg: 84.2, height_cm: null, chest_cm: 104, waist_cm: 92, hips_cm: 101, arm_cm: 36, thigh_cm: 58, notes: null },
-  { id: 'p2', client_id: 'p', taken_on: '2026-06-16', weight_kg: 82.8, height_cm: null, chest_cm: 104, waist_cm: 90, hips_cm: 100, arm_cm: 36.4, thigh_cm: 58, notes: 'Slept better' },
-  { id: 'p3', client_id: 'p', taken_on: '2026-06-30', weight_kg: 81.5, height_cm: null, chest_cm: 105, waist_cm: 88.5, hips_cm: 99, arm_cm: 36.8, thigh_cm: 58.5, notes: null },
-  { id: 'p4', client_id: 'p', taken_on: '2026-07-14', weight_kg: 80.6, height_cm: null, chest_cm: 105, waist_cm: 87, hips_cm: 98.5, arm_cm: 37.2, thigh_cm: 59, notes: 'PR on squats' },
+  { id: 'p1', client_id: 'p', taken_on: '2026-06-02', weight_kg: 84.2, height_cm: null, chest_cm: 104, waist_cm: 92, hips_cm: 101, arm_cm: 36, thigh_cm: 58, notes: null, photo_front: 'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=600&q=70', photo_side: null },
+  { id: 'p2', client_id: 'p', taken_on: '2026-06-16', weight_kg: 82.8, height_cm: null, chest_cm: 104, waist_cm: 90, hips_cm: 100, arm_cm: 36.4, thigh_cm: 58, notes: 'Slept better', photo_front: null, photo_side: null },
+  { id: 'p3', client_id: 'p', taken_on: '2026-06-30', weight_kg: 81.5, height_cm: null, chest_cm: 105, waist_cm: 88.5, hips_cm: 99, arm_cm: 36.8, thigh_cm: 58.5, notes: null, photo_front: null, photo_side: null },
+  { id: 'p4', client_id: 'p', taken_on: '2026-07-14', weight_kg: 80.6, height_cm: null, chest_cm: 105, waist_cm: 87, hips_cm: 98.5, arm_cm: 37.2, thigh_cm: 59, notes: 'PR on squats', photo_front: 'https://images.unsplash.com/photo-1594381898411-846e7d193883?w=600&q=70', photo_side: null },
 ];
 const SAMPLE_MESSAGES: CoachMessage[] = [
   { id: 'm1', client_id: 'p', author: 'client', kind: 'request', body: 'Requesting a diet plan, please.', read_at: null, created_at: '2026-07-10T09:00:00Z' },
@@ -72,14 +76,17 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 }
 
 function Template({
-  client, metrics, messages, saving, sending, onLog, onSend, onProfile, onSignOut, onInstall,
+  client, metrics, messages, saving, sending, dueDays, onDismissDue,
+  onLog, onSend, onProfile, onSignOut, onInstall,
 }: {
   client: CoachClient;
   metrics: Metric[];
   messages: CoachMessage[];
   saving: boolean;
   sending: boolean;
-  onLog: (m: Partial<MetricInput>) => void;
+  dueDays?: number | null;
+  onDismissDue?: () => void;
+  onLog: (m: Partial<MetricInput>, photos: { front: File | null; side: File | null }) => void;
   onSend: (body: string, kind?: 'note' | 'request') => void;
   onProfile: (p: { height_cm: number; birth_year: number; goal: string | null }) => void;
   onSignOut?: () => void;
@@ -114,6 +121,10 @@ function Template({
         </div>
       </div>
 
+      {dueDays !== undefined && onDismissDue && (
+        <CheckinDueBanner days={dueDays} onDismiss={onDismissDue} />
+      )}
+
       <Reveal delay={0.45}>
         <ProfileCard client={client} onSave={onProfile} saving={saving} />
       </Reveal>
@@ -127,6 +138,14 @@ function Template({
           <TrendChart title="Weight" unit="kg" points={metricPoints(metrics, 'weight_kg')} />
           <TrendChart title="Waist" unit="cm" points={metricPoints(metrics, 'waist_cm')} />
         </div>
+      </Reveal>
+
+      <Reveal>
+        <BmiCard metrics={metrics} heightCm={client.height_cm} />
+      </Reveal>
+
+      <Reveal>
+        <ProgressPhotos metrics={metrics} />
       </Reveal>
 
       <Reveal>
@@ -149,6 +168,8 @@ export default function ClientPortal() {
   const [state, setState] = useState<'loading' | 'not-enrolled' | 'ready'>('loading');
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [dueDismissed, setDueDismissed] = useState(false);
+  const remindedRef = useRef(false);
   const signedOut = !authLoading && !email;
 
   const ready = state === 'ready' && !!client;
@@ -200,6 +221,13 @@ export default function ClientPortal() {
     return subscribeClient(client.id, () => void refresh(client));
   }, [client, preview, refresh]);
 
+  // Weekly check-in nudge — fires once when the portal opens and one is due.
+  useEffect(() => {
+    if (state !== 'ready' || preview || remindedRef.current) return;
+    remindedRef.current = true;
+    maybeRemindCheckin(metrics, client?.reminders_enabled !== false);
+  }, [state, preview, metrics, client]);
+
   const signIn = () =>
     supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -212,11 +240,15 @@ export default function ClientPortal() {
     setState('loading');
   };
 
-  const log = async (m: Partial<MetricInput>) => {
+  const log = async (m: Partial<MetricInput>, photos: { front: File | null; side: File | null }) => {
     if (!client) return;
     setSaving(true);
     try {
-      await addMetric(client.id, m);
+      const withPhotos = { ...m };
+      if (photos.front) withPhotos.photo_front = await uploadPhoto(client.id, photos.front, 'front');
+      if (photos.side) withPhotos.photo_side = await uploadPhoto(client.id, photos.side, 'side');
+      await addMetric(client.id, withPhotos);
+      setDueDismissed(true);
       await refresh(client);
     } catch (e) {
       console.error('Failed to save check-in', e);
@@ -255,6 +287,10 @@ export default function ClientPortal() {
       setSaving(false);
     }
   };
+
+  // Show the banner when a check-in is overdue (or none exists yet).
+  const sinceCheckin = daysSinceCheckin(metrics);
+  const checkinDue = sinceCheckin === null || sinceCheckin >= 7 ? sinceCheckin : undefined;
 
   const shell = (children: React.ReactNode) => (
     <div className="focus-daylight min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -363,6 +399,8 @@ export default function ClientPortal() {
         messages={messages}
         saving={saving}
         sending={sending}
+        dueDays={dueDismissed ? undefined : checkinDue}
+        onDismissDue={() => setDueDismissed(true)}
         onLog={log}
         onSend={send}
         onProfile={saveProfile}

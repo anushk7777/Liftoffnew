@@ -166,3 +166,57 @@ create policy client_update_profile on public.coaching_clients
 do $$ begin
   alter publication supabase_realtime add table public.coaching_messages;
 exception when duplicate_object then null; end $$;
+
+-- =========================================================================
+-- v3 — progress photos, unread tracking, check-in reminders.
+-- Safe to re-run.
+-- =========================================================================
+
+-- ---- Progress photos: store object paths on the check-in row -------------
+alter table public.coaching_metrics add column if not exists photo_front text;
+alter table public.coaching_metrics add column if not exists photo_side text;
+
+-- Private bucket for client progress photos.
+insert into storage.buckets (id, name, public)
+values ('coaching-photos', 'coaching-photos', false)
+on conflict (id) do nothing;
+
+-- Photos are stored at "<client_id>/<filename>". A client may manage files in
+-- their own folder; the coach may read every file in the bucket.
+drop policy if exists coaching_photos_client_rw on storage.objects;
+create policy coaching_photos_client_rw on storage.objects
+  for all
+  using (
+    bucket_id = 'coaching-photos'
+    and (storage.foldername(name))[1] in (
+      select id::text from public.coaching_clients where user_id = auth.uid()
+    )
+  )
+  with check (
+    bucket_id = 'coaching-photos'
+    and (storage.foldername(name))[1] in (
+      select id::text from public.coaching_clients where user_id = auth.uid()
+    )
+  );
+
+drop policy if exists coaching_photos_coach_read on storage.objects;
+create policy coaching_photos_coach_read on storage.objects
+  for select using (bucket_id = 'coaching-photos' and public.is_coach());
+
+-- ---- Unread tracking: let each side mark the other's messages read -------
+-- Coach already has full access. Clients may flip read_at on coach messages
+-- addressed to them (used to clear their own unread badge).
+drop policy if exists client_mark_read on public.coaching_messages;
+create policy client_mark_read on public.coaching_messages
+  for update using (
+    client_id in (select id from public.coaching_clients where user_id = auth.uid())
+  )
+  with check (
+    client_id in (select id from public.coaching_clients where user_id = auth.uid())
+  );
+
+-- ---- Reminder preference -------------------------------------------------
+alter table public.coaching_clients
+  add column if not exists reminders_enabled boolean not null default true;
+alter table public.coaching_clients
+  add column if not exists last_reminded_at timestamptz;

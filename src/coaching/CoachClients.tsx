@@ -8,9 +8,11 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import {
   useSessionEmail, isCoach, listClients, addClient, removeClient,
   listMetrics, listMessages, sendMessage, subscribeClient, ageFromBirthYear, notify, ensureNotificationPermission,
+  unreadByClient, markClientMessagesRead,
   type CoachClient, type CoachMessage, type Metric,
 } from './api';
-import { TrendChart, MetricsHistory } from './components';
+import { TrendChart, MetricsHistory, BmiCard } from './components';
+import { ProgressPhotos } from './photos';
 import { CoachThread } from './onboarding';
 
 function metricPoints(metrics: Metric[], key: keyof Metric) {
@@ -47,6 +49,8 @@ function ClientDetail({ client, onBack }: { client: CoachClient; onBack: () => v
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount; state is set only after await
     void refresh();
+    // Opening a client clears their unread badge.
+    void markClientMessagesRead(client.id);
     return subscribeClient(client.id, () => void refresh());
   }, [client.id, refresh]);
 
@@ -115,6 +119,8 @@ function ClientDetail({ client, onBack }: { client: CoachClient; onBack: () => v
             <TrendChart title="Weight" unit="kg" points={metricPoints(metrics, 'weight_kg')} />
             <TrendChart title="Waist" unit="cm" points={metricPoints(metrics, 'waist_cm')} />
           </div>
+          <BmiCard metrics={metrics} heightCm={client.height_cm} />
+          <ProgressPhotos metrics={metrics} />
           <CoachThread messages={messages} author="coach" onSend={reply} sending={sending} />
           <MetricsHistory metrics={metrics} />
         </>
@@ -131,10 +137,13 @@ export default function CoachClients() {
   const [newEmail, setNewEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [unread, setUnread] = useState<Record<string, number>>({});
 
   const refresh = useCallback(async () => {
     try {
-      setClients(await listClients());
+      const [list, counts] = await Promise.all([listClients(), unreadByClient().catch(() => ({}))]);
+      setClients(list);
+      setUnread(counts);
     } catch (e) {
       console.error('Failed to load clients', e);
     }
@@ -197,7 +206,13 @@ export default function CoachClients() {
       )}
 
       {selected ? (
-        <ClientDetail client={selected} onBack={() => setSelected(null)} />
+        <ClientDetail
+          client={selected}
+          onBack={() => {
+            setSelected(null);
+            void refresh();
+          }}
+        />
       ) : (
         <div className="flex flex-col gap-5">
           {/* Add client */}
@@ -263,6 +278,15 @@ export default function CoachClients() {
                     <span className="block text-[15px] font-semibold text-[var(--text)] truncate">{c.name}</span>
                     <span className="block text-[12.5px] text-[var(--text-muted)] truncate">{c.email}</span>
                   </span>
+                  {unread[c.id] > 0 && (
+                    <span
+                      className="min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0"
+                      style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}
+                      title={`${unread[c.id]} unread`}
+                    >
+                      {unread[c.id]}
+                    </span>
+                  )}
                   <span
                     className="text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0"
                     style={c.user_id

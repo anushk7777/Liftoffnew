@@ -13,6 +13,8 @@ export interface CoachClient {
   email: string;
   user_id: string | null;
   created_at: string;
+  reminders_enabled?: boolean;
+  last_reminded_at?: string | null;
   // One-time profile details — asked once, edited from Profile, never on a
   // per-check-in basis.
   height_cm: number | null;
@@ -50,6 +52,8 @@ export interface Metric {
   arm_cm: number | null;
   thigh_cm: number | null;
   notes: string | null;
+  photo_front: string | null;
+  photo_side: string | null;
 }
 
 export interface Plan {
@@ -308,4 +312,145 @@ export function useInstallGuide(ready: boolean) {
     }
   };
   return { open, close, reopen: () => setOpen(true) };
+}
+
+// ---- Derived metrics -----------------------------------------------------
+/** BMI from a check-in weight and the client's stored height. */
+export function bmiOf(weightKg: number | null, heightCm: number | null): number | null {
+  if (!weightKg || !heightCm) return null;
+  const m = heightCm / 100;
+  return Math.round((weightKg / (m * m)) * 10) / 10;
+}
+
+export function bmiBand(bmi: number): { label: string; color: string } {
+  if (bmi < 18.5) return { label: 'Underweight', color: 'var(--warning)' };
+  if (bmi < 25) return { label: 'Healthy', color: 'var(--success)' };
+  if (bmi < 30) return { label: 'Overweight', color: 'var(--warning)' };
+  return { label: 'Obese', color: 'var(--danger)' };
+}
+
+// ---- Progress photos -----------------------------------------------------
+const PHOTO_BUCKET = 'coaching-photos';
+
+/** Upload one progress photo; returns the storage path to save on the row. */
+export async function uploadPhoto(clientId: string, file: File, slot: 'front' | 'side'): Promise<string> {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const path = `${clientId}/${Date.now()}-${slot}.${ext}`;
+  const { error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, file, { cacheControl: '3600', upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+/** Signed URL for a stored photo (the bucket is private). */
+export async function photoUrl(path: string | null): Promise<string | null> {
+  if (!path) return null;
+  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(path, 3600);
+  if (error) return null;
+  return data?.signedUrl ?? null;
+}
+
+/** Resolve many photo paths at once, keyed by path. */
+export async function photoUrls(paths: (string | null)[]): Promise<Record<string, string>> {
+  const wanted = paths.filter((p): p is string => !!p);
+  if (!wanted.length) return {};
+  const { data } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrls(wanted, 3600);
+  const out: Record<string, string> = {};
+  for (const row of data ?? []) {
+    if (row.path && row.signedUrl) out[row.path] = row.signedUrl;
+  }
+  return out;
+}
+
+// ---- Unread messages -----------------------------------------------------
+/** Unread counts per client for the coach's inbox badge. */
+export async function unreadByClient(): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from('coaching_messages')
+    .select('client_id')
+    .eq('author', 'client')
+    .is('read_at', null);
+  if (error) throw error;
+  const out: Record<string, number> = {};
+  for (const row of data ?? []) out[row.client_id] = (out[row.client_id] ?? 0) + 1;
+  return out;
+}
+
+/** Mark a client's messages as read (called when the coach opens them). */
+export async function markClientMessagesRead(clientId: string): Promise<void> {
+  await supabase
+    .from('coaching_messages')
+    .update({ read_at: new Date().toISOString() })
+    .eq('client_id', clientId)
+    .eq('author', 'client')
+    .is('read_at', null);
+}
+
+/** Live badge: total unread client messages, refreshed on any thread change. */
+export function useUnreadTotal(enabled: boolean): number {
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    const load = () => {
+      unreadByClient()
+        .then((c) => {
+          if (alive) setCounts(c);
+        })
+        .catch(() => {});
+    };
+    load();
+    const ch = supabase
+      .channel('coaching-inbox')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'coaching_messages' }, load)
+      .subscribe();
+    return () => {
+      alive = false;
+      void supabase.removeChannel(ch);
+    };
+  }, [enabled]);
+  return Object.values(counts).reduce((a, b) => a + b, 0);
+}
+
+// ---- Check-in reminders --------------------------------------------------
+const REMIND_KEY = 'liftoff_coaching_last_reminder';
+export const CHECKIN_INTERVAL_DAYS = 7;
+
+/** Days since the most recent check-in, or null when there are none yet. */
+export function daysSinceCheckin(metrics: Metric[]): number | null {
+  if (!metrics.length) return null;
+  const last = metrics.reduce((a, b) => (a.taken_on > b.taken_on ? a : b));
+  const diff = Date.now() - new Date(`${last.taken_on}T12:00:00`).getTime();
+  return Math.floor(diff / 86400000);
+}
+
+/**
+ * Fire a local "time for your check-in" notification when one is due, at most
+ * once a day. Runs whenever the portal/PWA is opened — the practical option
+ * without a push server, and it works in the installed app.
+ */
+export function maybeRemindCheckin(metrics: Metric[], enabled = true): boolean {
+  if (!enabled) return false;
+  const days = daysSinceCheckin(metrics);
+  const due = days === null || days >= CHECKIN_INTERVAL_DAYS;
+  if (!due) return false;
+  let last = 0;
+  try {
+    last = Number(localStorage.getItem(REMIND_KEY) ?? 0);
+  } catch {
+    /* ignore */
+  }
+  if (Date.now() - last < 86400000) return true; // already nudged today
+  try {
+    localStorage.setItem(REMIND_KEY, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+  void notify(
+    'Time for your check-in',
+    days === null ? 'Log your first measurements to start tracking.' : `It's been ${days} days since your last one.`,
+    'checkin-due',
+  );
+  return true;
 }

@@ -2,9 +2,10 @@
 // portal and the coach's dashboard so the "template" looks identical).
 import { useId, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus, Bell, X } from 'lucide-react';
 import { cn } from '../lib/utils';
-import type { Metric, MetricInput } from './api';
+import { bmiOf, bmiBand, type Metric, type MetricInput } from './api';
+import { PhotoSlots } from './photos';
 
 const tnum = { fontVariantNumeric: 'tabular-nums' } as const;
 
@@ -139,10 +140,20 @@ const FIELDS: { key: keyof MetricInput; label: string; unit: string }[] = [
   { key: 'thigh_cm', label: 'Thigh', unit: 'cm' },
 ];
 
-export function MetricsForm({ onSubmit, saving }: { onSubmit: (m: Partial<MetricInput>) => void; saving: boolean }) {
+export function MetricsForm({
+  onSubmit,
+  saving,
+}: {
+  onSubmit: (m: Partial<MetricInput>, photos: { front: File | null; side: File | null }) => void;
+  saving: boolean;
+}) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState('');
-  const canSave = useMemo(() => Object.values(values).some((v) => v.trim() !== ''), [values]);
+  const [photos, setPhotos] = useState<{ front: File | null; side: File | null }>({ front: null, side: null });
+  const canSave = useMemo(
+    () => Object.values(values).some((v) => v.trim() !== '') || !!photos.front || !!photos.side,
+    [values, photos],
+  );
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,9 +167,10 @@ export function MetricsForm({ onSubmit, saving }: { onSubmit: (m: Partial<Metric
       }
     }
     if (notes.trim()) m.notes = notes.trim();
-    onSubmit(m);
+    onSubmit(m, photos);
     setValues({});
     setNotes('');
+    setPhotos({ front: null, side: null });
   };
 
   return (
@@ -185,6 +197,12 @@ export function MetricsForm({ onSubmit, saving }: { onSubmit: (m: Partial<Metric
             />
           </label>
         ))}
+      </div>
+      <div className="mt-4">
+        <span className="text-[11px] text-[var(--text-muted)]">Progress photos (optional)</span>
+        <div className="mt-1.5">
+          <PhotoSlots files={photos} onChange={(slot, file) => setPhotos((p) => ({ ...p, [slot]: file }))} />
+        </div>
       </div>
       <textarea
         value={notes}
@@ -237,5 +255,92 @@ export function MetricsHistory({ metrics }: { metrics: Metric[] }) {
         </tbody>
       </table>
     </section>
+  );
+}
+
+// ---- Check-in reminder banner -------------------------------------------
+export function CheckinDueBanner({ days, onDismiss }: { days: number | null; onDismiss: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="rounded-2xl border p-4 flex items-center gap-3"
+      style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)' }}
+    >
+      <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--accent)' }}>
+        <Bell className="w-[18px] h-[18px]" style={{ color: 'var(--accent-text)' }} />
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[14px] font-semibold text-[var(--text)]">Time for your check-in</p>
+        <p className="text-[12.5px] text-[var(--text-muted)]">
+          {days === null ? 'Log your first measurements to start tracking.' : `It's been ${days} days since your last one.`}
+        </p>
+      </div>
+      <button
+        onClick={onDismiss}
+        className="p-1.5 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] transition-colors shrink-0"
+        aria-label="Dismiss"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </motion.div>
+  );
+}
+
+// ---- BMI card ------------------------------------------------------------
+export function BmiCard({ metrics, heightCm }: { metrics: Metric[]; heightCm: number | null }) {
+  const points = metrics
+    .filter((m) => m.weight_kg != null)
+    .map((m) => ({ date: m.taken_on, value: bmiOf(m.weight_kg, heightCm) }))
+    .filter((p): p is { date: string; value: number } => p.value != null);
+
+  if (!heightCm) return null;
+  const latest = points[points.length - 1]?.value ?? null;
+  const band = latest != null ? bmiBand(latest) : null;
+
+  return (
+    <div className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-5" style={{ boxShadow: 'var(--shadow-sm)' }}>
+      <div className="flex items-baseline justify-between mb-3">
+        <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">BMI</span>
+        {band && (
+          <span className="text-[12px] font-semibold" style={{ color: band.color }}>
+            {band.label}
+          </span>
+        )}
+      </div>
+      {latest == null ? (
+        <p className="text-sm text-[var(--text-subtle)] py-8 text-center">Log a weight to see this.</p>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-1.5 mb-2">
+            <span className="text-[26px] font-bold tracking-tight text-[var(--text)]" style={tnum}>{latest}</span>
+            <span className="text-[13px] text-[var(--text-muted)]">kg/m²</span>
+          </div>
+          {/* Healthy-range scale, 15 → 35 */}
+          <div className="relative h-2 rounded-full overflow-hidden mt-4" style={{ background: 'var(--elevated)' }}>
+            <div
+              className="absolute inset-y-0 rounded-full"
+              style={{ left: '17.5%', width: '32.5%', background: 'color-mix(in srgb, var(--success) 45%, transparent)' }}
+            />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full border-2"
+              style={{
+                left: `${Math.min(100, Math.max(0, ((latest - 15) / 20) * 100))}%`,
+                background: 'var(--accent)',
+                borderColor: 'var(--surface)',
+              }}
+            />
+          </div>
+          <div className="flex justify-between mt-1.5 text-[10px] text-[var(--text-subtle)]">
+            <span>15</span>
+            <span style={{ color: 'var(--success)' }}>healthy 18.5–25</span>
+            <span>35</span>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
