@@ -7,7 +7,7 @@ import { PageHeader } from '../components/ui';
 import { isSupabaseConfigured } from '../lib/supabase';
 import {
   useSessionEmail, isCoach, listClients, addClient, removeClient,
-  listMetrics, listMessages, sendMessage, subscribeClient, ageFromBirthYear, notify, ensureNotificationPermission,
+  listMetrics, listMessages, sendMessage, subscribeClient, ageFromBirthYear, notify, ensureNotificationPermission, updateProfile,
   unreadByClient, markClientMessagesRead,
   type CoachClient, type CoachMessage, type Metric,
 } from './api';
@@ -15,6 +15,8 @@ import { TrendChart, MetricsHistory, BmiCard } from './components';
 import { ProgressPhotos } from './photos';
 import { CoachThread } from './onboarding';
 import { InviteSheet } from './invite';
+import { CheckinCalendar, ScheduleEditor } from './Calendar';
+import { scheduleOf } from './schedule';
 
 function metricPoints(metrics: Metric[], key: keyof Metric) {
   return metrics
@@ -26,15 +28,18 @@ function ClientDetail({
   client,
   onBack,
   onInvite,
+  onScheduleSaved,
 }: {
   client: CoachClient;
   onBack: () => void;
   onInvite: (c: CoachClient) => void;
+  onScheduleSaved: () => void;
 }) {
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [sending, setSending] = useState(false);
+  const [savingSchedule, setSavingSchedule] = useState(false);
   const seenIds = useRef<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
@@ -62,6 +67,23 @@ function ClientDetail({
     void markClientMessagesRead(client.id);
     return subscribeClient(client.id, () => void refresh());
   }, [client.id, refresh]);
+
+  const saveSchedule = async (sch: {
+    measure_weekday: number;
+    measure_cadence: 'weekly' | 'biweekly';
+    measure_anchor: string | null;
+    daily_weight: boolean;
+  }) => {
+    setSavingSchedule(true);
+    try {
+      await updateProfile(client.id, sch);
+      onScheduleSaved();
+    } catch (e) {
+      console.error('Failed to save schedule', e);
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
 
   const reply = async (body: string) => {
     setSending(true);
@@ -128,6 +150,8 @@ function ClientDetail({
             <TrendChart title="Weight" unit="kg" points={metricPoints(metrics, 'weight_kg')} />
             <TrendChart title="Waist" unit="cm" points={metricPoints(metrics, 'waist_cm')} />
           </div>
+          <ScheduleEditor schedule={scheduleOf(client)} onSave={saveSchedule} saving={savingSchedule} />
+          <CheckinCalendar metrics={metrics} schedule={scheduleOf(client)} />
           <BmiCard metrics={metrics} heightCm={client.height_cm} />
           <ProgressPhotos metrics={metrics} />
           <CoachThread messages={messages} author="coach" onSend={reply} sending={sending} />
@@ -225,6 +249,7 @@ export default function CoachClients() {
             void refresh();
           }}
           onInvite={setInviting}
+          onScheduleSaved={() => void refresh()}
         />
       ) : (
         <div className="flex flex-col gap-5">

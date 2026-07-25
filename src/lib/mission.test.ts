@@ -68,9 +68,17 @@ describe('recentWins', () => {
 });
 
 describe('trajectoryTone', () => {
-  it('maps pace status to mission language', () => {
+  it('maps pace status to plain-language verdicts', () => {
     expect(trajectoryTone('ahead').tone).toBe('ahead');
-    expect(trajectoryTone('behind').label).toMatch(/drift/i);
+    expect(trajectoryTone('behind').label).toMatch(/behind/i);
     expect(trajectoryTone('idle').tone).toBe('idle');
+  });
+
+  // This is a focus tracker, not a launch console — keep the copy plain.
+  it('avoids space jargon', () => {
+    const labels = (['ahead', 'on-track', 'behind', 'idle'] as const).map((s) => trajectoryTone(s).label);
+    for (const l of labels) {
+      expect(l).not.toMatch(/drift|burn|launch|trajectory|orbit/i);
+    }
   });
 });

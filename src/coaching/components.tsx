@@ -143,13 +143,23 @@ const FIELDS: { key: keyof MetricInput; label: string; unit: string }[] = [
 export function MetricsForm({
   onSubmit,
   saving,
+  measureDay = true,
+  dailyWeight = true,
 }: {
   onSubmit: (m: Partial<MetricInput>, photos: { front: File | null; side: File | null }) => void;
   saving: boolean;
+  /** On a scheduled measurement day the full set is asked for; otherwise weight only. */
+  measureDay?: boolean;
+  dailyWeight?: boolean;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<{ front: File | null; side: File | null }>({ front: null, side: null });
+  // Weight every day; the rest only on scheduled measurement days.
+  const fields = useMemo(
+    () => (measureDay ? FIELDS : FIELDS.filter((f) => f.key === 'weight_kg')),
+    [measureDay],
+  );
   const canSave = useMemo(
     () => Object.values(values).some((v) => v.trim() !== '') || !!photos.front || !!photos.side,
     [values, photos],
@@ -158,8 +168,10 @@ export function MetricsForm({
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSave || saving) return;
-    const m: Partial<MetricInput> = { taken_on: new Date().toISOString().slice(0, 10) };
-    for (const f of FIELDS) {
+    const d = new Date();
+    const local = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
+    const m: Partial<MetricInput> = { taken_on: local };
+    for (const f of fields) {
       const raw = values[f.key]?.trim();
       if (raw) {
         const n = Number(raw);
@@ -179,11 +191,28 @@ export function MetricsForm({
       className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6"
       style={{ boxShadow: 'var(--shadow-sm)' }}
     >
-      <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">
-        Log today's check-in
-      </span>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-        {FIELDS.map((f) => (
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">
+          {measureDay ? "Today's full check-in" : "Today's weigh-in"}
+        </span>
+        {measureDay && (
+          <span
+            className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+            style={{ color: 'var(--accent)', background: 'var(--accent-soft)' }}
+          >
+            Measurement day
+          </span>
+        )}
+      </div>
+      {!measureDay && (
+        <p className="text-[12.5px] text-[var(--text-muted)] mt-1">
+          {dailyWeight
+            ? 'Just your weight today — measurements and photos come on your scheduled day.'
+            : 'Measurements come on your scheduled day.'}
+        </p>
+      )}
+      <div className={cn('grid gap-3 mt-4', measureDay ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2')}>
+        {fields.map((f) => (
           <label key={f.key} className="block">
             <span className="text-[11px] text-[var(--text-muted)]">{f.label} ({f.unit})</span>
             <input
@@ -198,12 +227,14 @@ export function MetricsForm({
           </label>
         ))}
       </div>
-      <div className="mt-4">
-        <span className="text-[11px] text-[var(--text-muted)]">Progress photos (optional)</span>
-        <div className="mt-1.5">
-          <PhotoSlots files={photos} onChange={(slot, file) => setPhotos((p) => ({ ...p, [slot]: file }))} />
+      {measureDay && (
+        <div className="mt-4">
+          <span className="text-[11px] text-[var(--text-muted)]">Progress photos (optional)</span>
+          <div className="mt-1.5">
+            <PhotoSlots files={photos} onChange={(slot, file) => setPhotos((p) => ({ ...p, [slot]: file }))} />
+          </div>
         </div>
-      </div>
+      )}
       <textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
@@ -219,7 +250,7 @@ export function MetricsForm({
         className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl py-3 text-[15px] font-semibold text-[var(--accent-text)] disabled:opacity-40 transition-opacity"
         style={{ background: 'var(--accent)' }}
       >
-        <Plus className="w-4 h-4" /> {saving ? 'Saving…' : 'Save check-in'}
+        <Plus className="w-4 h-4" /> {saving ? 'Saving…' : measureDay ? 'Save check-in' : 'Save weight'}
       </motion.button>
     </form>
   );

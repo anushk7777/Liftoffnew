@@ -11,13 +11,15 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
   useSessionEmail, getMyClientRecord, listMetrics, addMetric, listMessages, sendMessage,
   updateProfile, subscribeClient, hasProfile, notify, ensureNotificationPermission, useInstallGuide, isStandalone,
-  uploadPhoto, maybeRemindCheckin, daysSinceCheckin,
+  uploadPhoto, daysSinceCheckin,
   type CoachClient, type CoachMessage, type Metric, type MetricInput,
 } from './api';
 import {
   AnimatedGreeting, TrendChart, MetricsForm, MetricsHistory, CheckinDueBanner, BmiCard,
 } from './components';
 import { ProgressPhotos } from './photos';
+import { CheckinCalendar } from './Calendar';
+import { scheduleOf, isMeasureDay, indexByDay, reminderDueToday, scheduleLabel } from './schedule';
 import { InstallGuide, ProfileSetup, ProfileCard, CoachThread } from './onboarding';
 
 // Sample data so the coach can preview the exact template at /coaching?preview=1.
@@ -92,12 +94,13 @@ function Template({
   onSignOut?: () => void;
   onInstall?: () => void;
 }) {
+  const schedule = scheduleOf(client);
   return (
     <div className="mx-auto w-full max-w-3xl px-5 sm:px-8 py-10 pb-28 flex flex-col gap-5">
       <div className="flex items-start justify-between gap-4">
         <AnimatedGreeting
           name={client.name.split(' ')[0]}
-          subtitle="Log today's check-in and see how far you've come."
+          subtitle={`${scheduleLabel(schedule)} for measurements${schedule.dailyWeight ? ' · weight daily' : ''}.`}
         />
         <div className="flex items-center gap-1 shrink-0 mt-2">
           {onInstall && !isStandalone() && (
@@ -130,7 +133,16 @@ function Template({
       </Reveal>
 
       <Reveal delay={0.05}>
-        <MetricsForm onSubmit={onLog} saving={saving} />
+        <MetricsForm
+          onSubmit={onLog}
+          saving={saving}
+          measureDay={isMeasureDay(new Date(), schedule)}
+          dailyWeight={schedule.dailyWeight}
+        />
+      </Reveal>
+
+      <Reveal>
+        <CheckinCalendar metrics={metrics} schedule={schedule} />
       </Reveal>
 
       <Reveal>
@@ -221,11 +233,21 @@ export default function ClientPortal() {
     return subscribeClient(client.id, () => void refresh(client));
   }, [client, preview, refresh]);
 
-  // Weekly check-in nudge — fires once when the portal opens and one is due.
+  // Reminder fires only on the client's scheduled days (or for the daily
+  // weight log when that is switched on).
   useEffect(() => {
-    if (state !== 'ready' || preview || remindedRef.current) return;
+    if (state !== 'ready' || preview || remindedRef.current || !client) return;
     remindedRef.current = true;
-    maybeRemindCheckin(metrics, client?.reminders_enabled !== false);
+    if (client.reminders_enabled === false) return;
+    const { due, kind } = reminderDueToday(scheduleOf(client), indexByDay(metrics));
+    if (!due) return;
+    void notify(
+      kind === 'measure' ? 'Measurement day' : 'Log your weight',
+      kind === 'measure'
+        ? 'Time for your measurements and progress photos.'
+        : 'A quick weigh-in keeps your chart moving.',
+      'checkin-due',
+    );
   }, [state, preview, metrics, client]);
 
   const signIn = () =>
@@ -288,9 +310,10 @@ export default function ClientPortal() {
     }
   };
 
-  // Show the banner when a check-in is overdue (or none exists yet).
-  const sinceCheckin = daysSinceCheckin(metrics);
-  const checkinDue = sinceCheckin === null || sinceCheckin >= 7 ? sinceCheckin : undefined;
+  // Banner only when today is actually a scheduled day with nothing logged.
+  const scheduleNow = scheduleOf(client);
+  const todayDue = client ? reminderDueToday(scheduleNow, indexByDay(metrics)) : { due: false, kind: null };
+  const checkinDue = todayDue.due ? daysSinceCheckin(metrics) : undefined;
 
   const shell = (children: React.ReactNode) => (
     <div className="focus-daylight min-h-screen" style={{ background: 'var(--bg)' }}>

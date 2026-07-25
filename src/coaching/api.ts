@@ -15,6 +15,12 @@ export interface CoachClient {
   created_at: string;
   reminders_enabled?: boolean;
   last_reminded_at?: string | null;
+  // Check-in schedule (coach-set): which weekday measurements land on, how
+  // often, and whether a daily weight log is expected.
+  measure_weekday?: number;
+  measure_cadence?: 'weekly' | 'biweekly';
+  measure_anchor?: string | null;
+  daily_weight?: boolean;
   // One-time profile details — asked once, edited from Profile, never on a
   // per-check-in basis.
   height_cm: number | null;
@@ -186,7 +192,9 @@ export async function upsertPlan(
 // ---- Profile (the one-time questions) -----------------------------------
 export async function updateProfile(
   clientId: string,
-  patch: Partial<Pick<CoachClient, 'height_cm' | 'birth_year' | 'sex' | 'goal' | 'name'>>,
+  patch: Partial<Pick<CoachClient,
+    'height_cm' | 'birth_year' | 'sex' | 'goal' | 'name' |
+    'measure_weekday' | 'measure_cadence' | 'measure_anchor' | 'daily_weight'>>,
 ): Promise<CoachClient> {
   const { data, error } = await supabase
     .from('coaching_clients')

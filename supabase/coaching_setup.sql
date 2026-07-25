@@ -220,3 +220,22 @@ alter table public.coaching_clients
   add column if not exists reminders_enabled boolean not null default true;
 alter table public.coaching_clients
   add column if not exists last_reminded_at timestamptz;
+
+-- =========================================================================
+-- v4 — check-in scheduling.
+-- Weight is logged daily; measurements/photos follow a coach-set cadence.
+-- Safe to re-run.
+-- =========================================================================
+
+-- 0 = Sunday … 6 = Saturday. Defaults to Monday measurements, weekly.
+alter table public.coaching_clients
+  add column if not exists measure_weekday int not null default 1;
+alter table public.coaching_clients
+  add column if not exists measure_cadence text not null default 'weekly'
+  check (measure_cadence in ('weekly', 'biweekly'));
+-- Anchor for biweekly cycles: the first scheduled measurement date.
+alter table public.coaching_clients
+  add column if not exists measure_anchor date;
+-- Whether the daily weight log is expected at all.
+alter table public.coaching_clients
+  add column if not exists daily_weight boolean not null default true;
