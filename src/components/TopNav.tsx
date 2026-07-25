@@ -51,7 +51,7 @@ export default function TopNav({
       initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
-      className="topnav-underglow shrink-0 relative z-40 flex items-center gap-4 h-16 px-6 border-b border-border bg-[var(--sidebar)]/85 backdrop-blur-xl"
+      className="topnav-underglow shrink-0 relative z-40 flex items-center gap-3 h-16 px-4 xl:px-6 border-b border-border bg-[var(--sidebar)]/85 backdrop-blur-xl"
     >
       {/* Brand */}
       <NavLink to="/" className="flex items-center gap-2.5 shrink-0 text-[var(--text)] group">
@@ -78,7 +78,7 @@ export default function TopNav({
             end={end}
             className={({ isActive }) =>
               cn(
-                'group/nav relative flex items-center gap-2 px-3 my-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors',
+                'group/nav relative flex items-center gap-1.5 px-2.5 my-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 transition-colors',
                 isActive
                   ? 'text-[var(--accent)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--hover)]',
@@ -120,7 +120,7 @@ export default function TopNav({
         <button
           onClick={() => setAppMode('afterburn')}
           title="Enter Afterburn"
-          className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold transition-[transform,filter,box-shadow] hover:scale-105 hover:brightness-110 active:scale-95"
+          className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold transition-[transform,filter,box-shadow] hover:scale-105 hover:brightness-110 active:scale-95"
           style={{ color: 'var(--ember)', background: 'var(--ember-soft)' }}
         >
           <Flame className="w-4 h-4" />
@@ -129,14 +129,14 @@ export default function TopNav({
         <button
           onClick={() => setAppMode('kairos')}
           title="Enter Kairos"
-          className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold transition-[transform,filter,box-shadow] hover:scale-105 hover:brightness-110 active:scale-95"
+          className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-semibold transition-[transform,filter,box-shadow] hover:scale-105 hover:brightness-110 active:scale-95"
           style={{ color: 'var(--kairos)', background: 'var(--kairos-soft)' }}
         >
           <Sparkles className="w-4 h-4" />
           Kairos
         </button>
 
-        <span className="hidden lg:block w-px h-6 bg-border mx-1" />
+        <span className="hidden xl:block w-px h-6 bg-border mx-1" />
 
         <button
           onClick={onOpenSearch}

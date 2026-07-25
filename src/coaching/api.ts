@@ -454,3 +454,21 @@ export function maybeRemindCheckin(metrics: Metric[], enabled = true): boolean {
   );
   return true;
 }
+
+// ---- Invites -------------------------------------------------------------
+export const portalLink = () => `${window.location.origin}/coaching`;
+
+/** The message a client receives. Written to be pasted anywhere. */
+export function inviteText(client: CoachClient, coachName = 'your coach'): string {
+  return (
+    `Hey ${client.name.split(' ')[0]}! 👋\n\n` +
+    `I've set up your private progress page — you can log your weight and measurements, ` +
+    `add progress photos, see your charts, and message me directly.\n\n` +
+    `Open this link: ${portalLink()}\n\n` +
+    `Important: sign in with this Google account → ${client.email}\n` +
+    `(That's how it finds your page.)\n\n` +
+    `Tip: after signing in, tap "Add to Home Screen" so it works like an app.\n\n` +
+    `— ${coachName}`
+  );
+}
+

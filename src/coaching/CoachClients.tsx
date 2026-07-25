@@ -1,8 +1,8 @@
 // Coach dashboard — only the coach's account can use this page (client-side
 // gate here; the real enforcement is the RLS policies in Supabase).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
-import { UserPlus, Users, Link as LinkIcon, Trash2, ChevronLeft } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { UserPlus, Users, Send, Trash2, ChevronLeft } from 'lucide-react';
 import { PageHeader } from '../components/ui';
 import { isSupabaseConfigured } from '../lib/supabase';
 import {
@@ -14,6 +14,7 @@ import {
 import { TrendChart, MetricsHistory, BmiCard } from './components';
 import { ProgressPhotos } from './photos';
 import { CoachThread } from './onboarding';
+import { InviteSheet } from './invite';
 
 function metricPoints(metrics: Metric[], key: keyof Metric) {
   return metrics
@@ -21,7 +22,15 @@ function metricPoints(metrics: Metric[], key: keyof Metric) {
     .map((m) => ({ date: m.taken_on, value: m[key] as number }));
 }
 
-function ClientDetail({ client, onBack }: { client: CoachClient; onBack: () => void }) {
+function ClientDetail({
+  client,
+  onBack,
+  onInvite,
+}: {
+  client: CoachClient;
+  onBack: () => void;
+  onInvite: (c: CoachClient) => void;
+}) {
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -67,7 +76,6 @@ function ClientDetail({ client, onBack }: { client: CoachClient; onBack: () => v
   };
 
   const age = ageFromBirthYear(client.birth_year);
-  const inviteLink = `${window.location.origin}/coaching`;
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-5">
@@ -85,11 +93,12 @@ function ClientDetail({ client, onBack }: { client: CoachClient; onBack: () => v
             {client.user_id ? 'Signed up' : 'Invite pending'}
           </span>
           <button
-            onClick={() => navigator.clipboard?.writeText(inviteLink)}
-            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--border-strong)] transition-colors"
-            title="Copy the portal link to send to this client"
+            onClick={() => onInvite(client)}
+            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-1.5 rounded-lg text-[var(--accent-text)] transition-transform active:scale-95"
+            style={{ background: 'var(--accent)' }}
+            title="Send this client their page"
           >
-            <LinkIcon className="w-3.5 h-3.5" /> Copy portal link
+            <Send className="w-3.5 h-3.5" /> Send page
           </button>
         </div>
       </div>
@@ -138,6 +147,7 @@ export default function CoachClients() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [unread, setUnread] = useState<Record<string, number>>({});
+  const [inviting, setInviting] = useState<CoachClient | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -172,10 +182,12 @@ export default function CoachClients() {
     setBusy(true);
     setError('');
     try {
-      await addClient(name, newEmail);
+      const created = await addClient(name, newEmail);
       setName('');
       setNewEmail('');
       await refresh();
+      // Adding someone is only useful once they receive the link.
+      setInviting(created);
     } catch (err) {
       console.error(err);
       setError('Could not add — is that email already on the roster?');
@@ -212,6 +224,7 @@ export default function CoachClients() {
             setSelected(null);
             void refresh();
           }}
+          onInvite={setInviting}
         />
       ) : (
         <div className="flex flex-col gap-5">
@@ -298,6 +311,17 @@ export default function CoachClients() {
                   <span
                     onClick={(e) => {
                       e.stopPropagation();
+                      setInviting(c);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg shrink-0 transition-transform active:scale-95"
+                    style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+                    title="Send this client their page"
+                  >
+                    <Send className="w-3.5 h-3.5" /> Send
+                  </span>
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
                       void remove(c);
                     }}
                     className="p-2 rounded-lg text-[var(--text-subtle)] opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] transition-all"
@@ -311,6 +335,10 @@ export default function CoachClients() {
           )}
         </div>
       )}
+
+      <AnimatePresence>
+        {inviting && <InviteSheet client={inviting} onClose={() => setInviting(null)} />}
+      </AnimatePresence>
     </div>
   );
 }
