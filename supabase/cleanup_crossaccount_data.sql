@@ -84,6 +84,31 @@ order by u.email;
 
 
 -- ---------------------------------------------------------------------------
+-- STEP 3b. Prefer to just delete the whole second account?
+--
+-- That works, and it is the cleaner move — but it does NOT remove everything,
+-- because only two of the three tables cascade:
+--
+--   journal_data  references auth.users(id) on delete cascade  -> DIARY GOES
+--   workout_data  references auth.users(id) on delete cascade  -> GOES
+--   user_data     plain `text primary key`, no foreign key     -> LEFT BEHIND
+--   journal-photos files in storage                            -> LEFT BEHIND
+--
+-- So deleting the user (Dashboard -> Authentication -> Users -> Delete) takes
+-- the diary and the training log with it, but strands the Focus workspace —
+-- tasks, roadmap, notes, habits — and any diary photos.
+--
+-- No other person can reach those leftovers: a new account is issued a fresh
+-- uuid (Postgres never re-issues one), so its queries cannot match the old row,
+-- and RLS blocks it independently. The problem is only that your data outlives
+-- the account. Run step 4's user_data delete and step 5 either way.
+--
+-- supabase/migrations/20260726_user_data_cascade.sql fixes this properly, so
+-- future account deletions clean up after themselves. Run it after this script.
+-- ---------------------------------------------------------------------------
+
+
+-- ---------------------------------------------------------------------------
 -- STEP 4. Delete the second account's rows.
 --
 -- Replace SECOND_ACCOUNT_UUID (both forms) with the id from step 2. Deleting

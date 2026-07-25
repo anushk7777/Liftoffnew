@@ -21,6 +21,7 @@ import type { AiModelId } from '../lib/aicoach';
 import { useAppMode } from '../afterburn/mode';
 import { useSessionEmail, isCoach } from '../coaching/api';
 import { AccountRow } from '../components/AccountMenu';
+import DangerZone from '../components/DangerZone';
 import { cn } from '../lib/utils';
 import { PageHeader } from '../components/ui';
 import { DateTimePicker } from '../components/DateTimePicker';
@@ -105,6 +106,9 @@ export default function Settings() {
             <p className="text-xs text-ink-subtle mt-2">
               The Clients and Trainer tabs depend on which Google account you're signed in with.
             </p>
+          </div>
+          <div className="border-t border-border mt-3 pt-1">
+            <DangerZone />
           </div>
         </Section>
 
