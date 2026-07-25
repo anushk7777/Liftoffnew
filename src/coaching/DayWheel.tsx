@@ -9,9 +9,11 @@
 // A snapping strip rather than an actual rotating wheel — snap points give the
 // same "click into place" feel, but it stays a plain scroll container, so
 // native momentum, keyboard and screen readers all keep working.
-import { useEffect, useMemo, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { monthGrid, WEEKDAYS } from './schedule';
 
 const WEEKDAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -34,6 +36,11 @@ export function DayWheel({
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
 
   // Oldest first, ending today: the strip reads left-to-right like a timeline,
   // and the newest day sits where the eye lands after it scrolls to the end.
@@ -59,20 +66,36 @@ export function DayWheel({
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-1.5">
+      <div className="flex items-center justify-between mb-1.5">
         <span className="text-[12.5px] font-semibold text-[var(--text)]">
           {selected.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
         </span>
-        {value !== todayKey && (
+        <span className="flex items-center gap-2">
+          {value !== todayKey && (
+            <button
+              type="button"
+              onClick={() => onChange(todayKey)}
+              className="text-[12px] font-semibold transition-colors"
+              style={{ color: 'var(--accent)' }}
+            >
+              Jump to today
+            </button>
+          )}
+          {/* Escape hatch to a whole month at once — the strip is quick for the
+              last week or two, but scrolling back weeks is not. */}
           <button
             type="button"
-            onClick={() => onChange(todayKey)}
-            className="text-[12px] font-semibold transition-colors"
-            style={{ color: 'var(--accent)' }}
+            onClick={() => {
+              setPickerMonth(new Date(selected.getFullYear(), selected.getMonth(), 1));
+              setPickerOpen(true);
+            }}
+            aria-label="Pick a day from the calendar"
+            title="Pick a day from the calendar"
+            className="p-1.5 -mr-1 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition-colors"
           >
-            Jump to today
+            <CalendarDays className="w-[17px] h-[17px]" />
           </button>
-        )}
+        </span>
       </div>
 
       {/* Only the left edge fades. The strip ends at today, so there is nothing
@@ -153,6 +176,116 @@ export function DayWheel({
           })}
         </div>
       </div>
+
+      {/* Full month, for jumping further back than a swipe comfortably reaches. */}
+      <AnimatePresence>
+        {pickerOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[140] flex items-end sm:items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)' }}
+            onClick={() => setPickerOpen(false)}
+          >
+            <motion.div
+              initial={{ y: 28, scale: 0.97, opacity: 0 }}
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              exit={{ y: 16, scale: 0.98, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-xs rounded-2xl border border-[var(--border)] p-4"
+              style={{ background: 'var(--surface)', boxShadow: 'var(--shadow-lg)' }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPickerMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
+                  }
+                  className="p-1.5 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition-colors"
+                  aria-label="Previous month"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-[13px] font-semibold text-[var(--text)]">
+                  {pickerMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPickerMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
+                  }
+                  className="p-1.5 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition-colors"
+                  aria-label="Next month"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1 mb-1">
+                {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                  <div
+                    key={d}
+                    className="text-center text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]"
+                  >
+                    {WEEKDAYS[d]}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {monthGrid(pickerMonth.getFullYear(), pickerMonth.getMonth()).map((d) => {
+                  const k = key(d);
+                  const inMonth = d.getMonth() === pickerMonth.getMonth();
+                  // A weigh-in cannot be logged before it happens.
+                  const future = k > todayKey;
+                  const isSel = k === value;
+                  const has = logged?.has(k);
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      disabled={future}
+                      onClick={() => {
+                        onChange(k);
+                        setPickerOpen(false);
+                      }}
+                      className={cn(
+                        'relative aspect-square rounded-lg text-[13px] font-medium transition-colors',
+                        !inMonth && 'opacity-30',
+                        future ? 'opacity-20 cursor-default' : 'hover:bg-[var(--hover)]',
+                      )}
+                      style={{
+                        background: isSel ? 'var(--accent)' : undefined,
+                        color: isSel ? 'var(--accent-text)' : 'var(--text)',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {d.getDate()}
+                      {has && !isSel && (
+                        <span
+                          className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
+                          style={{ background: 'var(--accent)' }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPickerOpen(false)}
+                className="absolute top-3 right-3 p-1.5 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] transition-colors sm:hidden"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
