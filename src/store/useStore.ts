@@ -36,6 +36,9 @@ const nowISO = () => new Date().toISOString();
 interface AppState {
   _initialized: boolean;
   deviceId: string;
+  /** Which account this device's local copy belongs to. See loadFromDB. */
+  ownerId: string | null;
+  resetWorkspace: () => void;
   setInitialized: (val: boolean) => void;
   loadFromDB: () => Promise<void>;
 
@@ -132,12 +135,19 @@ interface AppState {
 
 const NON_PERSISTED = new Set(['_initialized', 'deviceId', 'focusTaskId']);
 
+// `ownerId` is device bookkeeping: persisted locally so an account switch can
+// be detected across reloads, but never uploaded — it isn't part of anyone's
+// workspace, and it must not survive a merge into someone else's row.
+const NON_SYNCED = new Set([...NON_PERSISTED, 'ownerId']);
+
+const EPOCH_ISO = '1970-01-01T00:00:00.000Z';
+
 // The persisted/synced slice of state: everything except functions and the
 // runtime-only / device-local fields above.
 function extractData(state: AppState): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(state)) {
-    if (typeof v === 'function' || NON_PERSISTED.has(k)) continue;
+    if (typeof v === 'function' || NON_SYNCED.has(k)) continue;
     out[k] = v;
   }
   return out;
@@ -148,7 +158,17 @@ export const useStore = create<AppState>()(
     (set, get) => ({
       _initialized: false,
       deviceId: getDeviceId(),
+      ownerId: null,
       setInitialized: (val) => set({ _initialized: val }),
+
+      // Wipe this device's copy back to a blank workspace. Used on sign-out and
+      // whenever a different account signs in on this browser, so one person's
+      // tasks/notes/roadmap can never surface in — or upload to — another's.
+      resetWorkspace: () => {
+        const fresh = extractData(useStore.getInitialState());
+        setLocalUpdatedAt(EPOCH_ISO);
+        set({ ...(fresh as Partial<AppState>), ownerId: null });
+      },
 
       // ---- Cross-device sync ----
       // Data syncs automatically per signed-in account (keyed by user.id); no
@@ -175,7 +195,18 @@ export const useStore = create<AppState>()(
             return;
           }
           const id = session.user.id;
-          
+
+          // A different account is now signed in on this browser. The local
+          // copy belongs to the previous one, so it must not be merged into
+          // this account — that would show them someone else's workspace and
+          // then upload it into their cloud row on the next save. Start blank
+          // and let the merge below take only what this account owns.
+          //
+          // A null ownerId means "written before this was tracked": adopt it
+          // for the current account rather than discarding a real workspace.
+          const prevOwner = get().ownerId;
+          if (prevOwner && prevOwner !== id) get().resetWorkspace();
+
           const { data, error } = await supabase
             .from('user_data')
             .select('data, updated_at')
@@ -196,9 +227,10 @@ export const useStore = create<AppState>()(
               getLocalUpdatedAt(),
               data.updated_at || '1970-01-01T00:00:00.000Z',
             );
-            set({ ...(merged as Partial<AppState>), _initialized: true });
+            set({ ...(merged as Partial<AppState>), _initialized: true, ownerId: id });
           } else {
-            set({ _initialized: true });
+            // No cloud row yet (new account): whatever is local is now theirs.
+            set({ _initialized: true, ownerId: id });
           }
         } catch (err) {
           console.error('Failed to load from Supabase:', err);

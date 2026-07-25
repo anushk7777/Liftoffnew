@@ -185,6 +185,26 @@ export async function getMyClientRecord(): Promise<CoachClient | null> {
 }
 
 /**
+ * Read-only "am I on the roster?" check.
+ *
+ * Deliberately not `getMyClientRecord()`: that one *claims* the row by writing
+ * user_id, which must only happen when someone actually opens their page — not
+ * as a side effect of rendering the nav bar.
+ */
+export async function isEnrolledClient(): Promise<boolean> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const email = session?.user?.email;
+  if (!email) return false;
+  const { data, error } = await supabase
+    .from('coaching_clients')
+    .select('id')
+    .eq('email', email.toLowerCase())
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
+/**
  * Whether the signed-in account is on the coach's roster.
  *
  * Drives the in-app "Trainer" tab: a client the coach invited gets their
@@ -196,16 +216,18 @@ export async function getMyClientRecord(): Promise<CoachClient | null> {
  * nothing on the roster side.
  */
 export function useIsClient(email: string | null, enabled = true): { isClient: boolean; loading: boolean } {
-  const active = enabled && !!email && isSupabaseConfigured;
+  // The coach is never their own client, even if their address ended up on the
+  // roster from testing the template — they get Clients, not Trainer.
+  const active = enabled && !!email && !isCoach(email) && isSupabaseConfigured;
   // Answer is stamped with the address it was resolved for, so signing in as
   // someone else can never leave the previous account's tab on screen.
   const [res, setRes] = useState<{ email: string; isClient: boolean } | null>(null);
   useEffect(() => {
     if (!active || !email) return;
     let alive = true;
-    getMyClientRecord()
-      .then((c) => {
-        if (alive) setRes({ email, isClient: !!c });
+    isEnrolledClient()
+      .then((enrolled) => {
+        if (alive) setRes({ email, isClient: enrolled });
       })
       .catch((e: unknown) => {
         console.error('Could not check coaching enrolment', e);
