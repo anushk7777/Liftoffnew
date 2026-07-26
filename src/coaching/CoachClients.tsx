@@ -50,7 +50,7 @@ function ClientDetail({
     if (seenIds.current.size > 0 && fresh.length) {
       const last = fresh[fresh.length - 1];
       void notify(
-        last.kind === 'request' ? `${client.name} requested a diet plan` : `${client.name} sent a message`,
+        `${client.name} sent a message`,
         last.body.slice(0, 120),
         `client-${client.id}`,
       );

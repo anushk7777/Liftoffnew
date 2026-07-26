@@ -92,6 +92,9 @@ export function TrendChart({
   height = 200,
   marked,
   markedLabel,
+  overlay,
+  overlayLabel,
+  headline,
 }: {
   title: string;
   unit: string;
@@ -100,15 +103,23 @@ export function TrendChart({
   /** Dates to flag on the line (e.g. period days, where weight reads high). */
   marked?: Set<string>;
   markedLabel?: string;
+  /** A calmer second series on the same axis, e.g. the 7-day average. */
+  overlay?: { date: string; value: number }[];
+  overlayLabel?: string;
+  /** The decision-relevant summary, shown beside the title. */
+  headline?: React.ReactNode;
 }) {
   return (
     <div
       className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-5"
       style={{ boxShadow: 'var(--shadow-sm)' }}
     >
-      <span className="block text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)] mb-3">
-        {title}
-      </span>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mb-3">
+        <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">
+          {title}
+        </span>
+        {headline}
+      </div>
       <Chart
         points={points}
         unit={unit}
@@ -116,6 +127,8 @@ export function TrendChart({
         accent="var(--accent)"
         marked={marked}
         markedLabel={markedLabel}
+        overlay={overlay}
+        overlayLabel={overlayLabel}
         emptyHint={
           points.length === 0
             ? 'No entries yet — your first check-in starts the trend.'
@@ -128,13 +141,17 @@ export function TrendChart({
 
 // ---- Measurement form ----------------------------------------------------
 // Height/age deliberately absent — they live on the profile and are asked once.
-const FIELDS: { key: keyof MetricInput; label: string; unit: string }[] = [
-  { key: 'weight_kg', label: 'Weight', unit: 'kg' },
-  { key: 'chest_cm', label: 'Chest', unit: 'cm' },
-  { key: 'waist_cm', label: 'Waist', unit: 'cm' },
-  { key: 'hips_cm', label: 'Hips', unit: 'cm' },
-  { key: 'arm_cm', label: 'Arm', unit: 'cm' },
-  { key: 'thigh_cm', label: 'Thigh', unit: 'cm' },
+// Bounds are deliberately generous — wide enough to accept any real person,
+// tight enough to catch a slipped decimal. An unnoticed 640 instead of 64 is
+// worse than a missing entry: the chart scales to min and max, so one bad value
+// flattens the whole trend line and the rate is read off it.
+const FIELDS: { key: keyof MetricInput; label: string; unit: string; min: number; max: number }[] = [
+  { key: 'weight_kg', label: 'Weight', unit: 'kg', min: 20, max: 400 },
+  { key: 'chest_cm', label: 'Chest', unit: 'cm', min: 40, max: 200 },
+  { key: 'waist_cm', label: 'Waist', unit: 'cm', min: 30, max: 200 },
+  { key: 'hips_cm', label: 'Hips', unit: 'cm', min: 40, max: 200 },
+  { key: 'arm_cm', label: 'Arm', unit: 'cm', min: 10, max: 80 },
+  { key: 'thigh_cm', label: 'Thigh', unit: 'cm', min: 20, max: 120 },
 ];
 
 export function MetricsForm({
@@ -199,9 +216,23 @@ export function MetricsForm({
     () => (measuring ? FIELDS.filter((f) => f.key !== 'weight_kg') : FIELDS.filter((f) => f.key === 'weight_kg')),
     [measuring],
   );
+  /** Fields typed but outside a plausible range, named for the message. */
+  const outOfRange = useMemo(
+    () =>
+      FIELDS.filter((f) => {
+        const raw = values[f.key];
+        if (!raw || !raw.trim()) return false;
+        const n = Number(raw);
+        return !Number.isNaN(n) && (n < f.min || n > f.max);
+      }),
+    [values],
+  );
+
   const canSave = useMemo(
-    () => Object.values(values).some((v) => v.trim() !== '') || !!photos.front || !!photos.side,
-    [values, photos],
+    () =>
+      (Object.values(values).some((v) => v.trim() !== '') || !!photos.front || !!photos.side) &&
+      outOfRange.length === 0,
+    [values, photos, outOfRange],
   );
 
   const submit = (e: React.FormEvent) => {
@@ -344,12 +375,34 @@ export function MetricsForm({
               placeholder={previous?.[f.key] != null ? String(previous[f.key]) : undefined}
               value={values[f.key] ?? ''}
               onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-              className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
-              style={tnum}
+              aria-invalid={outOfRange.some((o) => o.key === f.key)}
+              className="mt-1 w-full rounded-lg border bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] outline-none transition-colors"
+              style={{
+                ...tnum,
+                borderColor: outOfRange.some((o) => o.key === f.key)
+                  ? 'var(--danger, #ef4444)'
+                  : 'var(--border)',
+              }}
             />
           </label>
         ))}
       </div>
+      <AnimatePresence initial={false}>
+        {outOfRange.length > 0 && (
+          <motion.p
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="text-[12.5px] mt-2 overflow-hidden"
+            style={{ color: 'var(--danger, #ef4444)' }}
+          >
+            {outOfRange[0].label} of {values[outOfRange[0].key]} {outOfRange[0].unit} looks like a
+            slip — expected between {outOfRange[0].min} and {outOfRange[0].max}. Fix it and the save
+            will unlock.
+          </motion.p>
+        )}
+      </AnimatePresence>
+
       {measuring && (
         <div className="mt-4">
           <span className="text-[11px] text-[var(--text-muted)]">Progress photos (optional)</span>

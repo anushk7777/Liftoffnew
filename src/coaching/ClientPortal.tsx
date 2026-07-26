@@ -2,7 +2,7 @@
 // A client signs in with Google; if their coach added their email to the
 // roster, their account links up and they land on their template: a one-time
 // profile setup, then check-ins, progress graphs, and a direct line to their
-// coach (including "request a diet plan").
+// coach.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Lenis from 'lenis';
@@ -21,6 +21,7 @@ import {
 import { startAlarm, stopAlarm, testAlarm, alarmDue, markAlarmFired, primeAlarmAudio } from './alarm';
 import { ProgressPhotos } from './photos';
 import { scheduleOf, indexByDay, reminderDueToday, scheduleLabel, measuredRecently } from './schedule';
+import { weightPoints, rollingAverage, weeklyRate, rateVerdict, adherence } from './insights';
 import { InstallGuide, ProfileSetup, ProfileCard, CoachThread } from './onboarding';
 
 // Sample data so the coach can preview the exact template at /coaching?preview=1.
@@ -35,13 +36,57 @@ const SAMPLE_METRICS: Metric[] = [
   { id: 'p4', client_id: 'p', taken_on: '2026-07-14', weight_kg: 80.6, height_cm: null, chest_cm: 105, waist_cm: 87, hips_cm: 98.5, arm_cm: 37.2, thigh_cm: 59, notes: 'PR on squats', photo_front: 'https://images.unsplash.com/photo-1594381898411-846e7d193883?w=600&q=70', photo_side: null, menstruating: false },
 ];
 const SAMPLE_MESSAGES: CoachMessage[] = [
-  { id: 'm1', client_id: 'p', author: 'client', kind: 'request', body: 'Requesting a diet plan, please.', read_at: null, created_at: '2026-07-10T09:00:00Z' },
-  { id: 'm2', client_id: 'p', author: 'coach', kind: 'note', body: "On it — sending your plan tonight. Keep protein at 1.8g/kg until then.", read_at: null, created_at: '2026-07-10T12:30:00Z' },
+  { id: 'm1', client_id: 'p', author: 'client', kind: 'note', body: 'Scale is up 400g but I feel leaner — normal?', read_at: null, created_at: '2026-07-10T09:00:00Z' },
+  { id: 'm2', client_id: 'p', author: 'coach', kind: 'note', body: 'Completely normal — your 7-day average is still falling. Keep going.', read_at: null, created_at: '2026-07-10T12:30:00Z' },
 ];
 
 const dayKeyLocal = (d: Date) =>
   `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
 const todayKey = () => dayKeyLocal(new Date());
+
+/**
+ * The decision-relevant summary above the weight chart.
+ *
+ * Rate per week rather than a running total: a total says what happened, a rate
+ * says whether anything needs changing. It is read off a regression over the
+ * last four weeks, and stays silent until there is enough history to mean
+ * something rather than showing a confident number built from three days.
+ */
+function RateHeadline({ metrics }: { metrics: Metric[] }) {
+  const pts = weightPoints(metrics);
+  const rate = weeklyRate(pts, 28);
+  const latest = pts[pts.length - 1]?.value ?? 0;
+  const seen = adherence(metrics, 14);
+
+  const verdict = rate == null ? null : rateVerdict(rate, latest);
+  const COPY: Record<string, { text: string; tone: string }> = {
+    gaining: { text: 'gaining', tone: 'var(--warning)' },
+    fast: { text: 'quite fast', tone: 'var(--warning)' },
+    onTrack: { text: 'on track', tone: 'var(--success)' },
+    slow: { text: 'slow and steady', tone: 'var(--text-muted)' },
+    holding: { text: 'holding', tone: 'var(--text-muted)' },
+  };
+
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      {rate != null && verdict ? (
+        <span className="text-[12.5px] font-semibold" style={{ color: COPY[verdict].tone, ...tnumLocal }}>
+          {rate > 0 ? '+' : ''}{rate.toFixed(2)} kg/week
+          <span className="font-medium text-[var(--text-muted)]"> · {COPY[verdict].text}</span>
+        </span>
+      ) : (
+        <span className="text-[12px] text-[var(--text-subtle)]">
+          Keep logging — a weekly rate needs about a week of entries.
+        </span>
+      )}
+      <span className="text-[11.5px] text-[var(--text-subtle)]">
+        logged {seen.logged}/{seen.of} days
+      </span>
+    </span>
+  );
+}
+
+const tnumLocal = { fontVariantNumeric: 'tabular-nums' } as const;
 
 /** Dates the client flagged as period days, for chart markers. */
 function cycleDays(metrics: Metric[]): Set<string> {
@@ -188,6 +233,9 @@ function Template({
             title="Weight"
             unit="kg"
             points={metricPoints(metrics, 'weight_kg')}
+            overlay={rollingAverage(weightPoints(metrics), 7)}
+            overlayLabel="7-day average — the line to read; single days are mostly water and food"
+            headline={<RateHeadline metrics={metrics} />}
             marked={cycleDays(metrics)}
             markedLabel="On period — water weight is normal"
           />

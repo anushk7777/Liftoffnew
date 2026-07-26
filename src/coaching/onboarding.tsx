@@ -458,19 +458,14 @@ export function CoachThread({
   author,
   onSend,
   sending,
-  showRequest = true,
 }: {
   messages: CoachMessage[];
   author: 'client' | 'coach';
   onSend: (body: string, kind?: 'note' | 'request') => void;
   sending: boolean;
-  showRequest?: boolean;
 }) {
   const [text, setText] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
-  const hasPendingRequest = messages.some(
-    (m) => m.kind === 'request' && !messages.some((r) => r.author === 'coach' && r.created_at > m.created_at),
-  );
 
   // Keep the thread pinned to its newest message by scrolling the LIST, never
   // the page — scrollIntoView here used to yank the whole portal down on load.
@@ -483,7 +478,7 @@ export function CoachThread({
   }, [messages.length]);
 
   const send = (kind: 'note' | 'request' = 'note') => {
-    const body = kind === 'request' && !text.trim() ? 'Requesting a diet plan, please.' : text.trim();
+    const body = text.trim();
     if (!body || sending) return;
     onSend(body, kind);
     setText('');
@@ -498,21 +493,13 @@ export function CoachThread({
         <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">
           {author === 'client' ? 'Your coach' : 'Conversation'}
         </span>
-        {hasPendingRequest && (
-          <span
-            className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ color: 'var(--warning)', background: 'color-mix(in srgb, var(--warning) 15%, transparent)' }}
-          >
-            Plan requested
-          </span>
-        )}
       </div>
 
       <div ref={listRef} className="flex flex-col gap-2.5 max-h-[340px] overflow-y-auto overscroll-contain no-scrollbar py-1">
         {messages.length === 0 ? (
           <p className="text-sm text-[var(--text-subtle)] py-6 text-center">
             {author === 'client'
-              ? 'No messages yet. Ask your coach anything, or request a diet plan below.'
+              ? 'No messages yet. Ask your coach anything.'
               : 'No messages from this client yet.'}
           </p>
         ) : (
@@ -533,11 +520,6 @@ export function CoachThread({
                       : { background: 'var(--elevated)', color: 'var(--text)' }
                   }
                 >
-                  {m.kind === 'request' && (
-                    <span className="block text-[10.5px] font-bold uppercase tracking-wider opacity-70 mb-0.5">
-                      Diet plan request
-                    </span>
-                  )}
                   {m.body}
                 </div>
                 <span className="text-[10.5px] text-[var(--text-subtle)] mt-1 px-1">{timeLabel(m.created_at)}</span>
@@ -548,18 +530,6 @@ export function CoachThread({
       </div>
 
       <div className="mt-3 pt-3 border-t border-[var(--border)] flex flex-col gap-2">
-        {author === 'client' && showRequest && (
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            onClick={() => send('request')}
-            disabled={sending}
-            className="w-full py-2.5 rounded-xl text-[14px] font-semibold inline-flex items-center justify-center gap-2 border transition-colors disabled:opacity-50"
-            style={{ borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-soft)' }}
-          >
-            <Sparkles className="w-4 h-4" /> Request a diet plan
-          </motion.button>
-        )}
         <div className="flex gap-2">
           <input
             value={text}

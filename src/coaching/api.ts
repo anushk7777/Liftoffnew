@@ -83,14 +83,6 @@ export interface Metric {
   menstruating: boolean;
 }
 
-export interface Plan {
-  client_id: string;
-  diet_plan: string;
-  calorie_target: number | null;
-  protein_target: number | null;
-  updated_at: string;
-}
-
 export type MetricInput = Omit<Metric, 'id' | 'client_id'>;
 
 /**
@@ -260,7 +252,11 @@ export async function listMetrics(clientId: string): Promise<Metric[]> {
  * instead of creating a duplicate, so clients can always correct a mistake.
  */
 export async function saveMetric(clientId: string, m: Partial<MetricInput>): Promise<Metric> {
-  const day = m.taken_on ?? new Date().toISOString().slice(0, 10);
+  // Local, not UTC. toISOString() would file anything logged before ~05:30 in
+  // IST under the previous day; every other date in the app is a local day.
+  const now = new Date();
+  const localToday = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, '0')}-${`${now.getDate()}`.padStart(2, '0')}`;
+  const day = m.taken_on ?? localToday;
   const { data, error } = await supabase
     .from('coaching_metrics')
     .upsert({ client_id: clientId, ...m, taken_on: day }, { onConflict: 'client_id,taken_on' })
@@ -310,30 +306,6 @@ export function lastKnownValues(
 export async function deleteMetric(id: string): Promise<void> {
   const { error } = await supabase.from('coaching_metrics').delete().eq('id', id);
   if (error) throw error;
-}
-
-// ---- Plan ----------------------------------------------------------------
-export async function getPlan(clientId: string): Promise<Plan | null> {
-  const { data, error } = await supabase
-    .from('coaching_plans')
-    .select('*')
-    .eq('client_id', clientId)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
-}
-
-export async function upsertPlan(
-  clientId: string,
-  plan: { diet_plan: string; calorie_target: number | null; protein_target: number | null },
-): Promise<Plan> {
-  const { data, error } = await supabase
-    .from('coaching_plans')
-    .upsert({ client_id: clientId, ...plan, updated_at: new Date().toISOString() })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
 }
 
 // ---- Profile (the one-time questions) -----------------------------------
