@@ -209,11 +209,16 @@ function Template({
       </Reveal>
 
       <Reveal>
-        <div className="defer-paint">
-          {/* The client owns these files — RLS gives the coach read-only on
-              the bucket, so delete is offered only on their own portal. */}
-          <ProgressPhotos metrics={metrics} canDelete onChanged={onPhotosChanged} />
-        </div>
+        {/* Deliberately NOT `defer-paint`. content-visibility reserves a fixed
+            contain-intrinsic-size, and this section runs past 1500px once there
+            are a few months of photos — measured at 420px reserved against
+            1567px actual, so scrolling past it shoved the page down by more
+            than a screen. Its height grows with history, so no fixed estimate
+            holds. The thumbnails are lazy-loaded, which is where the saving
+            actually was. */}
+        {/* The client owns these files — RLS gives the coach read-only on
+            the bucket, so delete is offered only on their own portal. */}
+        <ProgressPhotos metrics={metrics} canDelete onChanged={onPhotosChanged} />
       </Reveal>
 
       <Reveal>
