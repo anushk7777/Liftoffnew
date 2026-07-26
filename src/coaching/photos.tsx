@@ -2,10 +2,17 @@
 // comparison that is the thing clients actually feel motivated by.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, X, ImageOff, MoveHorizontal, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { Camera, X, ImageOff, MoveHorizontal, ChevronLeft, ChevronRight, Trash2, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { photoUrls, deletePhoto, type Metric } from './api';
-import { monthGrid, dayKey } from './schedule';
+
+/** The comparisons people actually ask for, oldest span first. */
+const PRESETS: { label: string; days: number | null }[] = [
+  { label: 'First photo', days: null },
+  { label: '3 months', days: 90 },
+  { label: '1 month', days: 30 },
+  { label: '2 weeks', days: 14 },
+];
 
 /** Two file slots (front / side) with instant local previews. */
 export function PhotoSlots({
@@ -163,17 +170,23 @@ export function CompareSlider({
 }
 
 /**
- * Photo archive: a month calendar of shots, any two of which can be compared.
+ * Progress photos, built the way people actually look at photos.
  *
- * The old gallery was a single horizontal strip that always compared the first
- * shot against the last. That works for three entries and falls apart after
- * that — you cannot find May, and you cannot ask "how do I look against six
- * weeks ago" when the last shot is yesterday. So: a calendar you scan by month,
- * tap a day to open it, and pick the two days you actually want side by side.
+ * The previous version was a month calendar with an Archive/Compare mode
+ * switch. Three things made it hard work for a normal user:
  *
- * Signed URLs are minted per visible month plus the two comparison slots, not
- * for the whole history. A year of check-ins is ~24 signed URLs on screen
- * instead of 700, and they expire in an hour either way.
+ *  - A month grid is mostly empty. Checking in every fortnight means 28 blank
+ *    cells around two photos, and paging back through empty months to find
+ *    anything.
+ *  - "Archive" and "Compare" as modes is an abstraction nobody asked for. What
+ *    people want is "show me then versus now", immediately, with no setup.
+ *  - A front/side toggle hid half the photos behind a switch you had to know
+ *    about.
+ *
+ * So: the then-and-now comparison is the first thing on screen and needs no
+ * interaction, and beneath it the shots sit in a dated timeline that only shows
+ * months that actually have photos. Tapping one opens a full-screen viewer you
+ * can swipe through, which is where delete and "compare with this" live.
  */
 export function ProgressPhotos({
   metrics,
@@ -185,55 +198,41 @@ export function ProgressPhotos({
   canDelete?: boolean;
   onChanged?: () => void;
 }) {
-  const [slot, setSlot] = useState<'front' | 'side'>('front');
-  const [view, setView] = useState<'archive' | 'compare'>('archive');
-  const [cursor, setCursor] = useState(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1);
-  });
-  const [open, setOpen] = useState<string | null>(null); // day key in the lightbox
+  const [viewing, setViewing] = useState<string | null>(null); // day key
+  const [viewSlot, setViewSlot] = useState<'front' | 'side'>('front');
   const [aPick, setA] = useState<string | null>(null);
   const [bPick, setB] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [urls, setUrls] = useState<Record<string, string>>({});
 
-  const key = slot === 'front' ? 'photo_front' : 'photo_side';
+  /** Every check-in that has at least one photo, oldest first. */
+  const shots = useMemo(
+    () =>
+      metrics
+        .filter((m) => m.photo_front || m.photo_side)
+        .slice()
+        .sort((x, y) => x.taken_on.localeCompare(y.taken_on)),
+    [metrics],
+  );
+  const byDay = useMemo(() => new Map(shots.map((m) => [m.taken_on, m])), [shots]);
+  const days = useMemo(() => shots.map((m) => m.taken_on), [shots]);
 
-  /** Day key -> the metric row holding a photo in the active slot. */
-  const byDay = useMemo(() => {
-    const m = new Map<string, Metric>();
-    for (const row of metrics) if (row[key]) m.set(row.taken_on, row);
-    return m;
-  }, [metrics, key]);
-
-  const days = useMemo(() => [...byDay.keys()].sort(), [byDay]);
-
-  // The comparison defaults to the widest span available and is derived, not
-  // synced: state holds only what the user explicitly picked, and a pick that
-  // no longer exists (slot switched, photo deleted) falls back on its own.
+  // Comparison ends are derived, so a photo that gets deleted falls back on its
+  // own instead of leaving the slider pointing at nothing.
   const a = aPick && byDay.has(aPick) ? aPick : (days[0] ?? null);
   const b = bPick && byDay.has(bPick) ? bPick : (days[days.length - 1] ?? null);
 
-  const grid = useMemo(() => monthGrid(cursor.getFullYear(), cursor.getMonth()), [cursor]);
-
-  // Sign only what is on screen: this month's photos, the lightbox, and A/B.
-  const needed = useMemo(() => {
-    const want = new Set<string>();
-    for (const d of grid) {
-      const row = byDay.get(dayKey(d));
-      if (row?.[key]) want.add(row[key] as string);
-    }
-    for (const d of [open, a, b]) {
-      const row = d ? byDay.get(d) : null;
-      if (row?.[key]) want.add(row[key] as string);
-    }
-    return [...want];
-  }, [grid, byDay, key, open, a, b]);
+  // Sign every path once. One check-in a fortnight is ~26 rows a year, so this
+  // is a single batch of a few dozen URLs rather than anything that needs
+  // windowing — and they expire in an hour regardless.
+  const paths = useMemo(
+    () => shots.flatMap((m) => [m.photo_front, m.photo_side]).filter((p): p is string => !!p),
+    [shots],
+  );
 
   useEffect(() => {
-    const missing = needed.filter((p) => !urls[p]);
+    const missing = paths.filter((p) => !urls[p]);
     if (!missing.length) return;
-    // Absolute URLs (preview/demo rows) are already displayable.
     const direct: Record<string, string> = {};
     const sign: string[] = [];
     for (const p of missing) {
@@ -252,24 +251,67 @@ export function ProgressPhotos({
     return () => {
       alive = false;
     };
-  }, [needed, urls]);
+  }, [paths, urls]);
 
-  const urlFor = (day: string | null) => {
+  const urlOf = (day: string | null, slot: 'front' | 'side') => {
     const row = day ? byDay.get(day) : null;
-    const path = row?.[key] as string | undefined;
+    const path = row?.[slot === 'front' ? 'photo_front' : 'photo_side'];
     return path ? urls[path] : undefined;
   };
+  /** Whichever slot this day actually has, preferring front. */
+  const anyUrl = (day: string) => urlOf(day, 'front') ?? urlOf(day, 'side');
 
   const pretty = (day: string) =>
-    new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
-  const remove = async (day: string) => {
+  /**
+   * The photo closest to `targetDays` before the newest one.
+   *
+   * This is what makes "how do I look against three months ago" a single tap.
+   * Nobody photographs themselves exactly ninety days apart, so an exact-date
+   * lookup would almost always miss; the nearest shot is what a person means.
+   */
+  const nearestOlder = (targetDays: number): string | null => {
+    if (days.length < 2) return null;
+    const newest = new Date(`${days[days.length - 1]}T12:00:00`).getTime();
+    const want = newest - targetDays * 86400000;
+    let best: string | null = null;
+    let bestGap = Infinity;
+    for (const d of days.slice(0, -1)) {
+      const gap = Math.abs(new Date(`${d}T12:00:00`).getTime() - want);
+      if (gap < bestGap) { bestGap = gap; best = d; }
+    }
+    return best;
+  };
+
+  const weeksBetween = (x: string, y: string) =>
+    Math.round(
+      Math.abs(new Date(`${y}T12:00:00`).getTime() - new Date(`${x}T12:00:00`).getTime()) /
+        (7 * 86400000),
+    );
+
+  /** Months that actually contain photos — empty ones are never rendered. */
+  const months = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const d of days) {
+      const label = new Date(`${d}T12:00:00`).toLocaleDateString(undefined, {
+        month: 'long',
+        year: 'numeric',
+      });
+      groups.set(label, [...(groups.get(label) ?? []), d]);
+    }
+    // Newest month first: the recent stuff is what gets looked at.
+    return [...groups.entries()].reverse();
+  }, [days]);
+
+  const remove = async (day: string, slot: 'front' | 'side') => {
     const row = byDay.get(day);
-    if (!row || busy) return;
+    const path = row?.[slot === 'front' ? 'photo_front' : 'photo_side'];
+    if (!row || !path || busy) return;
     setBusy(true);
     try {
-      await deletePhoto(row.id, slot, row[key] as string | null);
-      setOpen(null);
+      await deletePhoto(row.id, slot, path);
+      setViewing(null);
       onChanged?.();
     } catch (e) {
       console.error('Could not delete photo', e);
@@ -278,247 +320,298 @@ export function ProgressPhotos({
     }
   };
 
-  const anyPhotos = metrics.some((m) => m.photo_front || m.photo_side);
-  if (!anyPhotos) {
+  if (shots.length === 0) {
     return (
       <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-6" style={{ boxShadow: 'var(--shadow-sm)' }}>
         <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">Progress photos</span>
         <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
           <ImageOff className="w-7 h-7 text-[var(--text-subtle)]" />
           <p className="text-sm text-[var(--text-subtle)] max-w-xs">
-            Add a front and side photo to your check-in — they'll collect here by date, and you can compare any two.
+            Add a photo to a check-in. Once there are two, this turns into a
+            then-and-now you can drag between.
           </p>
         </div>
       </section>
     );
   }
 
-  const move = (delta: number) =>
-    setCursor((c) => new Date(c.getFullYear(), c.getMonth() + delta, 1));
+  const spanDays =
+    days.length >= 2
+      ? Math.round(
+          (new Date(`${days[days.length - 1]}T12:00:00`).getTime() -
+            new Date(`${days[0]}T12:00:00`).getTime()) /
+            86400000,
+        )
+      : 0;
+
+  const canCompare = a && b && a !== b;
+  // The comparison uses whichever slot both ends share, so it never shows a
+  // front shot wiping into a side one.
+  const compareSlot: 'front' | 'side' =
+    canCompare && urlOf(a, 'front') && urlOf(b, 'front') ? 'front' : 'side';
+  const aUrl = canCompare ? urlOf(a, compareSlot) : undefined;
+  const bUrl = canCompare ? urlOf(b, compareSlot) : undefined;
+
+  const viewingRow = viewing ? byDay.get(viewing) : null;
+  const viewIdx = viewing ? days.indexOf(viewing) : -1;
+  const viewHasSlot = (slot: 'front' | 'side') => !!urlOf(viewing, slot);
+  const shownSlot: 'front' | 'side' = viewHasSlot(viewSlot) ? viewSlot : viewSlot === 'front' ? 'side' : 'front';
 
   return (
     <section className="rounded-2xl bg-[var(--surface)] border border-[var(--border)] p-4 sm:p-6" style={{ boxShadow: 'var(--shadow-sm)' }}>
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <div className="flex items-baseline justify-between mb-3">
         <span className="text-[11px] font-semibold tracking-[0.06em] uppercase text-[var(--text-subtle)]">
           Progress photos
         </span>
-        <div className="flex items-center gap-2">
-          <Segmented
-            options={[{ id: 'front', label: 'Front' }, { id: 'side', label: 'Side' }]}
-            value={slot}
-            onChange={(v) => setSlot(v as 'front' | 'side')}
-          />
-          <Segmented
-            options={[{ id: 'archive', label: 'Archive' }, { id: 'compare', label: 'Compare' }]}
-            value={view}
-            onChange={(v) => setView(v as 'archive' | 'compare')}
-          />
-        </div>
+        <span className="text-[11.5px] text-[var(--text-subtle)]">
+          {shots.length} check-in{shots.length === 1 ? '' : 's'}
+        </span>
       </div>
 
-      {days.length === 0 ? (
-        <p className="text-sm text-[var(--text-subtle)] py-6 text-center">No {slot} photos yet.</p>
-      ) : view === 'archive' ? (
-        <>
-          <div className="flex items-center justify-between mb-2">
-            <button
-              onClick={() => move(-1)}
-              className="p-1.5 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition-colors"
-              aria-label="Previous month"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-[13px] font-semibold text-[var(--text)]">
-              {cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+      {/* A nudge once there is actually something to look at. Two photos a week
+          apart is the first moment a comparison says anything. */}
+      {spanDays >= 7 && days.length >= 2 && (
+        <div
+          className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-3"
+          style={{ background: 'var(--accent-soft)' }}
+        >
+          <Sparkles className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
+          <p className="text-[12.5px] text-[var(--text)]">
+            <b className="font-semibold">Check out your progress</b>
+            <span className="text-[var(--text-muted)]">
+              {' '}— {weeksBetween(days[0], days[days.length - 1])} weeks since your first photo.
             </span>
-            <button
-              onClick={() => move(1)}
-              className="p-1.5 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition-colors"
-              aria-label="Next month"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          </p>
+        </div>
+      )}
 
-          <div className="grid grid-cols-7 gap-1">
-            {grid.map((d) => {
-              const k = dayKey(d);
-              const url = urlFor(k);
-              const has = byDay.has(k);
-              const inMonth = d.getMonth() === cursor.getMonth();
-              return (
+      {/* Then and now, with no setup. This is the payoff, so it leads. */}
+      {aUrl && bUrl ? (
+        <>
+          <CompareSlider
+            beforeUrl={aUrl}
+            afterUrl={bUrl}
+            beforeLabel={pretty(a!)}
+            afterLabel={pretty(b!)}
+          />
+          <p className="text-[11.5px] text-[var(--text-subtle)] mt-2.5 text-center">
+            Drag to compare · {weeksBetween(a!, b!)} week{weeksBetween(a!, b!) === 1 ? '' : 's'} apart
+            {(aPick || bPick) && (
+              <>
+                {' · '}
                 <button
-                  key={k}
-                  disabled={!has}
-                  onClick={() => setOpen(k)}
-                  className={cn(
-                    'relative aspect-[3/4] rounded-lg overflow-hidden text-[10px] transition-transform',
-                    has ? 'hover:scale-[1.04] active:scale-95' : 'cursor-default',
-                    !inMonth && 'opacity-30',
-                  )}
-                  style={{ background: has ? 'var(--elevated)' : 'transparent' }}
-                  aria-label={has ? `Photo from ${pretty(k)}` : undefined}
+                  onClick={() => {
+                    setA(null);
+                    setB(null);
+                  }}
+                  className="font-semibold"
+                  style={{ color: 'var(--accent)' }}
                 >
-                  {url ? (
-                    <img src={url} alt={pretty(k)} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                  ) : null}
-                  <span
-                    className={cn(
-                      'absolute bottom-0.5 right-1 font-semibold',
-                      url ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]' : 'text-[var(--text-subtle)]',
-                    )}
-                  >
-                    {d.getDate()}
-                  </span>
+                  reset
                 </button>
-              );
-            })}
-          </div>
-          <p className="text-[11.5px] text-[var(--text-subtle)] mt-3 text-center">
-            {days.length} {slot} photo{days.length === 1 ? '' : 's'} · tap a day to open it
+              </>
+            )}
           </p>
         </>
       ) : (
-        <>
-          {a && b && urlFor(a) && urlFor(b) && a !== b ? (
-            <>
-              <CompareSlider
-                beforeUrl={urlFor(a)!}
-                afterUrl={urlFor(b)!}
-                beforeLabel={pretty(a).replace(/, \d{4}$/, '')}
-                afterLabel={pretty(b).replace(/, \d{4}$/, '')}
-              />
-              <p className="text-[11.5px] text-[var(--text-subtle)] mt-2.5 text-center">Drag to compare</p>
-            </>
-          ) : (
-            <p className="text-sm text-[var(--text-subtle)] py-6 text-center">
-              {days.length < 2 ? 'Two photos are needed to compare.' : 'Pick two different days below.'}
-            </p>
-          )}
-
-          {/* Day pickers — either end can be any shot in the history. */}
-          <div className="mt-4 flex flex-col gap-3">
-            {([['Before', a, setA], ['After', b, setB]] as const).map(([label, val, set]) => (
-              <div key={label}>
-                <span className="text-[11px] text-[var(--text-muted)]">{label}</span>
-                <div className="flex gap-1.5 mt-1 overflow-x-auto no-scrollbar pb-1">
-                  {days.map((d) => (
-                    <button
-                      key={d}
-                      onClick={() => set(d)}
-                      className={cn(
-                        'shrink-0 px-2.5 py-1 rounded-lg text-[12px] font-medium border transition-colors',
-                        val === d
-                          ? 'text-[var(--accent-text)] border-transparent'
-                          : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]',
-                      )}
-                      style={val === d ? { background: 'var(--accent)' } : undefined}
-                    >
-                      {pretty(d).replace(/, \d{4}$/, '')}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+        <div className="rounded-xl border border-dashed border-[var(--border-strong)] py-8 px-4 text-center">
+          <p className="text-sm text-[var(--text-subtle)]">
+            One photo so far. Add another check-in photo and this becomes a
+            then-and-now.
+          </p>
+        </div>
       )}
 
-      {/* Lightbox for one day */}
+      {/* One tap per question a person actually asks. Ranges with no photo old
+          enough are left out rather than shown dead. */}
+      {days.length >= 2 && (
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          <span className="text-[11.5px] text-[var(--text-subtle)] self-center mr-0.5">
+            Compare with
+          </span>
+          {PRESETS.filter((pr) => pr.days === null || spanDays >= pr.days * 0.6).map((pr) => {
+            const target = pr.days === null ? days[0] : nearestOlder(pr.days);
+            const active = !!target && target === a;
+            return (
+              <button
+                key={pr.label}
+                onClick={() => target && setA(target)}
+                className={cn(
+                  'px-2.5 py-1 rounded-lg text-[12px] font-semibold border transition-colors',
+                  active
+                    ? 'text-[var(--accent-text)] border-transparent'
+                    : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]',
+                )}
+                style={active ? { background: 'var(--accent)' } : undefined}
+              >
+                {pr.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Dated timeline. Only months holding photos appear at all. */}
+      <div className="mt-5 flex flex-col gap-4">
+        {months.map(([label, monthDays]) => (
+          <div key={label}>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-subtle)]">
+              {label}
+            </span>
+            <div className="flex gap-2 mt-1.5 overflow-x-auto no-scrollbar pb-1">
+              {monthDays
+                .slice()
+                .reverse()
+                .map((d) => {
+                  const u = anyUrl(d);
+                  const isEnd = d === a || d === b;
+                  return (
+                    <button
+                      key={d}
+                      onClick={() => {
+                        setViewSlot('front');
+                        setViewing(d);
+                      }}
+                      className="relative shrink-0 w-[72px] rounded-xl overflow-hidden transition-transform hover:scale-[1.03] active:scale-95"
+                      style={{ background: 'var(--elevated)' }}
+                      aria-label={`Photo from ${pretty(d)}`}
+                    >
+                      <span className="block aspect-[3/4]">
+                        {u && <img src={u} alt={pretty(d)} className="w-full h-full object-cover" loading="lazy" />}
+                      </span>
+                      {/* Ends of the current comparison are marked, so the
+                          slider above and the timeline agree with each other. */}
+                      {isEnd && (
+                        <span
+                          className="absolute inset-0 rounded-xl pointer-events-none"
+                          style={{ boxShadow: 'inset 0 0 0 2px var(--accent)' }}
+                        />
+                      )}
+                      <span className="absolute inset-x-0 bottom-0 py-1 text-[10.5px] font-semibold text-white bg-black/55 backdrop-blur-[2px]">
+                        {pretty(d)}
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Full-screen viewer: swipe through check-ins, delete, set a comparison end. */}
       <AnimatePresence>
-        {open && (
+        {viewing && viewingRow && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[130] flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
-            onClick={() => setOpen(null)}
+            className="fixed inset-0 z-[130] flex flex-col"
+            style={{ background: 'rgba(0,0,0,0.94)' }}
           >
-            <motion.div
-              initial={{ scale: 0.94, y: 16 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.96, y: 8 }}
-              transition={{ type: 'spring', stiffness: 280, damping: 28 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-sm rounded-2xl overflow-hidden border border-[var(--border)]"
-              style={{ background: 'var(--surface)' }}
-            >
-              {urlFor(open) ? (
-                <img src={urlFor(open)} alt={pretty(open)} className="w-full max-h-[60vh] object-contain bg-black" />
-              ) : (
-                <div className="h-48 flex items-center justify-center text-[var(--text-subtle)]">Loading…</div>
-              )}
-              <div className="p-4">
-                <p className="text-[13.5px] font-semibold text-[var(--text)]">{pretty(open)}</p>
-                <p className="text-[12px] text-[var(--text-muted)] capitalize mt-0.5">{slot} photo</p>
-
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <button
-                    onClick={() => { setA(open); setView('compare'); setOpen(null); }}
-                    className="btn btn-secondary !py-1.5 !px-3 text-xs"
-                  >
-                    Compare from here
-                  </button>
-                  <button
-                    onClick={() => { setB(open); setView('compare'); setOpen(null); }}
-                    className="btn btn-secondary !py-1.5 !px-3 text-xs"
-                  >
-                    Compare to here
-                  </button>
-                  {canDelete && (
-                    <button
-                      onClick={() => remove(open)}
-                      disabled={busy}
-                      className="btn !py-1.5 !px-3 text-xs inline-flex items-center gap-1.5 disabled:opacity-50"
-                      style={{ background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger, #ef4444)' }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      {busy ? 'Deleting…' : 'Delete'}
-                    </button>
-                  )}
-                </div>
+            <div className="flex items-center justify-between p-4 shrink-0">
+              <div>
+                <p className="text-[14px] font-semibold text-white">
+                  {new Date(`${viewing}T12:00:00`).toLocaleDateString(undefined, {
+                    weekday: 'short', day: 'numeric', month: 'long', year: 'numeric',
+                  })}
+                </p>
+                <p className="text-[11.5px] text-white/60 mt-0.5">
+                  {viewIdx + 1} of {days.length}
+                  {viewIdx > 0 && ` · ${weeksBetween(days[0], viewing)} weeks in`}
+                </p>
               </div>
               <button
-                onClick={() => setOpen(null)}
-                className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 text-white backdrop-blur-sm"
+                onClick={() => setViewing(null)}
+                className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                 aria-label="Close"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
-            </motion.div>
+            </div>
+
+            <div className="relative flex-1 min-h-0 flex items-center justify-center px-2">
+              {urlOf(viewing, shownSlot) ? (
+                <motion.img
+                  key={`${viewing}-${shownSlot}`}
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.2 }}
+                  src={urlOf(viewing, shownSlot)}
+                  alt={pretty(viewing)}
+                  className="max-h-full max-w-full object-contain rounded-lg"
+                />
+              ) : (
+                <p className="text-white/60 text-sm">Loading…</p>
+              )}
+
+              {viewIdx > 0 && (
+                <button
+                  onClick={() => setViewing(days[viewIdx - 1])}
+                  className="absolute left-2 p-3 rounded-full bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 transition-colors"
+                  aria-label="Previous check-in"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+              )}
+              {viewIdx < days.length - 1 && (
+                <button
+                  onClick={() => setViewing(days[viewIdx + 1])}
+                  className="absolute right-2 p-3 rounded-full bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 transition-colors"
+                  aria-label="Next check-in"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            <div className="shrink-0 p-4 flex flex-col gap-3">
+              {/* Front/side only appears when the day actually has both. */}
+              {viewHasSlot('front') && viewHasSlot('side') && (
+                <div className="flex gap-1 p-0.5 rounded-lg bg-white/10 self-center">
+                  {(['front', 'side'] as const).map((sl) => (
+                    <button
+                      key={sl}
+                      onClick={() => setViewSlot(sl)}
+                      className={cn(
+                        'px-4 py-1.5 rounded-md text-[12.5px] font-semibold capitalize transition-colors',
+                        shownSlot === sl ? 'bg-white text-black' : 'text-white/70 hover:text-white',
+                      )}
+                    >
+                      {sl}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap justify-center gap-2">
+                <button
+                  onClick={() => { setA(viewing); setViewing(null); }}
+                  className="px-3 py-2 rounded-lg text-[12.5px] font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
+                >
+                  Compare from here
+                </button>
+                <button
+                  onClick={() => { setB(viewing); setViewing(null); }}
+                  className="px-3 py-2 rounded-lg text-[12.5px] font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
+                >
+                  Compare to here
+                </button>
+                {canDelete && (
+                  <button
+                    onClick={() => remove(viewing, shownSlot)}
+                    disabled={busy}
+                    className="px-3 py-2 rounded-lg text-[12.5px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                    style={{ background: 'rgba(239,68,68,0.18)', color: '#fca5a5' }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {busy ? 'Deleting…' : `Delete ${shownSlot}`}
+                  </button>
+                )}
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
     </section>
-  );
-}
-
-/** Small segmented control used by the photo header. */
-function Segmented({
-  options,
-  value,
-  onChange,
-}: {
-  options: { id: string; label: string }[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="flex gap-1 p-0.5 rounded-lg bg-[var(--elevated)] border border-[var(--border)]">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          onClick={() => onChange(o.id)}
-          className={cn(
-            'px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors',
-            value === o.id ? 'text-[var(--accent-text)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]',
-          )}
-          style={value === o.id ? { background: 'var(--accent)' } : undefined}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }
