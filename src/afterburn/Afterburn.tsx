@@ -5,6 +5,7 @@ import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, Ch
 import { cn } from '../lib/utils';
 import { pop, springSoft, fast, useReducedMotion } from '../lib/motion';
 import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance, restToSeconds, detectPRs } from './store';
+import { setVerdict, ghostLabel, exerciseProgress } from './progression';
 import { recoveryReadiness } from './recovery';
 import { analyzeVolume } from './volume';
 import WorkoutCelebration from './WorkoutCelebration';
@@ -617,17 +618,24 @@ function SetRow({
   set,
   unit,
   onDone,
+  lastSet,
 }: {
   exIdx: number;
   setIdx: number;
   set: LoggedSet;
   unit: WeightUnit;
   onDone: (becameDone: boolean) => void;
+  /** The same position last time, for the ghost value and the verdict. */
+  lastSet?: LoggedSet;
 }) {
   const updateSet = useAfterburn((s) => s.updateSet);
   const u = (patch: Partial<LoggedSet>) => updateSet(exIdx, setIdx, patch);
   // A set is "logged" (and thus rateable) once it has weight, reps, or is done.
   const logged = !!(set.weight.trim() || set.reps.trim() || set.done);
+  // Set-for-set, so #3 is judged against #3 rather than against a summary line
+  // of the whole exercise.
+  const ghost = ghostLabel(lastSet);
+  const verdict = setVerdict(set, lastSet, unit);
   return (
     <div className={cn('rounded-lg border p-2', set.done ? 'border-success/50 bg-success/5' : 'border-border bg-elevated')}>
       <div className="flex items-center gap-1.5">
@@ -650,9 +658,29 @@ function SetRow({
           <Check className="w-4 h-4" />
         </motion.button>
       </div>
-      <div className="mt-1.5 pl-9 flex items-center gap-2">
+      <div className="mt-1.5 pl-9 flex flex-wrap items-center gap-x-2 gap-y-1">
         <Stars value={set.rating} onChange={(v) => u({ rating: v })} disabled={!logged} />
-        {!logged && <span className="text-[11px] text-ink-subtle">Log the set to rate it</span>}
+        {/* Before you type: what this set was last time. After: whether you beat it. */}
+        {verdict.kind !== 'none' ? (
+          <span
+            className="text-[11px] font-semibold px-1.5 py-0.5 rounded"
+            style={
+              verdict.kind === 'up'
+                ? { color: 'var(--success)', background: 'color-mix(in srgb, var(--success) 15%, transparent)' }
+                : verdict.kind === 'down'
+                  ? { color: 'var(--warning)', background: 'color-mix(in srgb, var(--warning) 15%, transparent)' }
+                  : { color: 'var(--text-muted)', background: 'var(--elevated)' }
+            }
+          >
+            {verdict.label}
+          </span>
+        ) : ghost ? (
+          <span className="text-[11px] text-ink-subtle" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            was {ghost}
+          </span>
+        ) : (
+          !logged && <span className="text-[11px] text-ink-subtle">Log the set to rate it</span>
+        )}
       </div>
     </div>
   );
@@ -897,6 +925,27 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
                     .join(', ')}
                 </span>
               </div>
+              {(() => {
+                // One honest number for the exercise: total volume against the
+                // same positions last time, so a single heavy set can't hide
+                // two that dropped.
+                const p = exerciseProgress(ex.sets, last.sets);
+                if (p.kind === 'none') return null;
+                return (
+                  <span
+                    className="text-[11px] font-semibold px-1.5 py-0.5 rounded shrink-0 self-start"
+                    style={
+                      p.kind === 'up'
+                        ? { color: 'var(--success)', background: 'color-mix(in srgb, var(--success) 15%, transparent)' }
+                        : p.kind === 'down'
+                          ? { color: 'var(--warning)', background: 'color-mix(in srgb, var(--warning) 15%, transparent)' }
+                          : { color: 'var(--text-muted)', background: 'var(--elevated)' }
+                    }
+                  >
+                    {p.kind === 'same' ? 'level' : `${p.pct > 0 ? '+' : ''}${p.pct}% volume`}
+                  </span>
+                );
+              })()}
               <button onClick={prefill} className="btn btn-secondary !py-1 !px-2 text-[11px] shrink-0">
                 Use last
               </button>
@@ -921,6 +970,7 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
                   set={set}
                   unit={unit}
                   onDone={(becameDone) => becameDone && startRest(restSec)}
+                  lastSet={last?.sets[setIdx]}
                 />
               ))}
             </div>
