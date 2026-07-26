@@ -23,6 +23,8 @@ export default function Chart({
   format: fmtValue,
   marked,
   markedLabel,
+  overlay,
+  overlayLabel,
   emptyHint = 'Log at least two entries to see your trend.',
 }: {
   points: ChartPoint[];
@@ -33,6 +35,9 @@ export default function Chart({
   /** Dates to ring on the line — e.g. period days, where weight reads high. */
   marked?: Set<string>;
   markedLabel?: string;
+  /** A second, calmer series over the same axis — e.g. a rolling average. */
+  overlay?: ChartPoint[];
+  overlayLabel?: string;
   emptyHint?: string;
 }) {
   const gid = useId();
@@ -56,7 +61,9 @@ export default function Chart({
   const padT = 14;
   const padB = 14;
   const n = points.length;
-  const ys = points.map((p) => p.value);
+  // The overlay shares the axis, so it has to be in the extent — otherwise a
+  // smoothed line could sit outside the plot and get clipped.
+  const ys = [...points.map((p) => p.value), ...(overlay ?? []).map((p) => p.value)];
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
   const span = maxY - minY || 1;
@@ -174,6 +181,29 @@ export default function Chart({
           />
         ))}
 
+        {/* rolling average: the line to actually read, so it sits under the
+            raw series but is drawn calmer and dashed */}
+        {overlay && overlay.length > 1 && (
+          <motion.path
+            d={overlay
+              .map((p, i) => {
+                const idx = points.findIndex((q) => q.date === p.date);
+                const px = idx >= 0 ? x(idx) : x(i);
+                return `${i === 0 ? 'M' : 'L'}${px.toFixed(2)},${y(p.value).toFixed(2)}`;
+              })
+              .join(' ')}
+            fill="none"
+            stroke="var(--text-subtle)"
+            strokeWidth="2"
+            strokeDasharray="5 4"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            initial={rm ? false : { opacity: 0 }}
+            animate={{ opacity: 0.9 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+          />
+        )}
+
         {/* flagged days (e.g. on-period) get a hollow ring */}
         {marked &&
           points.map((p, i) =>
@@ -218,6 +248,16 @@ export default function Chart({
         <span>{format(new Date(points[0].date), 'MMM d')}</span>
         <span>{format(new Date(points[n - 1].date), 'MMM d')}</span>
       </div>
+
+      {overlay && overlay.length > 1 && overlayLabel && (
+        <p className="flex items-center gap-1.5 mt-2 text-[10.5px] text-ink-subtle">
+          <span
+            className="w-4 h-0 shrink-0 border-t-2 border-dashed"
+            style={{ borderColor: 'var(--text-subtle)' }}
+          />
+          {overlayLabel}
+        </p>
+      )}
 
       {marked && markedLabel && points.some((p) => marked.has(p.date)) && (
         <p className="flex items-center gap-1.5 mt-2 text-[10.5px] text-ink-subtle">
