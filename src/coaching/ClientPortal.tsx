@@ -20,7 +20,6 @@ import {
 } from './components';
 import { startAlarm, stopAlarm, testAlarm, alarmDue, markAlarmFired, primeAlarmAudio } from './alarm';
 import { ProgressPhotos } from './photos';
-import { CheckinCalendar } from './Calendar';
 import { scheduleOf, indexByDay, reminderDueToday, scheduleLabel, measuredRecently } from './schedule';
 import { InstallGuide, ProfileSetup, ProfileCard, CoachThread } from './onboarding';
 
@@ -170,14 +169,6 @@ function Template({
           editingDate={editDate ?? undefined}
           existing={metrics.find((m) => m.taken_on === (editDate ?? todayKey()))}
           onCancelEdit={editDate ? () => onEditDate(null) : undefined}
-        />
-      </Reveal>
-
-      <Reveal>
-        <CheckinCalendar
-          metrics={metrics}
-          schedule={schedule}
-          onPickDay={(d) => onEditDate(dayKeyLocal(d))}
         />
       </Reveal>
 
