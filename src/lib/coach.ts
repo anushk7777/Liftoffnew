@@ -10,6 +10,7 @@
 import { startOfDay, differenceInCalendarDays } from 'date-fns';
 import type { Phase, TodoTask, Idea, FocusSession, Habit, HabitLog } from '../store/data';
 import { dayKey } from './streak';
+import { isHabitDueOn } from './habits';
 import { countRoadmap } from './roadmap';
 
 export interface CoachState {
@@ -494,11 +495,7 @@ export function getSuggestions(state: CoachState, profile: CoachProfile, now = n
 
   // 6b. Habits still due today
   const todayKey = dayKey(now);
-  const dueHabits = state.habits.filter(
-    (h) =>
-      !h.archived &&
-      (h.cadence === 'daily' || !h.daysOfWeek?.length || h.daysOfWeek.includes(now.getDay())),
-  );
+  const dueHabits = state.habits.filter((h) => !h.archived && isHabitDueOn(h, now));
   const doneHabitIds = new Set(
     state.habitLog.filter((l) => l.date === todayKey).map((l) => l.habitId),
   );
