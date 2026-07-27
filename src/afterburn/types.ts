@@ -96,6 +96,9 @@ export interface WorkoutSession {
   completedAt?: string; // ISO — when finished
   endedEarly?: boolean; // user cut the session short (e.g. didn't feel recovered)
   endNote?: string; // why it was ended early
+  /** Lifter marked this an off day. Kept in history, excluded from the load
+   *  model — they know before the app can infer it. */
+  roughDay?: boolean;
   entries: LoggedExercise[];
 }
 

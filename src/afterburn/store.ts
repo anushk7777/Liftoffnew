@@ -391,7 +391,7 @@ interface AfterburnState {
   loadProgram: (program: WorkoutProgram) => void;
   startDay: (dayId: string) => void;
   cancelDraft: () => void;
-  finishDraft: (opts?: { endedEarly?: boolean; note?: string }) => void;
+  finishDraft: (opts?: { endedEarly?: boolean; note?: string; roughDay?: boolean }) => void;
   reopenSession: (id: string) => void;
   updateSet: (exIdx: number, setIdx: number, patch: Partial<LoggedSet>) => void;
   addSet: (exIdx: number) => void;
@@ -529,6 +529,9 @@ export const useAfterburn = create<AfterburnState>()(
           entries: performedEntries(d.entries),
           endedEarly: opts?.endedEarly || undefined,
           endNote: opts?.endedEarly ? opts?.note?.trim() || undefined : undefined,
+          // Kept in history and on the charts, but excluded from the load model:
+          // an off day is honest data about the day, not about strength.
+          roughDay: opts?.roughDay || undefined,
         };
         set({ sessions: [session, ...get().sessions], draft: null });
       },

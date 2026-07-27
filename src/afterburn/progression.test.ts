@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { setVerdict, ghostLabel, exerciseProgress, loadHint } from './progression';
+import { setVerdict, ghostLabel, exerciseProgress, loadHint, learnedLoadHint } from './progression';
 import type { LoggedSet } from './types';
 
 const set = (weight: string, reps: string, rpe = ''): LoggedSet =>
@@ -150,5 +150,50 @@ describe('loadHint', () => {
   it('honours a smaller plate step', () => {
     const h = loadHint('100', '5', '8', 1)!;
     expect(h.suggested).toBe(109);
+  });
+});
+
+describe('learnedLoadHint', () => {
+  const noModel = { confidence: 'none' as const, predict: () => null, kgPerRpe: null };
+  // A lifter for whom one RPE point is 4kg, not the textbook ~3%.
+  const personal = {
+    confidence: 'good' as const,
+    kgPerRpe: 4,
+    predict: (reps: number, rpe: number) => 120 - 4 * (reps + (10 - rpe)),
+  };
+
+  it('falls back to the flat rule with no model', () => {
+    const h = learnedLoadHint('100', '5', '8', '5', noModel)!;
+    expect(h.basis).toBe('rule');
+    expect(h.suggested).toBe(110);
+  });
+
+  it('uses the lifter\'s own curve when it is trusted', () => {
+    const h = learnedLoadHint('80', '5', '8', '5', personal)!;
+    expect(h.basis).toBe('personal');
+    expect(h.kgPerRpe).toBe(4);
+    expect(h.suggested).toBe(92.5); // 120 - 4*7 = 92, to the nearest 2.5
+  });
+
+  it('marks a shaky model as tentative rather than hiding it', () => {
+    const h = learnedLoadHint('80', '5', '8', '5', { ...personal, confidence: 'low' })!;
+    expect(h.basis).toBe('personal');
+    expect(h.tentative).toBe(true);
+  });
+
+  it('will not suggest a step backwards off the curve', () => {
+    // Already lifting more than the model predicts for the target.
+    const h = learnedLoadHint('120', '5', '8', '5', personal)!;
+    expect(h.basis).toBe('rule');
+  });
+
+  it('stays silent whenever the flat rule would have', () => {
+    expect(learnedLoadHint('100', '7', '8', '5', personal)).toBeNull(); // gap too small
+    expect(learnedLoadHint('100', '9', '8', '5', personal)).toBeNull(); // harder than asked
+  });
+
+  it('falls back when the target reps are unreadable', () => {
+    expect(learnedLoadHint('80', '5', '8', undefined, personal)!.basis).toBe('rule');
+    expect(learnedLoadHint('80', '5', '8', 'AMRAP', personal)!.basis).toBe('rule');
   });
 });

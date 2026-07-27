@@ -5,7 +5,8 @@ import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, Ch
 import { cn } from '../lib/utils';
 import { pop, springSoft, fast, useReducedMotion } from '../lib/motion';
 import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance, restToSeconds, detectPRs } from './store';
-import { setVerdict, ghostLabel, exerciseProgress, loadHint } from './progression';
+import { setVerdict, ghostLabel, exerciseProgress, learnedLoadHint } from './progression';
+import { buildLoadModel } from './loadModel';
 import { recoveryReadiness } from './recovery';
 import { analyzeVolume } from './volume';
 import WorkoutCelebration from './WorkoutCelebration';
@@ -725,7 +726,7 @@ function RestBar({ secondsLeft, total, onAdd, onSkip }: { secondsLeft: number; t
 const END_REASONS = ["Didn't feel recovered", 'Out of time', 'Pain / niggle', 'Other'];
 const NO_WEAK_POINTS: never[] = []; // stable identity so selectors/useMemo don't churn
 
-function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean; note?: string }) => void; onBack: () => void }) {
+function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean; note?: string; roughDay?: boolean }) => void; onBack: () => void }) {
   const draft = useAfterburn((s) => s.draft)!;
   const unit = useAfterburn((s) => s.program.unit);
   const sessions = useAfterburn((s) => s.sessions);
@@ -739,6 +740,7 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
   const weakPoints = useAfterburn((s) => s.program.weakPoints ?? NO_WEAK_POINTS);
   const [plateOpen, setPlateOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
+  const [rough, setRough] = useState(false);
 
   // Auto-suggest weak points: muscles reading below MEV / untrained in the last
   // 7 days float to the top of the picker, tagged so the pick is obvious.
@@ -981,8 +983,12 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
           {(() => {
             const target = ex.target.rpe;
             if (!target) return null;
+            // Learned from this lifter's own sets where there is enough recent,
+            // consistent history; the textbook rule otherwise.
+            const model = buildLoadModel(sessions, ex.name);
+            const step = unit === 'kg' ? 2.5 : 5;
             const hints = ex.sets
-              .map((st) => loadHint(st.weight, st.rpe, target, unit === 'kg' ? 2.5 : 5))
+              .map((st) => learnedLoadHint(st.weight, st.rpe, target, ex.target.reps, model, step))
               .filter((h): h is NonNullable<typeof h> => !!h);
             if (!hints.length) return null;
             // The biggest gap is the one worth acting on.
@@ -994,8 +1000,23 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
               >
                 Sheet asks for <span className="font-semibold">RPE {target}</span>, you logged{' '}
                 <span className="font-semibold">{h.under} under</span> at {h.current}
-                {unit} — that's roughly{' '}
+                {unit} — try{' '}
                 <span className="font-semibold">{h.suggested}{unit}</span> next time.
+                <span className="block mt-1 text-ink-subtle">
+                  {h.basis === 'personal' ? (
+                    <>
+                      From your own {ex.name.toLowerCase()} sets — about{' '}
+                      <span className="text-ink">{h.kgPerRpe}{unit} per RPE point</span> for you.
+                      {h.tentative && ' Still few recent sets, so treat it as a guide.'}
+                    </>
+                  ) : model.reason === 'stale' ? (
+                    'Rule of thumb — no recent sets for this lift, so starting conservative.'
+                  ) : model.reason === 'erratic' ? (
+                    'Rule of thumb — your recent sets are too mixed to read a curve from.'
+                  ) : (
+                    'Rule of thumb — keep logging RPE and this learns your own numbers.'
+                  )}
+                </span>
               </div>
             );
           })()}
@@ -1040,7 +1061,7 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
               {END_REASONS.map((reason) => (
                 <button
                   key={reason}
-                  onClick={() => { setEndOpen(false); onFinish({ endedEarly: true, note: reason }); }}
+                  onClick={() => { setEndOpen(false); onFinish({ endedEarly: true, note: reason, roughDay: rough }); }}
                   className="chip bg-surface border border-border text-ink hover:border-ember !text-xs"
                 >
                   {reason}
@@ -1050,12 +1071,28 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
             <p className="text-[11px] text-ink-subtle mt-2">Only the sets you actually did get saved.</p>
           </div>
         )}
+        {/* You know it is an off day before the app can work it out. One tap
+            keeps the session in your history but out of what it learns from. */}
+        {rough && (
+          <div className="mx-auto max-w-2xl mb-2 rounded-lg px-3 py-2 text-[11.5px] text-ink-subtle border border-border bg-elevated">
+            Marked an off day — it stays in your history and charts, but weight
+            suggestions won't learn from it.
+          </div>
+        )}
         <div className="mx-auto max-w-2xl flex gap-2">
           <button onClick={cancelDraft} className="btn btn-secondary !px-3">Cancel</button>
+          <button
+            onClick={() => setRough((v) => !v)}
+            aria-pressed={rough}
+            title="Don't learn weight suggestions from today"
+            className={cn('btn btn-secondary !px-3', rough && 'border-ember text-ember')}
+          >
+            Off day
+          </button>
           <button onClick={() => setEndOpen((o) => !o)} className={cn('btn btn-secondary !px-3', endOpen && 'border-ember text-ember')}>
             End early
           </button>
-          <motion.button whileTap={{ scale: 0.95 }} transition={pop} onClick={() => onFinish()} className="btn btn-primary flex-1">
+          <motion.button whileTap={{ scale: 0.95 }} transition={pop} onClick={() => onFinish({ roughDay: rough })} className="btn btn-primary flex-1">
             <Check className="w-4 h-4" /> Finish
           </motion.button>
         </div>
