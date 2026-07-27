@@ -306,7 +306,57 @@ high-rep work such as 15 reps at RPE 8.
 
 ---
 
-## 5. Known weaknesses — start here
+## 5. Return on volume — which lifts are earning their sets
+
+`returns.ts`, shown on Progress as "What's paying off".
+
+Every training app can tell you what you lifted. None tell you which lifts
+earned their place. A lifter spends a fixed, scarce budget — sets they can
+recover from — across ten or twelve movements. Some pay. Some have paid nothing
+for two months and nobody notices, because the only thing tracked is that the
+sets got done.
+
+Each lift is ranked by **estimated 1RM gained per ten sets invested**, over a
+90-day window. Where a lift has returned nothing, the swaps the program itself
+already sanctions are named.
+
+**It is deliberately hard to convince**, because a ranking built on noise is
+worse than no ranking — it would have you drop exercises for no reason:
+
+- Under **3 sessions**, or a span under **14 days**, the verdict is `unknown`,
+  never `flat`. Absence of evidence is said plainly, and those rows sink to the
+  bottom rather than sitting among real results with a misleading zero.
+- The trend is a **least-squares slope against time**, not last-minus-first. One
+  bad day at either end cannot decide a lift's fate, and unevenly spaced
+  sessions are handled correctly. A test covers exactly this: four sessions
+  climbing hard then one poor one still reads as progress.
+- A gain counts only once it clears a **noise floor** of `max(2.5 kg, 2% of the
+  working e1RM)`. e1RM is an estimate and small numbers wobble.
+- **Rough days are excluded**, same as the load model — and their sets are not
+  charged to the lift either, so a bad day costs nothing in both directions.
+
+**Substitutions are indexed by family, not by sheet name.** A substitution is
+not itself a program slot, so once you swap to "DB Flye" that name appears
+nowhere as a key — and the lift you are *actually doing* would be the one lift
+that never gets alternatives suggested. Every member of a slot's family maps to
+its siblings.
+
+**Decisions worth challenging**
+
+- *e1RM is the yardstick.* It conflates load and reps, which is what we want for
+  "did this get stronger", but it is an Epley estimate and drifts at very high
+  reps.
+- *Per ten sets, not per session.* Sets are the recoverable currency; a lift
+  done for 2 sets is genuinely cheaper than one done for 5.
+- *90 days is arbitrary.* Long enough to span a block, short enough that a lift
+  fixed two blocks ago is not condemned by ancient history.
+- *A lift can read flat because the program intends it to.* Deload weeks and
+  high-rep pump work will not move e1RM much, and this does not know that. It
+  reports what the numbers did, not whether that was the plan.
+
+---
+
+## 6. Known weaknesses — start here
 
 Ordered by how likely they are to matter.
 
@@ -338,11 +388,18 @@ Ordered by how likely they are to matter.
    cycles accumulate.
 8. **Volume is only counted from sets with reps recorded** (`isHardSet`), so an
    unlogged set is invisible to volume even if it was performed.
+9. **The return-on-volume ranking cannot tell intent from failure.** A lift
+   programmed for high-rep pump work, or one carried through a deload, will read
+   flat because e1RM did not move — which is true, and not the same as the lift
+   being useless.
+10. **Equipment is guessed from the exercise name.** A gym with 1 kg micro
+   plates or 5 kg dumbbell jumps will get the step wrong, and there is no way
+   to tell it otherwise. Letting the lifter set the step per lift would fix it.
 
 ## Testing
 
-`src/afterburn/{volume,classify,progression,loadModel}.test.ts` — the behavioural
-claims above are covered, including the 11-day-cycle miscalibration, one rough
+`src/afterburn/{volume,classify,progression,loadModel,equipment,returns}.test.ts`
+— the behavioural claims above are covered, including the 11-day-cycle miscalibration, one rough
 session barely moving the prescription, a sustained real drop still being
 followed, every refusal case, and every exercise name the program can show.
 

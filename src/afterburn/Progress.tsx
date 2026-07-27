@@ -6,6 +6,8 @@ import { cn } from '../lib/utils';
 import { useAfterburn, volumeByProgramWeek, volumeTrend, weekAdherence, detectPRs, formatVolume } from './store';
 import { analyzeVolume, MUSCLE_LABEL } from './volume';
 import type { MuscleAnalysis, VolumeStatus } from './volume';
+import { liftReturns, deadWeight } from './returns';
+import type { LiftReturn, ReturnVerdict } from './returns';
 import { recoveryReadiness, co2Band } from './recovery';
 import type { ReadinessVerdict } from './recovery';
 import { GOALS, weightTrendKgPerWeek } from './nutrition';
@@ -41,6 +43,59 @@ const VOL_STATUS: Record<VolumeStatus, { label: string; color: string; chip: str
   high: { label: 'Near MRV', color: 'var(--ember)', chip: 'text-ember bg-ember-soft' },
   excessive: { label: 'Over MRV', color: 'var(--danger)', chip: 'text-danger bg-danger/15' },
 };
+
+const RETURN_STATUS: Record<ReturnVerdict, { label: string; chip: string }> = {
+  strong: { label: 'Paying off', chip: 'text-success bg-success/15' },
+  working: { label: 'Working', chip: 'text-success bg-success/15' },
+  flat: { label: 'Flat', chip: 'text-[var(--warning)] bg-[var(--accent-soft)]' },
+  declining: { label: 'Going back', chip: 'text-danger bg-danger/15' },
+  unknown: { label: 'Too early', chip: 'text-ink-subtle bg-elevated' },
+};
+
+/** One lift's return on the sets invested in it. */
+function ReturnRow({ r, unit }: { r: LiftReturn; unit: string }) {
+  const judged = r.verdict !== 'unknown';
+  const stuck = r.verdict === 'flat' || r.verdict === 'declining';
+  return (
+    <div className="space-y-1">
+      {/* The name gets the full row and is allowed to wrap. Sharing the line
+          with the numbers truncated it to "High-Bar Back S…", and which lift
+          it is happens to be the one thing you cannot infer. */}
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-sm font-medium text-ink leading-snug">{r.name}</span>
+        <span className={cn('chip !px-1.5 !py-0.5 text-[10px] font-semibold border-0 shrink-0 mt-0.5', RETURN_STATUS[r.verdict].chip)}>
+          {RETURN_STATUS[r.verdict].label}
+        </span>
+      </div>
+      {judged ? (
+        <>
+          <p className="text-[11px] text-ink-subtle">
+            <span className="text-ink font-medium tabular-nums">
+              {r.perTenSets > 0 ? '+' : ''}{r.perTenSets}{unit} per 10 sets
+            </span>
+            {' · '}{r.sets} sets in · {r.from}→{r.to}{unit} e1RM over {r.spanDays} days
+          </p>
+          {stuck && r.substitutions.length > 0 && (
+            <p className="text-[11px] text-ink-subtle">
+              The sheet offers{' '}
+              {r.substitutions.map((sub, i) => (
+                <span key={sub}>
+                  {i > 0 && ' or '}
+                  <span className="text-ink">{sub}</span>
+                </span>
+              ))}
+              .
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="text-[11px] text-ink-subtle">
+          {r.sessions} session{r.sessions === 1 ? '' : 's'} logged — needs 3 across 2 weeks before this can say anything.
+        </p>
+      )}
+    </div>
+  );
+}
 
 /** A horizontal bar of weekly sets, with reference ticks at MEV / MAV / MRV. */
 function VolumeBar({ m }: { m: MuscleAnalysis }) {
@@ -219,6 +274,11 @@ export default function Progress() {
   // ---- "Volume IQ" — hard sets per muscle vs scientific landmarks ----
   const vol = useMemo(() => analyzeVolume(sessions), [sessions]);
 
+  // ---- Return on volume — which lifts are earning their sets ----
+  const returns = useMemo(() => liftReturns(sessions, program), [sessions, program]);
+  const judged = returns.filter((r) => r.verdict !== 'unknown');
+  const stuck = useMemo(() => deadWeight(judged), [judged]);
+
   // ---- Recovery — CO2 tolerance test readiness ----
   const readiness = useMemo(() => recoveryReadiness(recovery), [recovery]);
   const recoveryPoints: ChartPoint[] = useMemo(
@@ -395,6 +455,47 @@ export default function Progress() {
             {vol.unclassified.length > 0 && (
               <p className="text-[11px] text-ink-subtle border-t border-border pt-2">
                 Not counted (unrecognized lift): {vol.unclassified.join(', ')}. Rename it to a standard movement and it'll be tracked.
+              </p>
+            )}
+          </div>
+        </motion.section>
+      )}
+
+      {/* Return on volume — which lifts are earning the sets you spend on them */}
+      {judged.length > 0 && (
+        <motion.section
+          initial={rm ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
+          className="space-y-3"
+        >
+          <h2 className="section-label flex items-center gap-1.5">
+            <Trophy className="w-3.5 h-3.5" /> What's paying off
+          </h2>
+          <div className="neo-card p-5 space-y-4">
+            <div>
+              <p className="text-sm text-ink font-medium">
+                {stuck.length === 0
+                  ? `All ${judged.length} of your tracked lifts are moving.`
+                  : `${stuck.length} lift${stuck.length === 1 ? '' : 's'} ${stuck.length === 1 ? 'has' : 'have'} returned nothing for ${stuck.reduce((n, r) => n + r.sets, 0)} sets.`}
+              </p>
+              <p className="text-[11px] text-ink-subtle mt-1">
+                Estimated 1RM gained per set invested, over the last 90 days. Your set budget is
+                finite — this is what each lift bought with its share. A lift needs 3 sessions
+                across 2 weeks before it gets a verdict, and rough days are left out.
+              </p>
+            </div>
+
+            <div className="space-y-3.5">
+              {judged.map((r) => (
+                <ReturnRow key={r.name} r={r} unit={unit} />
+              ))}
+            </div>
+
+            {returns.length > judged.length && (
+              <p className="text-[11px] text-ink-subtle border-t border-border pt-2">
+                {returns.length - judged.length} more lift
+                {returns.length - judged.length === 1 ? '' : 's'} logged too recently to judge.
               </p>
             )}
           </div>
