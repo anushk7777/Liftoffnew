@@ -73,7 +73,12 @@ function VolumeRow({ m }: { m: MuscleAnalysis }) {
           {m.dir === 'down' && <TrendingDown className="w-3 h-3 text-[var(--warning)]" />}
         </span>
         <span className="flex items-center gap-2">
-          <span className="text-xs text-ink-subtle tabular-nums">{m.sets} sets</span>
+          {/* The rate is what the landmarks are measured in; the raw tally is
+              kept beside it so the number is never a black box. */}
+          <span className="text-xs text-ink-subtle tabular-nums">
+            {m.sets} sets/wk
+            {m.rawSets !== m.sets && <span className="opacity-60"> · {m.rawSets} logged</span>}
+          </span>
           <span className={cn('chip !px-1.5 !py-0.5 text-[10px] font-semibold border-0', VOL_STATUS[m.status].chip)}>{VOL_STATUS[m.status].label}</span>
         </span>
       </div>
@@ -340,6 +345,13 @@ export default function Progress() {
               <p className="text-sm text-ink font-medium">{vol.headline}</p>
               <p className="text-[11px] text-ink-subtle mt-1">
                 Hard sets per muscle for <span className="text-ink">{vol.windowLabel}</span> vs your science-based landmarks — ticks mark MEV (start growing), MAV (sweet spot) and MRV (recovery ceiling). Counted per program week, so a new week starts the tally fresh.
+                {vol.windowDays !== 7 && (
+                  <>
+                    {' '}Your microcycle runs <span className="text-ink">{vol.windowDays} days</span>, so sets are
+                    shown as a weekly rate — the landmarks are per 7 days, and comparing a longer
+                    cycle against them straight would read high.
+                  </>
+                )}
               </p>
             </div>
 

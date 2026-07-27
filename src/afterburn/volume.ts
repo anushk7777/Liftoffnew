@@ -175,8 +175,11 @@ export type VolumeStatus = 'untrained' | 'below' | 'optimal' | 'high' | 'excessi
 export interface MuscleAnalysis {
   muscle: Muscle;
   label: string;
-  sets: number; // hard sets in the last 7 days (rounded to 0.5)
-  prevSets: number; // hard sets in the prior 7-day window
+  /** Hard sets normalised to a 7-day rate — the basis the landmarks use. */
+  sets: number;
+  /** What was actually logged in the window, before normalising. */
+  rawSets: number;
+  prevSets: number; // the prior window, on the same 7-day basis
   dir: 'up' | 'down' | 'flat';
   landmark: Landmark;
   status: VolumeStatus;
@@ -188,6 +191,8 @@ export interface VolumeReport {
   hasData: boolean;
   weekStart: string | null;
   weeksLogged: number;
+  /** Length of the window the sets were counted over, in days. */
+  windowDays: number;
   muscles: MuscleAnalysis[]; // sorted most-actionable first
   trained: MuscleAnalysis[]; // muscles with sets > 0 in the last 7 days (the bars to show)
   neglected: Muscle[]; // landmark muscles with 0 sets in the last 7 days
@@ -239,6 +244,38 @@ function judge(sets: number, lm: Landmark): { status: VolumeStatus; suggestedSet
 
 const DAY_MS = 86_400_000;
 
+/**
+ * How long one of this lifter's microcycles actually takes, in calendar days.
+ *
+ * The volume landmarks are published as sets per SEVEN days, but a program
+ * "week" is not a calendar week: Pure Bodybuilding runs eight training days,
+ * which with rest days lands around ten or eleven. Counting a whole microcycle
+ * and holding it against a 7-day ceiling overstates volume by roughly half —
+ * enough to report "over MRV" and advise cutting sets while the true rate sits
+ * mid-range. So the window is measured from the lifter's own completed cycles.
+ *
+ * Median rather than mean, so one cycle interrupted by illness or travel does
+ * not stretch the estimate. Clamped to a sane band, and falls back to 7 when
+ * there is no tagged history to learn from.
+ */
+export function microcycleDays(sessions: WorkoutSession[]): number {
+  const byWeek = new Map<string, number[]>();
+  for (const s of sessions) {
+    if (!s.weekId) continue;
+    const t = Date.parse(s.completedAt ?? s.date);
+    if (Number.isNaN(t)) continue;
+    byWeek.set(s.weekId, [...(byWeek.get(s.weekId) ?? []), t]);
+  }
+  // A cycle's span is first session to last, plus the day the last one sits on.
+  const spans = [...byWeek.values()]
+    .filter((ts) => ts.length > 1)
+    .map((ts) => Math.round((Math.max(...ts) - Math.min(...ts)) / DAY_MS) + 1)
+    .sort((a, b) => a - b);
+  if (!spans.length) return 7;
+  const mid = spans[Math.floor(spans.length / 2)];
+  return Math.min(21, Math.max(5, mid));
+}
+
 /** Hard sets per muscle for sessions in the (startMs, endMs] window. */
 function setsInRange(sessions: WorkoutSession[], startMs: number, endMs: number): Record<Muscle, number> {
   const acc = emptySets();
@@ -274,7 +311,7 @@ export function analyzeVolume(sessions: WorkoutSession[]): VolumeReport {
     .filter((x) => !Number.isNaN(x.t))
     .sort((a, b) => b.t - a.t); // newest first
   if (stamped.length === 0) {
-    return { hasData: false, weekStart: null, weeksLogged: 0, muscles: [], trained: [], neglected: [], headline: 'Log a workout to see your per-muscle volume.', unclassified: [], windowLabel: 'last 7 days' };
+    return { hasData: false, weekStart: null, weeksLogged: 0, windowDays: 7, muscles: [], trained: [], neglected: [], headline: 'Log a workout to see your per-muscle volume.', unclassified: [], windowLabel: 'last 7 days' };
   }
   const anchor = stamped[0].t;
   const latestWeekId = stamped[0].s.weekId;
@@ -286,7 +323,8 @@ export function analyzeVolume(sessions: WorkoutSession[]): VolumeReport {
   let windowStartMs: number;
 
   if (latestWeekId) {
-    // Microcycle mode — current program week vs the previous one.
+    // Microcycle mode — current program week vs the previous one. The tally
+    // still starts fresh when a new program week begins.
     const curStart = Math.min(...stamped.filter((x) => x.s.weekId === latestWeekId).map((x) => x.t));
     const prevTagged = stamped.find((x) => x.t < curStart && x.s.weekId && x.s.weekId !== latestWeekId);
     const prevStart = prevTagged
@@ -306,13 +344,26 @@ export function analyzeVolume(sessions: WorkoutSession[]): VolumeReport {
     windowStartMs = anchor - 7 * DAY_MS;
   }
 
+  // Landmarks are published as sets per SEVEN days, but a program week is not a
+  // calendar week — Pure Bodybuilding runs eight training days, which with rest
+  // lands nearer eleven. Holding a whole microcycle's sets against a 7-day
+  // ceiling overstated volume by roughly half, enough to report "over MRV" and
+  // advise cutting sets while the true rate sat mid-range.
+  //
+  // Divided by the cycle's own length rather than by days elapsed: a week two
+  // days in has genuinely done two days of work, and dividing by two would
+  // report a wild rate off a single session.
+  const windowDays = latestWeekId ? microcycleDays(sessions) : 7;
+  const toWeekly = (n: number) => (n * 7) / windowDays;
+
   const muscles: MuscleAnalysis[] = ALL_MUSCLES.map((m) => {
-    const sets = round5(curr[m] ?? 0);
-    const prevSets = round5(prevW[m] ?? 0);
+    const rawSets = round5(curr[m] ?? 0);
+    const sets = round5(toWeekly(curr[m] ?? 0));
+    const prevSets = round5(toWeekly(prevW[m] ?? 0));
     const lm = LANDMARKS[m];
     const { status, suggestedSets, recommendation } = judge(sets, lm);
     const dir: MuscleAnalysis['dir'] = !prevHasData ? 'flat' : sets > prevSets + 0.5 ? 'up' : sets < prevSets - 0.5 ? 'down' : 'flat';
-    return { muscle: m, label: MUSCLE_LABEL[m], sets, prevSets, dir, landmark: lm, status, suggestedSets, recommendation };
+    return { muscle: m, label: MUSCLE_LABEL[m], sets, rawSets, prevSets, dir, landmark: lm, status, suggestedSets, recommendation };
   });
 
   const sorted = [...muscles].sort((a, b) => SEVERITY[a.status] - SEVERITY[b.status] || b.sets - a.sets || a.label.localeCompare(b.label));
@@ -332,5 +383,5 @@ export function analyzeVolume(sessions: WorkoutSession[]): VolumeReport {
   const label = windowLabel.charAt(0).toUpperCase() + windowLabel.slice(1);
   const headline = parts.length ? `${label}: ${parts.join(', ')}.` : 'Log a full training week to read your volume.';
 
-  return { hasData: true, weekStart: new Date(windowStartMs).toISOString(), weeksLogged: muscleSetsByWeek(sessions).length, muscles: sorted, trained, neglected, headline, unclassified, windowLabel };
+  return { hasData: true, weekStart: new Date(windowStartMs).toISOString(), weeksLogged: muscleSetsByWeek(sessions).length, windowDays, muscles: sorted, trained, neglected, headline, unclassified, windowLabel };
 }

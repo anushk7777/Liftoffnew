@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { setVerdict, ghostLabel, exerciseProgress } from './progression';
+import { setVerdict, ghostLabel, exerciseProgress, loadHint } from './progression';
 import type { LoggedSet } from './types';
 
 const set = (weight: string, reps: string, rpe = ''): LoggedSet =>
@@ -15,8 +15,32 @@ describe('setVerdict', () => {
     expect(setVerdict(set('80', '10'), set('80', '8')).label).toBe('+2 reps');
   });
 
-  it('says matched when nothing moved', () => {
+  it('says matched only when effort is unchanged too', () => {
+    expect(setVerdict(set('80', '8', '8'), set('80', '8', '8'))).toEqual({ kind: 'same', label: 'matched' });
+    // No RPE on either side — nothing left to distinguish them.
     expect(setVerdict(set('80', '8'), set('80', '8'))).toEqual({ kind: 'same', label: 'matched' });
+  });
+
+  it('counts the same weight at a lower RPE as progress', () => {
+    // 100kg x 5 felt like RPE 6 last week and RPE 5 today: you got stronger,
+    // and this is the moment you are ready to add load.
+    const v = setVerdict(set('100', '5', '5'), set('100', '5', '6'));
+    expect(v.kind).toBe('up');
+    expect(v.label).toContain('RPE');
+  });
+
+  it('flags the same weight costing more effort', () => {
+    const v = setVerdict(set('100', '5', '8'), set('100', '5', '6'));
+    expect(v.kind).toBe('down');
+    expect(v.label).toContain('+2 RPE');
+  });
+
+  it('handles half-point RPE', () => {
+    expect(setVerdict(set('100', '5', '7.5'), set('100', '5', '8')).kind).toBe('up');
+  });
+
+  it('does not invent an effort verdict when only one side logged RPE', () => {
+    expect(setVerdict(set('80', '8', '7'), set('80', '8'))).toEqual({ kind: 'same', label: 'matched' });
   });
 
   it('reports a genuine drop', () => {
@@ -85,5 +109,46 @@ describe('exerciseProgress', () => {
 
   it('says nothing with no comparable history', () => {
     expect(exerciseProgress([set('80', '8')], []).kind).toBe('none');
+  });
+});
+
+describe('loadHint', () => {
+  it('turns an RPE gap into a load suggestion', () => {
+    // Sheet asked for RPE 8, the set came in at 5: three reps were left over.
+    const h = loadHint('100', '5', '8')!;
+    expect(h.under).toBe(3);
+    expect(h.suggested).toBe(110); // 100 * 1.09, rounded to the nearest 2.5
+    expect(h.current).toBe(100);
+  });
+
+  it('stays quiet when the gap is within self-rating noise', () => {
+    expect(loadHint('100', '7', '8')).toBeNull(); // 1 point
+    expect(loadHint('100', '7.5', '8')).toBeNull(); // half a point
+  });
+
+  it('says nothing when the set was harder than asked', () => {
+    expect(loadHint('100', '9', '8')).toBeNull();
+  });
+
+  it('reads a ranged target off the sheet conservatively', () => {
+    // "7-8" is treated as 7, so it will not over-prescribe.
+    expect(loadHint('100', '5', '7-8')!.under).toBe(2);
+  });
+
+  it('needs a target, a weight and an RPE', () => {
+    expect(loadHint('100', '5', undefined)).toBeNull();
+    expect(loadHint('100', undefined, '8')).toBeNull();
+    expect(loadHint(undefined, '5', '8')).toBeNull();
+    expect(loadHint('heavy', '5', '8')).toBeNull();
+  });
+
+  it('does not suggest a weight you are already using', () => {
+    // A light bar with a big gap can still round back to itself.
+    expect(loadHint('2.5', '5', '8', 2.5)).toBeNull();
+  });
+
+  it('honours a smaller plate step', () => {
+    const h = loadHint('100', '5', '8', 1)!;
+    expect(h.suggested).toBe(109);
   });
 });
