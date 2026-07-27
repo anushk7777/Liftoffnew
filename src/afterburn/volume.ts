@@ -266,14 +266,37 @@ export function microcycleDays(sessions: WorkoutSession[]): number {
     if (Number.isNaN(t)) continue;
     byWeek.set(s.weekId, [...(byWeek.get(s.weekId) ?? []), t]);
   }
+  if (byWeek.size === 0) return 7;
+
   // A cycle's span is first session to last, plus the day the last one sits on.
-  const spans = [...byWeek.values()]
-    .filter((ts) => ts.length > 1)
-    .map((ts) => Math.round((Math.max(...ts) - Math.min(...ts)) / DAY_MS) + 1)
+  const spanOf = (ts: number[]) =>
+    ts.length > 1 ? Math.round((Math.max(...ts) - Math.min(...ts)) / DAY_MS) + 1 : 0;
+
+  const newest = [...byWeek.entries()].reduce((a, b) =>
+    Math.max(...b[1]) > Math.max(...a[1]) ? b : a,
+  )[0];
+
+  const finished = [...byWeek.entries()]
+    .filter(([id]) => id !== newest)
+    .map(([, ts]) => spanOf(ts))
+    .filter((d) => d > 0)
     .sort((a, b) => a - b);
-  if (!spans.length) return 7;
-  const mid = spans[Math.floor(spans.length / 2)];
-  return Math.min(21, Math.max(5, mid));
+
+  const medianFinished = finished.length ? finished[Math.floor(finished.length / 2)] : 0;
+  // The cycle in progress cannot say how long a cycle takes, but the days it
+  // has already run are a LOWER bound on one, which is worth keeping when it is
+  // the only cycle there is.
+  const inProgress = spanOf(byWeek.get(newest) ?? []);
+
+  // Never below seven, in either direction.
+  //
+  // Seven is the landmarks' own basis, so a denominator under it would scale
+  // the rate UP and could invent an "over MRV" that is not there — the exact
+  // false alarm this normalisation exists to prevent. Three days into a new
+  // cycle the in-progress span is 3, and without this floor the rate came out
+  // more than doubled. Erring long can under-report volume, which is the safe
+  // direction: it never tells someone to cut work they should be doing.
+  return Math.min(21, Math.max(7, medianFinished, inProgress));
 }
 
 /** Hard sets per muscle for sessions in the (startMs, endMs] window. */

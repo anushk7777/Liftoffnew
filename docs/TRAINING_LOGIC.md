@@ -38,10 +38,16 @@ weekly rate. The UI shows both: `15 sets/wk · 24 logged`.
 
 **Decisions worth challenging**
 
-- *Microcycle length is the **median** span of that lifter's completed program
-  weeks* (`microcycleDays`), clamped to 5–21 days, defaulting to 7 with no
-  tagged history. Median so one cycle interrupted by illness does not stretch
-  the estimate.
+- *Microcycle length is the **median span of FINISHED cycles***
+  (`microcycleDays`), with the in-progress cycle used only as a lower bound.
+  Median so one cycle interrupted by illness does not stretch the estimate.
+- *The denominator never drops below 7, and is capped at 21.* Seven is the
+  landmarks' own basis, so a smaller denominator scales the rate **up** and can
+  invent an "over MRV" that is not there. Found on review: the in-progress cycle
+  was informing its own denominator, so three days into a new week the span was
+  3, the rate came out more than doubled, and the original false alarm returned
+  through the back door. Erring long can under-report volume, which is the safe
+  direction — it never tells someone to cut work they should be doing.
 - *Divided by the cycle's **length**, not by days elapsed.* A week two days in
   has genuinely done two days of work; dividing by two would report a wild rate
   off a single session. The cost is that a partially complete week reads low —

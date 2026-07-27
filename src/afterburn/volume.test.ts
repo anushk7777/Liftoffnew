@@ -189,6 +189,36 @@ describe('analyzeVolume — program-week (microcycle) mode', () => {
     expect(chest.status).toBe('optimal');
   });
 
+  // Found on review: the in-progress cycle was informing its own denominator.
+  it('does not inflate the rate from a cycle still in progress', () => {
+    const finished = [0, 1, 2, 4, 5, 6, 8, 10].map((d, i) =>
+      sess(`f${i}`, new Date(Date.UTC(2026, 2, 9 + d, 10)).toISOString(), [['Cable Fly', 2]], w1),
+    );
+    // Three days into the next cycle, six chest sets in.
+    const started = [0, 1, 2].map((d, i) =>
+      sess(`n${i}`, new Date(Date.UTC(2026, 2, 23 + d, 10)).toISOString(), [['Cable Fly', 2]], w2),
+    );
+    const r = analyzeVolume([...finished, ...started]);
+    // The finished 11-day cycle sets the basis, not the 3 days done so far.
+    expect(r.windowDays).toBe(11);
+    const chest = r.muscles.find((m) => m.muscle === 'chest')!;
+    expect(chest.rawSets).toBe(6);
+    expect(chest.sets).toBeCloseTo(3.8, 0); // 6 over 11 days, not 6 over 3
+    expect(chest.status).not.toBe('excessive');
+  });
+
+  it('leaves the rate alone until a cycle has actually finished', () => {
+    // Nothing complete yet, so there is no measured cycle length to scale by.
+    const r = analyzeVolume(
+      [0, 1, 2].map((d, i) =>
+        sess(`n${i}`, new Date(Date.UTC(2026, 2, 23 + d, 10)).toISOString(), [['Cable Fly', 3]], w1),
+      ),
+    );
+    expect(r.windowDays).toBe(7);
+    const chest = r.muscles.find((m) => m.muscle === 'chest')!;
+    expect(chest.sets).toBe(chest.rawSets);
+  });
+
   it('still flags genuinely excessive volume once normalised', () => {
     const days = [0, 1, 2, 4, 5, 6, 8, 10];
     const sessions = days.map((d, i) =>
