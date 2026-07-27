@@ -56,6 +56,45 @@ weekly rate. The UI shows both: `15 sets/wk · 24 logged`.
   reverted: two existing tests encoded the reset deliberately, it matches the UI
   copy, and it matches how a lifter thinks about a block.
 
+### 1a. The volume-by-program-week chart
+
+`volumeByProgramWeek` in `store.ts`, drawn by `Chart.tsx` from `Progress.tsx`.
+
+One point per program week, grouped by the `weekId` stamped on each session
+**when it was logged**. Switching the active week writes nothing — the chart
+only ever reflects logged work, so moving to week 3 changes nothing until the
+first week-3 session is saved.
+
+**The bug this fixed.** A week's point only reaches its real height once every
+day in it is logged. Plotted plain, the first session of a new week dropped the
+line from a finished week's total (~54 t) to one day's (~6 t) and then climbed
+back over the next ten days. Every single week, the chart said volume had
+collapsed. The headline number and the "overall" delta both read the last point,
+so they collapsed too.
+
+Now, while the week is incomplete:
+
+- the final leg is **dashed** and its dot **hollow**, so a partial is never read
+  as a finished value
+- a **projection ring** sits above it at `partial ÷ days done × days planned` —
+  the figure that actually compares with the weeks before it
+- the subtitle reads `day 3 of 8 · on pace for 82.7 t` instead of a meaningless
+  overall delta
+- **high/low and the gridline labels describe values actually reached**, so they
+  exclude both the partial and the projection. Reporting "high 82.7 t" for a
+  number no week has hit is a lie; the plot *scale* still spans everything drawn,
+  or the ring would fall outside the chart.
+
+Completion is read from `weekAdherence`, so it counts program days done, not
+calendar days. When the week finishes, everything reverts to solid and the
+overall delta returns.
+
+Worth challenging: the projection is a **linear pace estimate** and assumes the
+remaining days resemble the ones done. Pure Bodybuilding's days are not equal —
+an Arms day carries far less tonnage than a Legs day — so early in a week the
+projection can be off by a fair margin. Weighting by each day's planned set
+count would be more honest.
+
 ### 1b. Which muscle a lift counts for
 
 `classifyExercise` in `volume.ts`. Exercises are logged as free text with no

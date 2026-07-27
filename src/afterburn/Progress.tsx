@@ -192,15 +192,29 @@ export default function Progress() {
   const volume = useMemo(() => volumeByProgramWeek(sessions), [sessions]);
   const volPoints: ChartPoint[] = volume.map((v) => ({ date: v.start, value: v.volume }));
   const latestWeek = volume[volume.length - 1];
+  const latestAdherence = useMemo(
+    () => (latestWeek?.weekId ? weekAdherence(program, sessions, latestWeek.weekId) : null),
+    [latestWeek, program, sessions],
+  );
   // Latest bucket is "in progress" while its program week still has undone days.
   const latestInProgress = useMemo(() => {
     if (!latestWeek) return false;
-    if (latestWeek.weekId) {
-      const adh = weekAdherence(program, sessions, latestWeek.weekId);
-      return adh.total > 0 && adh.done < adh.total;
-    }
+    if (latestAdherence) return latestAdherence.total > 0 && latestAdherence.done < latestAdherence.total;
     return new Date(latestWeek.start).getTime() > mountedAt - 7 * 86_400_000;
-  }, [latestWeek, program, sessions, mountedAt]);
+  }, [latestWeek, latestAdherence, mountedAt]);
+
+  // A program week's point only reaches its real height once every day in it is
+  // logged. Plotted plain, the first session of a new week looks like volume
+  // collapsed — it drops from a finished week's total to one day's. So the
+  // partial is drawn dashed, and where it lands at the current pace is shown
+  // beside it, which is the figure that compares with the weeks before it.
+  const volProjection = useMemo(() => {
+    if (!latestInProgress || !latestWeek || !latestAdherence || latestAdherence.done < 1) return undefined;
+    const { done, total } = latestAdherence;
+    if (total <= done) return undefined;
+    const value = Math.round((latestWeek.volume / done) * total);
+    return { value, label: `day ${done} of ${total} · on pace for ${formatVolume(value, unit)}` };
+  }, [latestInProgress, latestWeek, latestAdherence, unit]);
 
   // ---- "Volume IQ" — hard sets per muscle vs scientific landmarks ----
   const vol = useMemo(() => analyzeVolume(sessions), [sessions]);
@@ -492,13 +506,24 @@ export default function Progress() {
           <p className="text-sm text-ink-subtle">Log some workouts and your total weekly training volume shows up here.</p>
         ) : (
           <div className="card p-4 space-y-2">
-            <Chart points={volPoints} unit="" accent="var(--ember)" format={(v) => formatVolume(v, unit)} />
+            <Chart
+              points={volPoints}
+              unit=""
+              accent="var(--ember)"
+              format={(v) => formatVolume(v, unit)}
+              provisionalLast={latestInProgress}
+              projection={volProjection}
+            />
             <p className="text-[11px] text-ink-subtle">
               Total load = weight × reps across <span className="text-ink">all</span> lifts, tallied per <span className="text-ink">program week</span> (a week ends when all its sessions are done — even past 7 calendar days; in {unit}).
               {latestWeek && (
                 <>
                   {' '}{latestWeek.label || 'Latest week'}: <span className="text-ink font-medium">{formatVolume(latestWeek.volume, unit)}</span> over {latestWeek.sets} sets
-                  {latestInProgress ? ' · still in progress' : ''}.
+                  {latestInProgress
+                    ? latestAdherence
+                      ? ` so far — ${latestAdherence.done} of ${latestAdherence.total} days done, so this point is still climbing.`
+                      : ' · still in progress.'
+                    : '.'}
                 </>
               )}
             </p>

@@ -26,6 +26,8 @@ export default function Chart({
   overlay,
   overlayLabel,
   emptyHint = 'Log at least two entries to see your trend.',
+  provisionalLast = false,
+  projection,
 }: {
   points: ChartPoint[];
   unit?: string;
@@ -39,6 +41,13 @@ export default function Chart({
   overlay?: ChartPoint[];
   overlayLabel?: string;
   emptyHint?: string;
+  /** The last point is a partial total that is still being added to — drawn
+   *  dashed and hollow so it is never read as a finished value. */
+  provisionalLast?: boolean;
+  /** Where the last point is heading if the current pace holds. Shown as a
+   *  hollow ring above it, so a half-done week can be compared with whole ones
+   *  instead of looking like a collapse. */
+  projection?: { value: number; label: string };
 }) {
   const gid = useId();
   const rm = useReducedMotion();
@@ -63,16 +72,33 @@ export default function Chart({
   const n = points.length;
   // The overlay shares the axis, so it has to be in the extent — otherwise a
   // smoothed line could sit outside the plot and get clipped.
-  const ys = [...points.map((p) => p.value), ...(overlay ?? []).map((p) => p.value)];
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const span = maxY - minY || 1;
-  const lo = minY - span * 0.12;
-  const hi = maxY + span * 0.12;
+  const ys = [
+    ...points.map((p) => p.value),
+    ...(overlay ?? []).map((p) => p.value),
+    ...(projection ? [projection.value] : []),
+  ];
+  // The high/low readout and the gridline labels describe VALUES ACTUALLY
+  // REACHED, so a provisional partial and a projection are excluded — reporting
+  // "high 82.7 t" for a figure no week has hit, or "low 31.0 t" for a week
+  // three days in, both state something untrue. The plot SCALE still spans
+  // everything drawn, or the projection ring would sit outside the chart.
+  const settled = provisionalLast && n > 1 ? points.slice(0, n - 1) : points;
+  const shown = [...settled.map((p) => p.value), ...(overlay ?? []).map((p) => p.value)];
+  const minY = Math.min(...shown);
+  const maxY = Math.max(...shown);
+  const span = Math.max(...ys) - Math.min(...ys) || 1;
+  const lo = Math.min(...ys) - span * 0.12;
+  const hi = Math.max(...ys) + span * 0.12;
   const x = (i: number) => padL + (n <= 1 ? 0 : (i / (n - 1)) * (W - padL - padR));
   const y = (v: number) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
 
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(2)},${y(p.value).toFixed(2)}`).join(' ');
+  // With a provisional last point the line is drawn in two pieces: the settled
+  // history solid, the final leg dashed. Otherwise a half-logged week reads as
+  // a real drop in volume.
+  const seg = (from: number, to: number) =>
+    points.slice(from, to + 1).map((p, k) => `${k === 0 ? 'M' : 'L'}${x(from + k).toFixed(2)},${y(p.value).toFixed(2)}`).join(' ');
+  const solidPath = provisionalLast && n > 1 ? seg(0, n - 2) : seg(0, n - 1);
+  const dashedPath = provisionalLast && n > 1 ? seg(n - 2, n - 1) : null;
   const areaPath = `M${x(0).toFixed(2)},${(H - padB).toFixed(2)} ${points.map((p, i) => `L${x(i).toFixed(2)},${y(p.value).toFixed(2)}`).join(' ')} L${x(n - 1).toFixed(2)},${(H - padB).toFixed(2)} Z`;
   const ticks = [maxY, (maxY + minY) / 2, minY];
 
@@ -102,10 +128,20 @@ export default function Chart({
             {fmtValue ? fmtValue(last) : (<><AnimatedNumber value={last} /><span className="text-base text-ink-subtle font-normal ml-1">{unit}</span></>)}
           </p>
           <p className="text-xs text-ink-subtle mt-1">
-            {n} entries ·{' '}
-            <span className={delta === 0 ? 'text-ink-subtle' : delta > 0 ? 'text-ember' : 'text-[var(--text-muted)]'}>
-              {delta > 0 ? '+' : ''}{fmt(delta)} overall
-            </span>
+            {/* With a provisional last point the headline is a partial total,
+                so the overall delta it implies would be nonsense — the pace
+                figure is the honest comparison instead. */}
+            {n} entries
+            {projection ? (
+              <> · <span className="text-ember">{projection.label}</span></>
+            ) : (
+              <>
+                {' · '}
+                <span className={delta === 0 ? 'text-ink-subtle' : delta > 0 ? 'text-ember' : 'text-[var(--text-muted)]'}>
+                  {delta > 0 ? '+' : ''}{fmt(delta)} overall
+                </span>
+              </>
+            )}
           </p>
         </div>
         <div className="text-right text-[11px] text-ink-subtle">
@@ -153,7 +189,7 @@ export default function Chart({
 
         {/* line draws on once */}
         <motion.path
-          d={linePath}
+          d={solidPath}
           fill="none"
           stroke={accent}
           strokeWidth="2.5"
@@ -165,21 +201,63 @@ export default function Chart({
           transition={{ duration: 0.7, ease: [0.21, 1, 0.4, 1] }}
         />
 
-        {/* dots fade in */}
-        {points.map((p, i) => (
-          <motion.circle
-            key={i}
-            cx={x(i)}
-            cy={y(p.value)}
-            r={i === n - 1 ? 4 : 2.5}
-            fill={i === n - 1 ? accent : 'var(--surface)'}
+        {/* the still-being-added-to leg */}
+        {dashedPath && (
+          <motion.path
+            d={dashedPath}
+            fill="none"
             stroke={accent}
-            strokeWidth="1.5"
+            strokeWidth="2.5"
+            strokeDasharray="5 4"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            initial={rm ? false : { opacity: 0 }}
+            animate={{ opacity: 0.75 }}
+            transition={{ duration: 0.4, delay: 0.5 }}
+          />
+        )}
+
+        {/* where the last point lands if the current pace holds */}
+        {projection && (
+          <motion.g
             initial={rm ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.25, delay: rm ? 0 : 0.45 + i * 0.03 }}
-          />
-        ))}
+            transition={{ duration: 0.4, delay: 0.6 }}
+          >
+            <line
+              x1={x(n - 1)}
+              y1={y(points[n - 1].value)}
+              x2={x(n - 1)}
+              y2={y(projection.value)}
+              stroke={accent}
+              strokeWidth="1.5"
+              strokeDasharray="3 3"
+              opacity={0.5}
+              vectorEffect="non-scaling-stroke"
+            />
+            <circle cx={x(n - 1)} cy={y(projection.value)} r={4.5} fill="none" stroke={accent} strokeWidth="1.75" strokeDasharray="3 2.5" vectorEffect="non-scaling-stroke" />
+          </motion.g>
+        )}
+
+        {/* dots fade in */}
+        {points.map((p, i) => {
+          const isLast = i === n - 1;
+          const hollow = isLast && provisionalLast;
+          return (
+            <motion.circle
+              key={i}
+              cx={x(i)}
+              cy={y(p.value)}
+              r={isLast ? 4 : 2.5}
+              fill={isLast && !hollow ? accent : 'var(--surface)'}
+              stroke={accent}
+              strokeWidth="1.5"
+              initial={rm ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.25, delay: rm ? 0 : 0.45 + i * 0.03 }}
+            />
+          );
+        })}
 
         {/* rolling average: the line to actually read, so it sits under the
             raw series but is drawn calmer and dashed */}
