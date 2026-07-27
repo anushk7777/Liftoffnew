@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { equipmentOf, loadStep, stepShare } from './equipment';
-import { loadHint, learnedLoadHint } from './progression';
+import { loadHint, learnedLoadHint } from '../progression';
 
 const noModel = { confidence: 'none' as const, predict: () => null, kgPerRpe: null };
 

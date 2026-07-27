@@ -6,8 +6,8 @@ import { cn } from '../lib/utils';
 import { useAfterburn, volumeByProgramWeek, volumeTrend, weekAdherence, detectPRs, formatVolume } from './store';
 import { analyzeVolume, MUSCLE_LABEL } from './volume';
 import type { MuscleAnalysis, VolumeStatus } from './volume';
-import { liftReturns, deadWeight } from './returns';
-import type { LiftReturn, ReturnVerdict } from './returns';
+import { liftReturns, deadWeight } from './innovation/returns';
+import type { LiftReturn, ReturnVerdict } from './innovation/returns';
 import { recoveryReadiness, co2Band } from './recovery';
 import type { ReadinessVerdict } from './recovery';
 import { GOALS, weightTrendKgPerWeek } from './nutrition';
@@ -75,22 +75,66 @@ function ReturnRow({ r, unit }: { r: LiftReturn; unit: string }) {
             </span>
             {' · '}{r.sets} sets in · {r.from}→{r.to}{unit} e1RM over {r.spanDays} days
           </p>
-          {stuck && r.substitutions.length > 0 && (
+          {/* Effort and load are checked BEFORE the exercise is blamed. The
+              evidence says how hard you push and how much you do matter more
+              than which movement you picked — and swapping a lift you train
+              too easily just gets you a new lift you train too easily. */}
+          {stuck && r.diagnosis && (
             <p className="text-[11px] text-ink-subtle">
-              The sheet offers{' '}
-              {r.substitutions.map((sub, i) => (
-                <span key={sub}>
-                  {i > 0 && ' or '}
-                  <span className="text-ink">{sub}</span>
-                </span>
-              ))}
-              .
+              {r.diagnosis.cause === 'effort' ? (
+                <>
+                  Your sets averaged <span className="text-ink">RPE {r.diagnosis.meanRpe}</span> against a
+                  target of {r.diagnosis.targetRpe} — about{' '}
+                  {Math.round(10 - (r.diagnosis.meanRpe ?? 0))} reps from failure.{' '}
+                  <span className="text-ink">Push closer before changing anything.</span>
+                </>
+              ) : r.diagnosis.cause === 'load-dropping' ? (
+                <>
+                  The weight has come down {Math.abs(r.diagnosis.loadChange)}{unit} over {r.spanDays} days.
+                  If that wasn't deliberate,{' '}
+                  <span className="text-ink">that is the decline, not the exercise.</span>
+                </>
+              ) : r.diagnosis.cause === 'load-static' ? (
+                <>
+                  The weight hasn't moved in {r.spanDays} days.{' '}
+                  <span className="text-ink">Try adding load or reps</span> before blaming the exercise.
+                </>
+              ) : r.diagnosis.cause === 'volume' ? (
+                <>
+                  Only {r.diagnosis.setsPerSession} set{r.diagnosis.setsPerSession === 1 ? '' : 's'} a session —
+                  there may not be enough work here to grow from.
+                </>
+              ) : r.substitutions.length > 0 ? (
+                <>
+                  Effort and load were both there, so the movement itself is the best guess left. The sheet
+                  offers{' '}
+                  {r.substitutions.map((sub, i) => (
+                    <span key={sub}>
+                      {i > 0 && ' or '}
+                      <span className="text-ink">{sub}</span>
+                    </span>
+                  ))}
+                  .
+                </>
+              ) : (
+                <>Effort and load were both there — this movement may just not suit you.</>
+              )}
             </p>
           )}
         </>
       ) : (
         <p className="text-[11px] text-ink-subtle">
-          {r.sessions} session{r.sessions === 1 ? '' : 's'} logged — needs 3 across 2 weeks before this can say anything.
+          {r.typicalError > 0 ? (
+            <>
+              Your sessions on this scatter by ±{r.typicalError}{unit}, which is wider than a gain worth
+              finding — nothing could be read either way yet.
+            </>
+          ) : (
+            <>
+              {r.sessions} session{r.sessions === 1 ? '' : 's'} logged — needs 4 across 2 weeks before this
+              can say anything.
+            </>
+          )}
         </p>
       )}
     </div>
@@ -481,7 +525,7 @@ export default function Progress() {
               </p>
               <p className="text-[11px] text-ink-subtle mt-1">
                 Estimated 1RM gained per set invested, over the last 90 days. Your set budget is
-                finite — this is what each lift bought with its share. A lift needs 3 sessions
+                finite — this is what each lift bought with its share. A lift needs 4 sessions
                 across 2 weeks before it gets a verdict, and rough days are left out.
               </p>
             </div>

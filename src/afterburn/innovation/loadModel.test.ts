@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildLoadModel, observationsFor, repsToFailure } from './loadModel';
-import type { WorkoutSession, LoggedSet } from './types';
+import type { WorkoutSession, LoggedSet } from '../types';
 
 const NOW = Date.parse('2026-07-27T10:00:00.000Z');
 const DAY = 86_400_000;
