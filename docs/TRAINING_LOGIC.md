@@ -135,8 +135,15 @@ getting stronger, and it always precedes being able to add weight. Calling it
 Rule 6 is a judgement call: trading reps for load may be a good session or a bad
 one, and the app should not hand it a green chip on the lifter's behalf.
 
-`exerciseProgress` reads the whole lift as total volume across matched
-positions, so one heavy set cannot hide two that fell.
+`exerciseProgress` (in `progression.ts`) reads the whole lift as total volume
+across matched positions, so one heavy set cannot hide two that fell.
+
+Note there is a **second, unrelated `exerciseProgress` in `store.ts`** — the
+per-session top-weight and estimated-1RM series the coach summarises. Same name,
+different module, different job; importing the wrong one is an easy mistake.
+That one used to read e1RM off the heaviest set alone, which under-reports:
+80×3 estimates 88, while a 60×15 back-off estimates 90. Top weight and best
+e1RM are now tracked separately, matching how `detectPRs` already scored them.
 
 ---
 
