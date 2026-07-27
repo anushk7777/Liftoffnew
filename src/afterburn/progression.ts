@@ -133,37 +133,58 @@ export function exerciseProgress(
  * input, or a gap small enough to be the noise in anybody's self-rating.
  */
 export interface LoadHint {
+  /** What the gap actually calls for. */
+  kind: 'weight' | 'reps';
   /** RPE points below target. */
   under: number;
-  /** Suggested load, rounded to the nearest 2.5. */
+  /** Suggested load, rounded to the plate step. Equals `current` for kind 'reps'. */
   suggested: number;
   current: number;
+  /** For kind 'reps': the prescribed count to reach before adding load. */
+  targetReps?: number;
+  loggedReps?: number;
 }
 
 const PCT_PER_RPE = 0.03;
 /** Under a point and a half is within the noise of rating your own effort. */
 const MIN_GAP = 1.5;
 
+/** First number out of a loosely written sheet value: "8", "8.5", "7-8". */
+const firstNumber = (v: string | undefined): number | null =>
+  v ? num(v.split(/[-–—/]/)[0]?.trim()) : null;
+
 export function loadHint(
   loggedWeight: string | undefined,
   loggedRpe: string | undefined,
   targetRpe: string | undefined,
   step = 2.5,
+  loggedReps?: string,
+  targetReps?: string,
 ): LoadHint | null {
   const w = num(loggedWeight);
   const rpe = num(loggedRpe);
-  // Targets are written loosely on a sheet — "8", "8.5", sometimes "7-8".
-  const target = targetRpe ? num(targetRpe.split(/[-–—/]/)[0]?.trim()) : null;
+  const target = firstNumber(targetRpe);
   if (w == null || rpe == null || target == null) return null;
   if (w <= 0) return null;
 
   const under = Math.round((target - rpe) * 10) / 10;
   if (under < MIN_GAP) return null;
 
+  // Reps come first. RPE is a function of load AND reps together, so an easy
+  // set that fell short of the prescribed reps says nothing about the load —
+  // the prescribed work simply was not done. Telling someone to add weight
+  // after one rep of a five-rep target is exactly backwards: they should reach
+  // five at this weight, and only then does an easy rating mean it is light.
+  const lr = num(loggedReps);
+  const tr = firstNumber(targetReps);
+  if (lr != null && tr != null && lr < tr) {
+    return { kind: 'reps', under, suggested: w, current: w, targetReps: tr, loggedReps: lr };
+  }
+
   const suggested = Math.round((w * (1 + under * PCT_PER_RPE)) / step) * step;
   // Rounding can land back on the weight already used; nothing to suggest then.
   if (suggested <= w) return null;
-  return { under, suggested, current: w };
+  return { kind: 'weight', under, suggested, current: w };
 }
 
 /**
@@ -191,15 +212,18 @@ export function learnedLoadHint(
   loggedRpe: string | undefined,
   targetRpe: string | undefined,
   targetReps: string | undefined,
+  loggedReps: string | undefined,
   model: { confidence: 'good' | 'low' | 'none'; predict: (r: number, e: number) => number | null; kgPerRpe: number | null },
   step = 2.5,
 ): LearnedHint | null {
-  const base = loadHint(loggedWeight, loggedRpe, targetRpe, step);
+  const base = loadHint(loggedWeight, loggedRpe, targetRpe, step, loggedReps, targetReps);
   if (!base) return null;
+  // The rep target was missed — no load model can change that answer.
+  if (base.kind === 'reps') return { ...base, basis: 'rule' };
   if (model.confidence === 'none') return { ...base, basis: 'rule' };
 
-  const reps = num(targetReps ? targetReps.split(/[-–—/]/)[0]?.trim() : undefined);
-  const target = num(targetRpe ? targetRpe.split(/[-–—/]/)[0]?.trim() : undefined);
+  const reps = firstNumber(targetReps);
+  const target = firstNumber(targetRpe);
   if (reps == null || target == null) return { ...base, basis: 'rule' };
 
   const predicted = model.predict(reps, target);

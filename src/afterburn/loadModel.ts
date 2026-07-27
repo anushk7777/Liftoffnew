@@ -208,7 +208,13 @@ export function buildLoadModel(
   const bySession = new Map<string, number[]>();
   obs.forEach((o, i) => bySession.set(o.sessionId, [...(bySession.get(o.sessionId) ?? []), resid[i]]));
 
-  const typical = median(resid.map(Math.abs)) || 1;
+  // "Twice the typical miss" needs a floor, or it collapses on clean data: a
+  // lifter whose sets sit close to the curve has a typical residual near zero,
+  // so twice nothing flags ordinary sessions as off days and down-weights them.
+  // A session has to be off by a real amount — 2% of working weight, and at
+  // least a plate step — before it counts as one.
+  const meanW = obs.reduce((sum, o) => sum + o.weight, 0) / obs.length;
+  const typical = Math.max(median(resid.map(Math.abs)), meanW * 0.02, 2.5);
   const offDays: string[] = [];
   const sessionBias = new Map<string, number>();
   for (const [id, rs] of bySession) {
@@ -232,7 +238,7 @@ export function buildLoadModel(
 
   const kgPerRpe = Math.round(Math.abs(second.b) * 100) / 100;
   const effective = obs.filter((o) => !offDays.includes(o.sessionId)).length;
-  const meanWeight = obs.reduce((s, o) => s + o.weight, 0) / obs.length;
+  const meanWeight = meanW;
 
   // Spread past a tenth of working weight means recent sessions disagree too
   // much to name a number from.
