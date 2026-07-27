@@ -987,23 +987,51 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
             // consistent history; the textbook rule otherwise.
             const model = buildLoadModel(sessions, ex.name);
             const step = unit === 'kg' ? 2.5 : 5;
-            const hints = ex.sets
-              .map((st) => learnedLoadHint(st.weight, st.rpe, target, ex.target.reps, model, step))
-              .filter((h): h is NonNullable<typeof h> => !!h);
-            if (!hints.length) return null;
-            // The biggest gap is the one worth acting on.
-            const h = hints.reduce((a, b) => (b.under > a.under ? b : a));
+            // Read the HEAVIEST set, not the largest RPE gap. Picking by gap
+            // systematically picks the lightest set on the card — a 40kg opener
+            // logged at RPE 3 would produce a confident "try 45kg" for a lift
+            // whose working weight is 100kg.
+            const heaviest = ex.sets
+              .filter((st) => Number.isFinite(Number(st.weight)) && Number(st.weight) > 0)
+              .reduce<typeof ex.sets[number] | null>(
+                (a, b) => (a && Number(a.weight) >= Number(b.weight) ? a : b),
+                null,
+              );
+            if (!heaviest) return null;
+            const h = learnedLoadHint(
+              heaviest.weight,
+              heaviest.rpe,
+              target,
+              ex.target.reps,
+              heaviest.reps,
+              model,
+              step,
+            );
+            if (!h) return null;
             return (
               <div
                 className="mt-2 rounded-lg px-3 py-2 text-xs"
                 style={{ background: 'var(--accent-soft)', color: 'var(--text)' }}
               >
-                Sheet asks for <span className="font-semibold">RPE {target}</span>, you logged{' '}
-                <span className="font-semibold">{h.under} under</span> at {h.current}
-                {unit} — try{' '}
-                <span className="font-semibold">{h.suggested}{unit}</span> next time.
+                {h.kind === 'reps' ? (
+                  <>
+                    That felt easy ({h.under} under RPE {target}) but it was{' '}
+                    <span className="font-semibold">{h.loggedReps} of {h.targetReps} reps</span> —
+                    get the full {h.targetReps} at {h.current}
+                    {unit} before adding load.
+                  </>
+                ) : (
+                  <>
+                    Sheet asks for <span className="font-semibold">RPE {target}</span>, you logged{' '}
+                    <span className="font-semibold">{h.under} under</span> at {h.current}
+                    {unit} — try{' '}
+                    <span className="font-semibold">{h.suggested}{unit}</span> next time.
+                  </>
+                )}
                 <span className="block mt-1 text-ink-subtle">
-                  {h.basis === 'personal' ? (
+                  {h.kind === 'reps' ? (
+                    'Reps first — an easy set that fell short of the target says nothing about the weight.'
+                  ) : h.basis === 'personal' ? (
                     <>
                       From your own {ex.name.toLowerCase()} sets — about{' '}
                       <span className="text-ink">{h.kgPerRpe}{unit} per RPE point</span> for you.

@@ -112,6 +112,15 @@ describe('buildLoadModel — bad days', () => {
     expect(Math.abs(m.predict(5, 8)! - clean.predict(5, 8)!)).toBeLessThan(3);
   });
 
+  it('does not flag ordinary sessions when the data is clean', () => {
+    // The off-day test is "twice the typical miss". On consistent data the
+    // typical miss approaches zero, and without a floor twice-nothing marks
+    // every session an off day and quietly down-weights the whole history.
+    const m = buildLoadModel(goodHistory(), 'BACK SQUAT', NOW);
+    expect(m.offDays).toEqual([]);
+    expect(m.confidence).toBe('good');
+  });
+
   it('does not learn from a session the lifter marked rough', () => {
     const flagged = [
       ...goodHistory(),
