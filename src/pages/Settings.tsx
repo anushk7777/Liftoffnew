@@ -48,7 +48,7 @@ export default function Settings() {
   // Templates is the coaching workspace: coach's account only.
   const { email } = useSessionEmail();
   const coach = isCoach(email);
-  const [importStatus, setImportStatus] = useState('');
+  const [importStatus, setImportStatus] = useState<{ msg: string; ok: boolean } | null>(null);
   const [reminders, setReminders] = useState(() => notificationPermission() === 'granted');
   const [push, setPush] = useState(() => isPushConfigured() && pushPermission() === 'granted');
   const [pushBusy, setPushBusy] = useState(false);
@@ -73,10 +73,17 @@ export default function Settings() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      importData(ev.target?.result as string);
-      setImportStatus('Backup imported successfully.');
-      setTimeout(() => setImportStatus(''), 3000);
+      const res = importData(ev.target?.result as string);
+      setImportStatus(res.ok ? { msg: 'Backup imported successfully.', ok: true } : { msg: res.error, ok: false });
+      setTimeout(() => setImportStatus(null), res.ok ? 3000 : 6000);
     };
+    reader.onerror = () => {
+      setImportStatus({ msg: "That file couldn't be read.", ok: false });
+      setTimeout(() => setImportStatus(null), 6000);
+    };
+    // Let the same file be picked again after a failed attempt — without this
+    // the input keeps its value and re-choosing it fires no change event.
+    reader.onloadend = () => { e.target.value = ''; };
     reader.readAsText(file);
   };
 
@@ -133,10 +140,12 @@ export default function Settings() {
         <Section title="Appearance">
           <Row label="Theme" desc="Dark-first, switch any time.">
             <div className="flex bg-elevated p-0.5 rounded-lg border border-border">
-              <ThemeBtn active={theme === 'light'} onClick={() => setTheme('light')}>
+              {/* Icon-only, so they need a name for screen readers and a
+                  tooltip for anyone unsure which is which. */}
+              <ThemeBtn active={theme === 'light'} onClick={() => setTheme('light')} label="Light theme">
                 <Sun className="w-4 h-4" />
               </ThemeBtn>
-              <ThemeBtn active={theme === 'dark'} onClick={() => setTheme('dark')}>
+              <ThemeBtn active={theme === 'dark'} onClick={() => setTheme('dark')} label="Dark theme">
                 <Moon className="w-4 h-4" />
               </ThemeBtn>
             </div>
@@ -369,7 +378,13 @@ export default function Settings() {
               <input type="file" accept=".json" className="hidden" onChange={handleImport} />
             </label>
           </div>
-          {importStatus && <p className="text-xs text-success font-medium mt-2">{importStatus}</p>}
+          {/* A failed restore must not read as a success — this line was
+              always green, whatever it said. */}
+          {importStatus && (
+            <p className={cn('text-xs font-medium mt-2', importStatus.ok ? 'text-success' : 'text-danger')}>
+              {importStatus.msg}
+            </p>
+          )}
           {phases.length === 0 && (
             <button
               onClick={() => {
@@ -439,14 +454,19 @@ function ThemeBtn({
   active,
   onClick,
   children,
+  label,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  label: string;
 }) {
   return (
     <button
       onClick={onClick}
+      aria-label={label}
+      title={label}
+      aria-pressed={active}
       className={cn(
         'p-1.5 rounded-md transition-colors',
         active ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted hover:text-ink',

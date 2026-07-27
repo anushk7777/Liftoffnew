@@ -143,9 +143,15 @@ describe('loadHint', () => {
     expect(loadHint('heavy', '5', '8')).toBeNull();
   });
 
-  it('does not suggest a weight you are already using', () => {
-    // A light bar with a big gap can still round back to itself.
-    expect(loadHint('2.5', '5', '8', 2.5)).toBeNull();
+  it('never suggests a weight you are already using', () => {
+    // A light load with a big gap rounds back to itself: the jump available is
+    // larger than the gap justifies. This used to go silent, which reads as
+    // "all good" and is how an easy set stays easy for months. It now says to
+    // add reps instead — the smaller increment, and the same load.
+    const h = loadHint('2.5', '5', '8', 2.5)!;
+    expect(h.kind).toBe('more-reps');
+    expect(h.suggested).toBe(2.5);
+    expect(h.current).toBe(2.5);
   });
 
   it('honours a smaller plate step', () => {

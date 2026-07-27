@@ -6,6 +6,8 @@ import { cn } from '../lib/utils';
 import { useAfterburn, volumeByProgramWeek, volumeTrend, weekAdherence, detectPRs, formatVolume } from './store';
 import { analyzeVolume, MUSCLE_LABEL } from './volume';
 import type { MuscleAnalysis, VolumeStatus } from './volume';
+import { liftReturns, deadWeight } from './returns';
+import type { LiftReturn, ReturnVerdict } from './returns';
 import { recoveryReadiness, co2Band } from './recovery';
 import type { ReadinessVerdict } from './recovery';
 import { GOALS, weightTrendKgPerWeek } from './nutrition';
@@ -42,6 +44,59 @@ const VOL_STATUS: Record<VolumeStatus, { label: string; color: string; chip: str
   excessive: { label: 'Over MRV', color: 'var(--danger)', chip: 'text-danger bg-danger/15' },
 };
 
+const RETURN_STATUS: Record<ReturnVerdict, { label: string; chip: string }> = {
+  strong: { label: 'Paying off', chip: 'text-success bg-success/15' },
+  working: { label: 'Working', chip: 'text-success bg-success/15' },
+  flat: { label: 'Flat', chip: 'text-[var(--warning)] bg-[var(--accent-soft)]' },
+  declining: { label: 'Going back', chip: 'text-danger bg-danger/15' },
+  unknown: { label: 'Too early', chip: 'text-ink-subtle bg-elevated' },
+};
+
+/** One lift's return on the sets invested in it. */
+function ReturnRow({ r, unit }: { r: LiftReturn; unit: string }) {
+  const judged = r.verdict !== 'unknown';
+  const stuck = r.verdict === 'flat' || r.verdict === 'declining';
+  return (
+    <div className="space-y-1">
+      {/* The name gets the full row and is allowed to wrap. Sharing the line
+          with the numbers truncated it to "High-Bar Back S…", and which lift
+          it is happens to be the one thing you cannot infer. */}
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-sm font-medium text-ink leading-snug">{r.name}</span>
+        <span className={cn('chip !px-1.5 !py-0.5 text-[10px] font-semibold border-0 shrink-0 mt-0.5', RETURN_STATUS[r.verdict].chip)}>
+          {RETURN_STATUS[r.verdict].label}
+        </span>
+      </div>
+      {judged ? (
+        <>
+          <p className="text-[11px] text-ink-subtle">
+            <span className="text-ink font-medium tabular-nums">
+              {r.perTenSets > 0 ? '+' : ''}{r.perTenSets}{unit} per 10 sets
+            </span>
+            {' · '}{r.sets} sets in · {r.from}→{r.to}{unit} e1RM over {r.spanDays} days
+          </p>
+          {stuck && r.substitutions.length > 0 && (
+            <p className="text-[11px] text-ink-subtle">
+              The sheet offers{' '}
+              {r.substitutions.map((sub, i) => (
+                <span key={sub}>
+                  {i > 0 && ' or '}
+                  <span className="text-ink">{sub}</span>
+                </span>
+              ))}
+              .
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="text-[11px] text-ink-subtle">
+          {r.sessions} session{r.sessions === 1 ? '' : 's'} logged — needs 3 across 2 weeks before this can say anything.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** A horizontal bar of weekly sets, with reference ticks at MEV / MAV / MRV. */
 function VolumeBar({ m }: { m: MuscleAnalysis }) {
   const rm = useReducedMotion();
@@ -56,9 +111,13 @@ function VolumeBar({ m }: { m: MuscleAnalysis }) {
         animate={{ width: pct(m.sets) }}
         transition={{ duration: 0.7, ease: [0.21, 1, 0.4, 1], delay: 0.1 }}
       />
-      {[m.landmark.mev, m.landmark.mav, m.landmark.mrv].map((v, i) => (
-        <div key={i} className="absolute inset-y-0 w-px bg-ink/40" style={{ left: pct(v) }} title={`${['MEV', 'MAV', 'MRV'][i]} ${v}`} />
-      ))}
+      {/* A zero MEV (an optional muscle) has no tick — it would sit on the left
+          edge of the bar and mark nothing. */}
+      {([['MEV', m.landmark.mev], ['MAV', m.landmark.mav], ['MRV', m.landmark.mrv]] as const)
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => (
+          <div key={k} className="absolute inset-y-0 w-px bg-ink/40" style={{ left: pct(v) }} title={`${k} ${v}`} />
+        ))}
     </div>
   );
 }
@@ -188,18 +247,37 @@ export default function Progress() {
   const volume = useMemo(() => volumeByProgramWeek(sessions), [sessions]);
   const volPoints: ChartPoint[] = volume.map((v) => ({ date: v.start, value: v.volume }));
   const latestWeek = volume[volume.length - 1];
+  const latestAdherence = useMemo(
+    () => (latestWeek?.weekId ? weekAdherence(program, sessions, latestWeek.weekId) : null),
+    [latestWeek, program, sessions],
+  );
   // Latest bucket is "in progress" while its program week still has undone days.
   const latestInProgress = useMemo(() => {
     if (!latestWeek) return false;
-    if (latestWeek.weekId) {
-      const adh = weekAdherence(program, sessions, latestWeek.weekId);
-      return adh.total > 0 && adh.done < adh.total;
-    }
+    if (latestAdherence) return latestAdherence.total > 0 && latestAdherence.done < latestAdherence.total;
     return new Date(latestWeek.start).getTime() > mountedAt - 7 * 86_400_000;
-  }, [latestWeek, program, sessions, mountedAt]);
+  }, [latestWeek, latestAdherence, mountedAt]);
+
+  // A program week's point only reaches its real height once every day in it is
+  // logged. Plotted plain, the first session of a new week looks like volume
+  // collapsed — it drops from a finished week's total to one day's. So the
+  // partial is drawn dashed, and where it lands at the current pace is shown
+  // beside it, which is the figure that compares with the weeks before it.
+  const volProjection = useMemo(() => {
+    if (!latestInProgress || !latestWeek || !latestAdherence || latestAdherence.done < 1) return undefined;
+    const { done, total } = latestAdherence;
+    if (total <= done) return undefined;
+    const value = Math.round((latestWeek.volume / done) * total);
+    return { value, label: `day ${done} of ${total} · on pace for ${formatVolume(value, unit)}` };
+  }, [latestInProgress, latestWeek, latestAdherence, unit]);
 
   // ---- "Volume IQ" — hard sets per muscle vs scientific landmarks ----
   const vol = useMemo(() => analyzeVolume(sessions), [sessions]);
+
+  // ---- Return on volume — which lifts are earning their sets ----
+  const returns = useMemo(() => liftReturns(sessions, program), [sessions, program]);
+  const judged = returns.filter((r) => r.verdict !== 'unknown');
+  const stuck = useMemo(() => deadWeight(judged), [judged]);
 
   // ---- Recovery — CO2 tolerance test readiness ----
   const readiness = useMemo(() => recoveryReadiness(recovery), [recovery]);
@@ -363,7 +441,9 @@ export default function Progress() {
 
             {vol.neglected.length > 0 && (
               <div className="pt-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-1.5">Not trained (last 7 days)</p>
+                {/* Was hardcoded to "last 7 days" even in microcycle mode,
+                    where the window above is a program week of 10-11 days. */}
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-1.5">Not trained ({vol.windowLabel})</p>
                 <div className="flex flex-wrap gap-1.5">
                   {vol.neglected.map((mu) => (
                     <span key={mu} className="chip text-ink-subtle bg-elevated border-0 !text-[11px]">{MUSCLE_LABEL[mu]}</span>
@@ -375,6 +455,47 @@ export default function Progress() {
             {vol.unclassified.length > 0 && (
               <p className="text-[11px] text-ink-subtle border-t border-border pt-2">
                 Not counted (unrecognized lift): {vol.unclassified.join(', ')}. Rename it to a standard movement and it'll be tracked.
+              </p>
+            )}
+          </div>
+        </motion.section>
+      )}
+
+      {/* Return on volume — which lifts are earning the sets you spend on them */}
+      {judged.length > 0 && (
+        <motion.section
+          initial={rm ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
+          className="space-y-3"
+        >
+          <h2 className="section-label flex items-center gap-1.5">
+            <Trophy className="w-3.5 h-3.5" /> What's paying off
+          </h2>
+          <div className="neo-card p-5 space-y-4">
+            <div>
+              <p className="text-sm text-ink font-medium">
+                {stuck.length === 0
+                  ? `All ${judged.length} of your tracked lifts are moving.`
+                  : `${stuck.length} lift${stuck.length === 1 ? '' : 's'} ${stuck.length === 1 ? 'has' : 'have'} returned nothing for ${stuck.reduce((n, r) => n + r.sets, 0)} sets.`}
+              </p>
+              <p className="text-[11px] text-ink-subtle mt-1">
+                Estimated 1RM gained per set invested, over the last 90 days. Your set budget is
+                finite — this is what each lift bought with its share. A lift needs 3 sessions
+                across 2 weeks before it gets a verdict, and rough days are left out.
+              </p>
+            </div>
+
+            <div className="space-y-3.5">
+              {judged.map((r) => (
+                <ReturnRow key={r.name} r={r} unit={unit} />
+              ))}
+            </div>
+
+            {returns.length > judged.length && (
+              <p className="text-[11px] text-ink-subtle border-t border-border pt-2">
+                {returns.length - judged.length} more lift
+                {returns.length - judged.length === 1 ? '' : 's'} logged too recently to judge.
               </p>
             )}
           </div>
@@ -486,13 +607,24 @@ export default function Progress() {
           <p className="text-sm text-ink-subtle">Log some workouts and your total weekly training volume shows up here.</p>
         ) : (
           <div className="card p-4 space-y-2">
-            <Chart points={volPoints} unit="" accent="var(--ember)" format={(v) => formatVolume(v, unit)} />
+            <Chart
+              points={volPoints}
+              unit=""
+              accent="var(--ember)"
+              format={(v) => formatVolume(v, unit)}
+              provisionalLast={latestInProgress}
+              projection={volProjection}
+            />
             <p className="text-[11px] text-ink-subtle">
               Total load = weight × reps across <span className="text-ink">all</span> lifts, tallied per <span className="text-ink">program week</span> (a week ends when all its sessions are done — even past 7 calendar days; in {unit}).
               {latestWeek && (
                 <>
                   {' '}{latestWeek.label || 'Latest week'}: <span className="text-ink font-medium">{formatVolume(latestWeek.volume, unit)}</span> over {latestWeek.sets} sets
-                  {latestInProgress ? ' · still in progress' : ''}.
+                  {latestInProgress
+                    ? latestAdherence
+                      ? ` so far — ${latestAdherence.done} of ${latestAdherence.total} days done, so this point is still climbing.`
+                      : ' · still in progress.'
+                    : '.'}
                 </>
               )}
             </p>

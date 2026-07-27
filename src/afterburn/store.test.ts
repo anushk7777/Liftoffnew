@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weeklyVolume, volumeByProgramWeek, volumeTrend, detectPRs, formatVolume } from './store';
+import { weeklyVolume, volumeByProgramWeek, volumeTrend, detectPRs, formatVolume, exerciseProgress } from './store';
 import type { WorkoutSession } from './types';
 
 // Minimal session builder — only the fields weeklyVolume/detectPRs read.
@@ -99,5 +99,28 @@ describe('volumeByProgramWeek', () => {
       sess('b', '2026-03-17T10:00:00.000Z', 'Bench', [[100, 5]]),
     ]);
     expect(out).toHaveLength(2); // different calendar Mondays
+  });
+});
+
+describe('exerciseProgress e1RM', () => {
+  const s = (id: string, date: string, sets: [string, string][]): WorkoutSession =>
+    ({ id, date, completedAt: date, entries: [{ name: 'Squat', sets: sets.map(([weight, reps]) => ({ weight, reps, done: true })) }] }) as unknown as WorkoutSession;
+
+  it('takes the best estimated 1RM across the sets, not just the heaviest one', () => {
+    // 80×3 estimates 88; the back-off 60×15 estimates 90. The heaviest set is
+    // still 80, but the better strength estimate came from the lighter set.
+    const [p] = exerciseProgress([s('a', '2026-07-01T10:00:00.000Z', [['80', '3'], ['60', '15']])], 'Squat');
+    expect(p.weight).toBe(80);
+    expect(p.est1RM).toBe(90);
+  });
+
+  it('ignores sets with no weight logged', () => {
+    const [p] = exerciseProgress([s('a', '2026-07-01T10:00:00.000Z', [['', '8'], ['100', '5']])], 'Squat');
+    expect(p.weight).toBe(100);
+    expect(p.est1RM).toBe(117);
+  });
+
+  it('skips a session where the lift was never loaded', () => {
+    expect(exerciseProgress([s('a', '2026-07-01T10:00:00.000Z', [['', '']])], 'Squat')).toEqual([]);
   });
 });

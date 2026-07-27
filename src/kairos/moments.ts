@@ -109,3 +109,38 @@ export function songLink(moment: { song?: string; songUrl?: string }): string | 
   if (moment.song && moment.song.trim()) return `https://music.youtube.com/search?q=${encodeURIComponent(moment.song.trim())}`;
   return undefined;
 }
+
+/**
+ * Find moments by words, place, song or mood.
+ *
+ * A diary you cannot search stops being useful at exactly the point it becomes
+ * valuable — a few hundred entries in, when scrolling a timeline is no longer a
+ * way to find anything. Everything a moment holds is searchable, so "goa",
+ * "grateful" and a half-remembered song lyric all lead somewhere.
+ *
+ * Every term must match somewhere (AND), because narrowing is the point; but a
+ * term may match any field, so the user does not have to remember which one it
+ * was. Case and accents are ignored, so "café" finds "cafe".
+ */
+export function searchMoments(moments: Moment[], query: string, mood?: MoodId | 'all'): Moment[] {
+  // \u0300-\u036f is the combining-diacritics block. NFD splits "café" into
+  // "cafe" plus a separate accent mark, and this strips the mark. Written as an
+  // escape rather than the literal characters, which are invisible in source
+  // and easily mangled by an editor.
+  const normalise = (s: string) =>
+    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  const terms = normalise(query).split(/\s+/).filter(Boolean);
+  const wantMood = mood && mood !== 'all' ? mood : null;
+
+  return moments.filter((mo) => {
+    if (wantMood && mo.mood !== wantMood) return false;
+    if (!terms.length) return true;
+    // The mood's own label is searchable too, so typing "calm" works whether or
+    // not the mood filter is being used.
+    const hay = normalise(
+      [mo.text, mo.place, mo.song, moodMeta(mo.mood)?.label].filter(Boolean).join(' '),
+    );
+    return terms.every((t) => hay.includes(t));
+  });
+}

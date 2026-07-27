@@ -133,16 +133,26 @@ export function exerciseProgress(
  * input, or a gap small enough to be the noise in anybody's self-rating.
  */
 export interface LoadHint {
-  /** What the gap actually calls for. */
-  kind: 'weight' | 'reps';
+  /**
+   * What the gap actually calls for.
+   * - `weight`   — it was light, and a sensible heavier load exists
+   * - `reps`     — the rep target was missed, so the load says nothing yet
+   * - `more-reps`— it was light, but the smallest load this equipment can add
+   *                overshoots the gap, so reps are the smaller increment
+   */
+  kind: 'weight' | 'reps' | 'more-reps';
   /** RPE points below target. */
   under: number;
-  /** Suggested load, rounded to the plate step. Equals `current` for kind 'reps'. */
+  /** Suggested load, rounded to the plate step. Equals `current` for both rep kinds. */
   suggested: number;
   current: number;
-  /** For kind 'reps': the prescribed count to reach before adding load. */
+  /** For kind 'reps': the prescribed count to reach before adding load.
+   *  For kind 'more-reps': the count to now push BEYOND. */
   targetReps?: number;
   loggedReps?: number;
+  /** For kind 'more-reps': the unmakeable jump, and what it is worth in %. */
+  step?: number;
+  stepPct?: number;
 }
 
 const PCT_PER_RPE = 0.03;
@@ -182,8 +192,26 @@ export function loadHint(
   }
 
   const suggested = Math.round((w * (1 + under * PCT_PER_RPE)) / step) * step;
-  // Rounding can land back on the weight already used; nothing to suggest then.
-  if (suggested <= w) return null;
+  // Rounding landed back on the weight already used: the gap is real, but the
+  // smallest load this equipment can add is bigger than the gap justifies.
+  //
+  // This used to return null — silence. That is the wrong answer, and it is the
+  // classic way to stall on isolation work: a 2.5 kg dumbbell step is 25% on a
+  // 10 kg curl, so the set stays "too easy" for months because the only jump
+  // available is unmakeable. Reps are the smaller increment, and pushing past
+  // the rep target at the same load is precisely double progression.
+  if (suggested <= w) {
+    return {
+      kind: 'more-reps',
+      under,
+      suggested: w,
+      current: w,
+      targetReps: tr ?? undefined,
+      loggedReps: lr ?? undefined,
+      step,
+      stepPct: Math.round((step / w) * 1000) / 10,
+    };
+  }
   return { kind: 'weight', under, suggested, current: w };
 }
 
@@ -230,13 +258,19 @@ export function learnedLoadHint(
   if (predicted == null || predicted <= 0) return { ...base, basis: 'rule' };
 
   const suggested = Math.round(predicted / step) * step;
-  // The model can land on or below what was just lifted — say nothing rather
-  // than suggest a backward step off a curve.
+  // The model can land on or below what was just lifted. Note this is also
+  // where a 'more-reps' verdict gets its second opinion: the flat 3%-per-point
+  // rule may not clear the equipment's step while this lifter's own figure
+  // does. Only when BOTH fail to reach the next makeable weight does the
+  // more-reps answer stand.
   if (suggested <= base.current) return { ...base, basis: 'rule' };
 
   return {
     ...base,
+    kind: 'weight',
     suggested,
+    step: undefined,
+    stepPct: undefined,
     basis: 'personal',
     kgPerRpe: model.kgPerRpe ?? undefined,
     tentative: model.confidence === 'low',

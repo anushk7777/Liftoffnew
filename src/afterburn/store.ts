@@ -158,14 +158,21 @@ export function exerciseProgress(
   for (const s of sessions) {
     const e = s.entries.find((x) => x.name === name);
     if (!e) continue;
-    let top: { weight: number; reps: number } | null = null;
+    // Top weight and best estimated 1RM are tracked separately, because they
+    // are not always the same set: 60×15 estimates higher than 80×3. Reading
+    // e1RM off the heaviest set alone under-reported exactly the back-off work
+    // that shows strength going up. detectPRs already scores them apart.
+    let topWeight = 0;
+    let best1RM = 0;
     for (const st of e.sets) {
       const w = parseFloat(st.weight);
       const r = parseInt(st.reps, 10) || 0;
       if (!Number.isFinite(w) || w <= 0) continue;
-      if (!top || w > top.weight) top = { weight: w, reps: r };
+      if (w > topWeight) topWeight = w;
+      const est = w * (1 + r / 30);
+      if (est > best1RM) best1RM = est;
     }
-    if (top) out.push({ date: s.completedAt ?? s.date, weight: top.weight, est1RM: Math.round(top.weight * (1 + top.reps / 30)) });
+    if (topWeight > 0) out.push({ date: s.completedAt ?? s.date, weight: topWeight, est1RM: Math.round(best1RM) });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }

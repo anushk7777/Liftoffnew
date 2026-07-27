@@ -130,7 +130,7 @@ interface AppState {
 
   // Backup
   exportData: () => string;
-  importData: (jsonStr: string) => void;
+  importData: (jsonStr: string) => ImportResult;
 }
 
 const NON_PERSISTED = new Set(['_initialized', 'deviceId', 'focusTaskId']);
@@ -141,6 +141,13 @@ const NON_PERSISTED = new Set(['_initialized', 'deviceId', 'focusTaskId']);
 const NON_SYNCED = new Set([...NON_PERSISTED, 'ownerId']);
 
 const EPOCH_ISO = '1970-01-01T00:00:00.000Z';
+
+/** Outcome of restoring a backup file, so the UI can tell the truth about it. */
+export type ImportResult = { ok: true } | { ok: false; error: string };
+
+/** A real backup has at least one of these. Enough to reject a stray JSON file
+ *  without rejecting a genuine backup made before a given feature existed. */
+const IMPORT_MARKERS = ['tasks', 'habits', 'phases', 'ideas', 'activityHistory', 'focusSessions'];
 
 // The persisted/synced slice of state: everything except functions and the
 // runtime-only / device-local fields above.
@@ -511,8 +518,11 @@ export const useStore = create<AppState>()(
     const idx = state.activityHistory.findIndex((l) => l.date === today);
     const newHistory = [...state.activityHistory];
     if (idx >= 0) {
+      // Replace rather than assign into the existing entry: the array is a
+      // shallow copy, so mutating the object edits the live (and persisted)
+      // state in place, and anything memoised on that entry never sees it.
       if (newHistory[idx].type === type) newHistory.splice(idx, 1);
-      else newHistory[idx].type = type;
+      else newHistory[idx] = { ...newHistory[idx], type };
     } else {
       newHistory.push({ date: today, type });
     }
@@ -533,13 +543,33 @@ export const useStore = create<AppState>()(
 
   exportData: () => JSON.stringify(extractData(get()), null, 2),
 
+  // Returns whether the restore actually happened. It used to swallow every
+  // failure and return nothing, and Settings announced "Backup imported
+  // successfully" either way — so a truncated or wrong-format file looked like
+  // a good restore, at the exact moment someone might delete the backup.
   importData: (jsonStr) => {
+    let parsed: unknown;
     try {
-      const parsed = migrate(JSON.parse(jsonStr));
-      set(parsed);
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      return { ok: false, error: "That file isn't valid JSON." };
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { ok: false, error: "That file isn't a Liftoff backup." };
+    }
+    // A backup carries at least one of the workspace's own collections. Without
+    // this, any JSON object at all would be merged into the store as junk.
+    const keys = Object.keys(parsed);
+    if (!IMPORT_MARKERS.some((k) => keys.includes(k))) {
+      return { ok: false, error: "That file isn't a Liftoff backup — no tasks, habits or roadmap in it." };
+    }
+    try {
+      set(migrate(parsed as Record<string, unknown>));
       get().recalculateStreak();
+      return { ok: true };
     } catch (e) {
-      console.error('Failed to parse import string', e);
+      console.error('Failed to import backup', e);
+      return { ok: false, error: 'That backup could not be read. Nothing was changed.' };
     }
   },
     }),

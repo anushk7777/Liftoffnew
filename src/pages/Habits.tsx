@@ -5,23 +5,17 @@ import { Repeat, Plus, Check, Flame, Trash2, AlertTriangle } from 'lucide-react'
 import { useStore } from '../store/useStore';
 import type { Habit } from '../store/data';
 import { cn } from '../lib/utils';
-import { dayKey, streakFromDays } from '../lib/streak';
+import { dayKey } from '../lib/streak';
+import { habitStreak, isHabitDueOn, missedLastDue } from '../lib/habits';
 import { pop } from '../lib/motion';
 import { PageHeader, ProgressBar, EmptyState } from '../components/ui';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-const isDueToday = (h: Habit) => {
-  if (h.cadence === 'daily') return true;
-  if (!h.daysOfWeek || h.daysOfWeek.length === 0) return true;
-  return h.daysOfWeek.includes(new Date().getDay());
-};
-
 export default function Habits() {
   const { habits, habitLog, addHabit, deleteHabit, toggleHabitToday } = useStore();
 
   const today = dayKey(new Date());
-  const yesterday = dayKey(subDays(new Date(), 1));
 
   const logsByHabit = useMemo(() => {
     const m = new Map<string, Set<string>>();
@@ -33,7 +27,7 @@ export default function Habits() {
   }, [habitLog]);
 
   const active = habits.filter((h) => !h.archived);
-  const dueToday = active.filter(isDueToday);
+  const dueToday = active.filter((h) => isHabitDueOn(h, new Date()));
   const doneToday = dueToday.filter((h) => logsByHabit.get(h.id)?.has(today)).length;
   const progress = dueToday.length ? Math.round((doneToday / dueToday.length) * 100) : 0;
 
@@ -77,9 +71,12 @@ export default function Habits() {
           {active.map((h) => {
             const days = logsByHabit.get(h.id) ?? new Set<string>();
             const done = days.has(today);
-            const streak = streakFromDays(days).streak;
-            const due = isDueToday(h);
-            const missedTwice = !done && !days.has(yesterday) && days.size > 0 && due;
+            // Counted over the days this habit was DUE — a Mon/Wed/Fri habit
+            // kept perfectly used to read a streak of 2 forever, because a
+            // day-by-day walk treats Tuesday as a miss.
+            const streak = habitStreak(days, h);
+            const due = isHabitDueOn(h, new Date());
+            const missedTwice = !done && due && missedLastDue(days, h);
             return (
               <HabitRow
                 key={h.id}
@@ -123,10 +120,13 @@ function HabitRow({
     const out = [];
     for (let i = 6; i >= 0; i--) {
       const d = subDays(new Date(), i);
-      out.push({ key: dayKey(d), weekday: d.getDay(), hit: days.has(dayKey(d)) });
+      // A day the habit wasn't scheduled on is not a miss. Drawn the same as a
+      // missed day, a Mon/Wed/Fri habit looked like it was failing four days a
+      // week.
+      out.push({ key: dayKey(d), weekday: d.getDay(), hit: days.has(dayKey(d)), due: isHabitDueOn(habit, d) });
     }
     return out;
-  }, [days]);
+  }, [days, habit]);
 
   return (
     <div className="group card card-hover flex items-center gap-3.5 px-3.5 py-3">
@@ -166,10 +166,14 @@ function HabitRow({
             {strip.map((d) => (
               <span
                 key={d.key}
-                title={d.key}
+                title={`${d.key}${d.hit ? ' — done' : d.due ? ' — missed' : ' — not scheduled'}`}
                 className={cn(
                   'w-3.5 h-3.5 rounded-[4px] flex items-center justify-center text-[7px] font-bold',
-                  d.hit ? 'bg-accent text-[var(--accent-text)]' : 'bg-elevated text-ink-subtle',
+                  d.hit
+                    ? 'bg-accent text-[var(--accent-text)]'
+                    : d.due
+                      ? 'bg-elevated text-ink-subtle'
+                      : 'bg-transparent border border-dashed border-border text-ink-subtle/40',
                 )}
               >
                 {WEEKDAYS[d.weekday]}

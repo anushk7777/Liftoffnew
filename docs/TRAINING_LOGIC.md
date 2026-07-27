@@ -38,10 +38,16 @@ weekly rate. The UI shows both: `15 sets/wk · 24 logged`.
 
 **Decisions worth challenging**
 
-- *Microcycle length is the **median** span of that lifter's completed program
-  weeks* (`microcycleDays`), clamped to 5–21 days, defaulting to 7 with no
-  tagged history. Median so one cycle interrupted by illness does not stretch
-  the estimate.
+- *Microcycle length is the **median span of FINISHED cycles***
+  (`microcycleDays`), with the in-progress cycle used only as a lower bound.
+  Median so one cycle interrupted by illness does not stretch the estimate.
+- *The denominator never drops below 7, and is capped at 21.* Seven is the
+  landmarks' own basis, so a smaller denominator scales the rate **up** and can
+  invent an "over MRV" that is not there. Found on review: the in-progress cycle
+  was informing its own denominator, so three days into a new week the span was
+  3, the rate came out more than doubled, and the original false alarm returned
+  through the back door. Erring long can under-report volume, which is the safe
+  direction — it never tells someone to cut work they should be doing.
 - *Divided by the cycle's **length**, not by days elapsed.* A week two days in
   has genuinely done two days of work; dividing by two would report a wild rate
   off a single session. The cost is that a partially complete week reads low —
@@ -49,6 +55,101 @@ weekly rate. The UI shows both: `15 sets/wk · 24 logged`.
 - *The window still resets each program week.* A rolling window was tried and
   reverted: two existing tests encoded the reset deliberately, it matches the UI
   copy, and it matches how a lifter thinks about a block.
+
+### 1a. The volume-by-program-week chart
+
+`volumeByProgramWeek` in `store.ts`, drawn by `Chart.tsx` from `Progress.tsx`.
+
+One point per program week, grouped by the `weekId` stamped on each session
+**when it was logged**. Switching the active week writes nothing — the chart
+only ever reflects logged work, so moving to week 3 changes nothing until the
+first week-3 session is saved.
+
+**The bug this fixed.** A week's point only reaches its real height once every
+day in it is logged. Plotted plain, the first session of a new week dropped the
+line from a finished week's total (~54 t) to one day's (~6 t) and then climbed
+back over the next ten days. Every single week, the chart said volume had
+collapsed. The headline number and the "overall" delta both read the last point,
+so they collapsed too.
+
+Now, while the week is incomplete:
+
+- the final leg is **dashed** and its dot **hollow**, so a partial is never read
+  as a finished value
+- a **projection ring** sits above it at `partial ÷ days done × days planned` —
+  the figure that actually compares with the weeks before it
+- the subtitle reads `day 3 of 8 · on pace for 82.7 t` instead of a meaningless
+  overall delta
+- **high/low and the gridline labels describe values actually reached**, so they
+  exclude both the partial and the projection. Reporting "high 82.7 t" for a
+  number no week has hit is a lie; the plot *scale* still spans everything drawn,
+  or the ring would fall outside the chart.
+
+Completion is read from `weekAdherence`, so it counts program days done, not
+calendar days. When the week finishes, everything reverts to solid and the
+overall delta returns.
+
+Worth challenging: the projection is a **linear pace estimate** and assumes the
+remaining days resemble the ones done. Pure Bodybuilding's days are not equal —
+an Arms day carries far less tonnage than a Legs day — so early in a week the
+projection can be off by a fair margin. Weighting by each day's planned set
+count would be more honest.
+
+### 1b. Which muscle a lift counts for
+
+`classifyExercise` in `volume.ts`. Exercises are logged as free text with no
+muscle tag, so each name is matched against an ordered rule table — first match
+wins — crediting 1.0 set to each primary muscle and 0.5 to each secondary.
+
+**This is the weakest link in the whole volume feature**, because a name that
+matches nothing is worth **zero sets** and simply disappears. That does not look
+like a bug; it looks like you under-trained a muscle. A name that matches the
+*wrong* rule is worse still — it moves the sets to another muscle, so one reads
+high and the other low, and both recommendations are wrong.
+
+Auditing all 169 names the loaded program can put on screen found **18 counting
+for nothing and 11 counted as the wrong muscle**:
+
+| Name | Was | Now | Why it went wrong |
+| --- | --- | --- | --- |
+| Reverse DB Flye | chest | shoulders | `"Flye"` contains `"fly"`, and `"reverse fly"` never matched as one substring because the equipment sits between the words |
+| DB Incline Curl | chest | biceps | the `incline` rule ran before the biceps rule and read it as a bench press |
+| Low Incline DB Press | shoulders | chest | `"db press"` meant an overhead press and swallowed the incline bench too |
+| …Row + Kelso Shrug | traps only | back + traps | the shrug rule claimed the whole movement and the row vanished |
+| Reverse Nordic | hamstrings | quads | `"nordic"` matched, but the knee *extends* — it is the opposite movement |
+| Bench Dip | chest | triceps | matched on `"bench"` |
+| Decline Barbell Press | *nothing* | chest | no rule mentioned decline |
+| Straight-Bar Lat Prayer | *nothing* | back | a week-1 exercise, counting for zero |
+| Hip adduction ×4 | *nothing* | adductors | no such muscle existed |
+| Hyperextension, Pallof press, vacuums, rollouts, Y-raise, band walks | *nothing* | as labelled | simply absent |
+
+Two mechanisms were added to the rule table to make this expressible:
+
+- **A keyword may be an array**, meaning *all of these words appear, in any
+  order*. `['reverse', 'fly']` catches "Reverse DB Flye" and "Reverse Cable
+  Flye" without also catching a chest flye.
+- **A rule may carry `not`**, an exclusion list. The overhead-press rule now
+  refuses any name containing incline, decline, bench, chest or pec.
+
+**Adductors became a thirteenth muscle.** The program trains them directly and
+often — machine, cable and Copenhagen adduction, three sets, twice a cycle.
+Folding that into glutes would both overstate glutes and hide the work.
+
+**MEV 0 means optional.** Adductors are the first muscle whose minimum effective
+volume is zero: the compounds cover them, so skipping them is a choice, not a
+shortfall. A muscle with no MEV is never reported as under-trained or neglected,
+and does not pad the "dialed in" count when untouched — but its MRV ceiling
+still applies.
+
+A superset prefix (`A1: Machine Hip Adduction`) is stripped before matching; it
+labels the pairing, not the movement. Unfilled weak-point picker slots are
+recognised as placeholders so they are not reported as unknown lifts.
+
+The guard against regression is a test that walks **every name in the loaded
+program** — main slots, substitutions and weak-point options — and asserts the
+list of unclassified names is empty. Neck work is the one deliberate exception:
+there is no neck landmark, so it stays unclassified rather than being credited
+somewhere false. (The trap it guards: "Neck Curls" contains "curl".)
 
 ---
 
@@ -73,8 +174,15 @@ getting stronger, and it always precedes being able to add weight. Calling it
 Rule 6 is a judgement call: trading reps for load may be a good session or a bad
 one, and the app should not hand it a green chip on the lifter's behalf.
 
-`exerciseProgress` reads the whole lift as total volume across matched
-positions, so one heavy set cannot hide two that fell.
+`exerciseProgress` (in `progression.ts`) reads the whole lift as total volume
+across matched positions, so one heavy set cannot hide two that fell.
+
+Note there is a **second, unrelated `exerciseProgress` in `store.ts`** — the
+per-session top-weight and estimated-1RM series the coach summarises. Same name,
+different module, different job; importing the wrong one is an easy mistake.
+That one used to read e1RM off the heaviest set alone, which under-reports:
+80×3 estimates 88, while a 60×15 back-off estimates 90. Top weight and best
+e1RM are now tracked separately, matching how `detectPRs` already scored them.
 
 ---
 
@@ -91,6 +199,38 @@ the prescribed work simply was not done. One rep of a five-rep target at RPE 2.5
 returns a `reps` verdict — *get the full 5 at this weight first* — not a heavier
 suggestion. Only once the reps are met does an easy rating mean the load is
 light.
+
+**Then the equipment gets a veto.** `equipment.ts`.
+
+The step was a flat 2.5 kg for everything. Equipment does not work that way:
+
+| lift | smallest jump | as a share of the load |
+| --- | --- | --- |
+| barbell @ 100 kg | +2.5 kg | 2.5% |
+| machine @ 60 kg | +5 kg | 8.3% |
+| **dumbbell @ 10 kg** | **+2.5 kg** | **25%** |
+
+A dumbbell is logged *per hand*, so the smallest pair in the rack is an enormous
+relative increment on small isolation work. When the RPE gap justifies less than
+half a step, the suggestion used to round back to the current weight and the app
+**said nothing at all**. Silence reads as "all good" — and that is exactly how a
+set stays easy for months: the only jump available is unmakeable, so nothing
+ever changes.
+
+That case now returns `kind: 'more-reps'` — *stay at 10 kg and push past 10 reps*
+— which is plain double progression, and the smaller increment.
+
+- The step is guessed from the exercise name (`equipmentOf`), ordered so a cable
+  movement that names a bar attachment ("Straight-Bar Lat Prayer") is not read
+  as a barbell.
+- Where a gym might have either 2.5 kg or 5 kg jumps, the **smaller** is
+  assumed. Guessing small risks suggesting a weight that turns out unmakeable,
+  which the lifter sees instantly. Guessing large silently converts a real load
+  increase into "add reps", which is invisible and would stall progression.
+- An unrecognised name keeps the old flat 2.5 kg, so nothing regresses.
+- The personal model gets a **second opinion** on a `more-reps` verdict: the flat
+  3%-per-point rule may fail to clear the step where this lifter's own figure
+  clears it easily. Only when both fail does `more-reps` stand.
 
 Guards, all deliberate:
 
@@ -166,7 +306,57 @@ high-rep work such as 15 reps at RPE 8.
 
 ---
 
-## 5. Known weaknesses — start here
+## 5. Return on volume — which lifts are earning their sets
+
+`returns.ts`, shown on Progress as "What's paying off".
+
+Every training app can tell you what you lifted. None tell you which lifts
+earned their place. A lifter spends a fixed, scarce budget — sets they can
+recover from — across ten or twelve movements. Some pay. Some have paid nothing
+for two months and nobody notices, because the only thing tracked is that the
+sets got done.
+
+Each lift is ranked by **estimated 1RM gained per ten sets invested**, over a
+90-day window. Where a lift has returned nothing, the swaps the program itself
+already sanctions are named.
+
+**It is deliberately hard to convince**, because a ranking built on noise is
+worse than no ranking — it would have you drop exercises for no reason:
+
+- Under **3 sessions**, or a span under **14 days**, the verdict is `unknown`,
+  never `flat`. Absence of evidence is said plainly, and those rows sink to the
+  bottom rather than sitting among real results with a misleading zero.
+- The trend is a **least-squares slope against time**, not last-minus-first. One
+  bad day at either end cannot decide a lift's fate, and unevenly spaced
+  sessions are handled correctly. A test covers exactly this: four sessions
+  climbing hard then one poor one still reads as progress.
+- A gain counts only once it clears a **noise floor** of `max(2.5 kg, 2% of the
+  working e1RM)`. e1RM is an estimate and small numbers wobble.
+- **Rough days are excluded**, same as the load model — and their sets are not
+  charged to the lift either, so a bad day costs nothing in both directions.
+
+**Substitutions are indexed by family, not by sheet name.** A substitution is
+not itself a program slot, so once you swap to "DB Flye" that name appears
+nowhere as a key — and the lift you are *actually doing* would be the one lift
+that never gets alternatives suggested. Every member of a slot's family maps to
+its siblings.
+
+**Decisions worth challenging**
+
+- *e1RM is the yardstick.* It conflates load and reps, which is what we want for
+  "did this get stronger", but it is an Epley estimate and drifts at very high
+  reps.
+- *Per ten sets, not per session.* Sets are the recoverable currency; a lift
+  done for 2 sets is genuinely cheaper than one done for 5.
+- *90 days is arbitrary.* Long enough to span a block, short enough that a lift
+  fixed two blocks ago is not condemned by ancient history.
+- *A lift can read flat because the program intends it to.* Deload weeks and
+  high-rep pump work will not move e1RM much, and this does not know that. It
+  reports what the numbers did, not whether that was the plan.
+
+---
+
+## 6. Known weaknesses — start here
 
 Ordered by how likely they are to matter.
 
@@ -179,10 +369,13 @@ Ordered by how likely they are to matter.
    across singles and sets of fifteen, where the true relationship flattens at
    the high-rep end. Predictions near the edges of the logged range are the
    least trustworthy.
-3. **`classifyExercise` is keyword matching.** An unrecognised custom exercise
-   name returns `null` and that exercise **vanishes from volume tracking
-   entirely** — silently making a muscle look under-trained. `unclassified` is
-   surfaced in the report, but the count is still wrong.
+3. **`classifyExercise` is still keyword matching.** Every name the loaded
+   program can produce is now covered and locked down by a test, but a *custom*
+   exercise typed by hand can still match nothing — and an unmatched name is
+   worth zero sets, silently making a muscle look under-trained. `unclassified`
+   is surfaced in the report, but the count is still wrong until it is renamed.
+   The real fix is letting the lifter tag an exercise with its muscles once and
+   remembering it.
 4. **`3%` per RPE point is a population constant** used whenever the model is
    not confident. It is roughly right in the mid range and worse at the extremes.
 5. **RPE ratings are self-reported and drift.** Someone whose calibration
@@ -195,13 +388,20 @@ Ordered by how likely they are to matter.
    cycles accumulate.
 8. **Volume is only counted from sets with reps recorded** (`isHardSet`), so an
    unlogged set is invisible to volume even if it was performed.
+9. **The return-on-volume ranking cannot tell intent from failure.** A lift
+   programmed for high-rep pump work, or one carried through a deload, will read
+   flat because e1RM did not move — which is true, and not the same as the lift
+   being useless.
+10. **Equipment is guessed from the exercise name.** A gym with 1 kg micro
+   plates or 5 kg dumbbell jumps will get the step wrong, and there is no way
+   to tell it otherwise. Letting the lifter set the step per lift would fix it.
 
 ## Testing
 
-`src/afterburn/{volume,progression,loadModel}.test.ts` — the behavioural claims
-above are covered, including the 11-day-cycle miscalibration, one rough session
-barely moving the prescription, a sustained real drop still being followed, and
-every refusal case.
+`src/afterburn/{volume,classify,progression,loadModel,equipment,returns}.test.ts`
+— the behavioural claims above are covered, including the 11-day-cycle miscalibration, one rough
+session barely moving the prescription, a sustained real drop still being
+followed, every refusal case, and every exercise name the program can show.
 
 ```bash
 npm test

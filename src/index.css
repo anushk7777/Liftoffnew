@@ -965,3 +965,19 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Hover-revealed actions on a touch device.
+   ---------------------------------------------------------------------------
+   Several rows fade their actions in on hover — delete a habit, delete an idea,
+   the schedule row's controls. A phone has no hover, so those buttons stayed at
+   opacity 0 permanently: on the device this app is actually used on, there was
+   no visible way to delete a habit at all.
+
+   Matching the utility token rather than editing seven call sites, so the
+   pattern is safe to keep using. Specificity ties with .opacity-0, and this
+   sheet is later in the cascade, so it wins without !important. */
+@media (hover: none) {
+  [class~='group-hover:opacity-100'] {
+    opacity: 1;
+  }
+}
