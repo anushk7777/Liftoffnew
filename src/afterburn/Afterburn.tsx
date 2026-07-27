@@ -5,7 +5,7 @@ import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, Ch
 import { cn } from '../lib/utils';
 import { pop, springSoft, fast, useReducedMotion } from '../lib/motion';
 import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance, restToSeconds, detectPRs } from './store';
-import { setVerdict, ghostLabel, exerciseProgress } from './progression';
+import { setVerdict, ghostLabel, exerciseProgress, loadHint } from './progression';
 import { recoveryReadiness } from './recovery';
 import { analyzeVolume } from './volume';
 import WorkoutCelebration from './WorkoutCelebration';
@@ -975,6 +975,30 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
               ))}
             </div>
           </div>
+
+          {/* The sheet prescribes an RPE; when a set lands well under it, the
+              gap is the overload instruction. Suggestion only — never applied. */}
+          {(() => {
+            const target = ex.target.rpe;
+            if (!target) return null;
+            const hints = ex.sets
+              .map((st) => loadHint(st.weight, st.rpe, target, unit === 'kg' ? 2.5 : 5))
+              .filter((h): h is NonNullable<typeof h> => !!h);
+            if (!hints.length) return null;
+            // The biggest gap is the one worth acting on.
+            const h = hints.reduce((a, b) => (b.under > a.under ? b : a));
+            return (
+              <div
+                className="mt-2 rounded-lg px-3 py-2 text-xs"
+                style={{ background: 'var(--accent-soft)', color: 'var(--text)' }}
+              >
+                Sheet asks for <span className="font-semibold">RPE {target}</span>, you logged{' '}
+                <span className="font-semibold">{h.under} under</span> at {h.current}
+                {unit} — that's roughly{' '}
+                <span className="font-semibold">{h.suggested}{unit}</span> next time.
+              </div>
+            );
+          })()}
 
           <div className="flex gap-2 mt-2">
             <button onClick={() => addSet(exIdx)} className="btn btn-secondary !py-1 !px-2.5 text-xs">

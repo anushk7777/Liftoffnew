@@ -144,7 +144,13 @@ describe('analyzeVolume — program-week (microcycle) mode', () => {
       sess('b', '2026-03-17T10:00:00.000Z', [['Cable Fly', 6]], w1), // 8 days later, same program week
     ]);
     const chest = r.muscles.find((m) => m.muscle === 'chest')!;
-    expect(chest.sets).toBe(12); // trailing-7-day would have dropped session a
+    // Raw tally is unchanged: a trailing-7-day window would have dropped session a.
+    expect(chest.rawSets).toBe(12);
+    // Judged as a rate, because the landmarks are sets per SEVEN days and this
+    // microcycle spans nine: 12 over 9 days is 9.3 a week, not 12.
+    expect(r.windowDays).toBe(9);
+    expect(chest.sets).toBeCloseTo(9.5, 1);
+    expect(chest.sets).toBeLessThan(chest.rawSets);
     expect(r.windowLabel).toBe('Week 1 · Build');
   });
 
@@ -155,8 +161,42 @@ describe('analyzeVolume — program-week (microcycle) mode', () => {
       sess('c', '2026-03-19T10:00:00.000Z', [['Cable Fly', 4]], w2), // Week 2, 2 days after w1 ended
     ]);
     const chest = r.muscles.find((m) => m.muscle === 'chest')!;
-    expect(chest.sets).toBe(4); // only Week 2 — Week 1 concluded
-    expect(chest.prevSets).toBe(12); // compared against the full previous microcycle
+    expect(chest.rawSets).toBe(4); // only Week 2 — Week 1 concluded
+    // Both windows are put on the same 7-day basis before being compared.
+    expect(chest.sets).toBeLessThan(chest.prevSets);
     expect(r.windowLabel).toBe('Week 2 · Build');
+  });
+
+  // The bug this normalisation exists for. Pure Bodybuilding runs eight
+  // training days, which with rest days lands around eleven calendar days.
+  it('does not call a normal 11-day microcycle "over MRV"', () => {
+    const days = [0, 1, 2, 4, 5, 6, 8, 10];
+    const sessions = days.map((d, i) =>
+      sess(
+        `s${i}`,
+        new Date(Date.UTC(2026, 2, 9 + d, 10)).toISOString(),
+        [['Cable Fly', 3]], // 24 chest sets across the cycle — above the 22 MRV
+        w1,
+      ),
+    );
+    const r = analyzeVolume(sessions);
+    const chest = r.muscles.find((m) => m.muscle === 'chest')!;
+
+    expect(r.windowDays).toBe(11);
+    expect(chest.rawSets).toBe(24); // more than MRV as a raw total…
+    expect(chest.sets).toBeCloseTo(15.5, 0); // …but ~15 a week, which is productive
+    expect(chest.status).not.toBe('excessive');
+    expect(chest.status).toBe('optimal');
+  });
+
+  it('still flags genuinely excessive volume once normalised', () => {
+    const days = [0, 1, 2, 4, 5, 6, 8, 10];
+    const sessions = days.map((d, i) =>
+      sess(`s${i}`, new Date(Date.UTC(2026, 2, 9 + d, 10)).toISOString(), [['Cable Fly', 6]], w1),
+    );
+    const r = analyzeVolume(sessions);
+    const chest = r.muscles.find((m) => m.muscle === 'chest')!;
+    expect(chest.sets).toBeGreaterThan(chest.landmark.mrv);
+    expect(chest.status).toBe('excessive');
   });
 });

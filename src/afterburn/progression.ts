@@ -32,6 +32,11 @@ export interface SetVerdict {
  * a tie. Fewer reps at heavier load is deliberately NOT called progress — that
  * trade is a judgement call the lifter should make, not one the app should
  * quietly award a green chip to.
+ *
+ * Effort breaks the remaining tie. Identical weight and reps at a lower RPE is
+ * real progress — the earliest kind there is, and it always arrives before you
+ * can add load. Calling that "matched" hides the exact moment a lifter becomes
+ * ready to move up.
  */
 export function setVerdict(
   current: LoggedSet | undefined,
@@ -51,7 +56,19 @@ export function setVerdict(
 
   if (dw > 0 && dr >= 0) return { kind: 'up', label: `+${dw} ${unit}` };
   if (dw === 0 && dr > 0) return { kind: 'up', label: `+${dr} rep${dr === 1 ? '' : 's'}` };
-  if (dw === 0 && dr === 0) return { kind: 'same', label: 'matched' };
+  if (dw === 0 && dr === 0) {
+    // Same work — so the only thing left that can have changed is how hard it
+    // felt. Easier is progress; harder is worth knowing about too.
+    const ce = num(current?.rpe);
+    const le = num(last?.rpe);
+    if (ce != null && le != null && ce !== le) {
+      const de = Math.round((le - ce) * 10) / 10;
+      return de > 0
+        ? { kind: 'up', label: `same weight, −${de} RPE` }
+        : { kind: 'down', label: `same weight, +${Math.abs(de)} RPE` };
+    }
+    return { kind: 'same', label: 'matched' };
+  }
   if (dw < 0 && dr <= 0) return { kind: 'down', label: `${dw} ${unit}` };
   if (dw === 0 && dr < 0) return { kind: 'down', label: `${dr} rep${dr === -1 ? '' : 's'}` };
 
@@ -97,4 +114,54 @@ export function exerciseProgress(
   if (pct > 0.5) return { kind: 'up', pct };
   if (pct < -0.5) return { kind: 'down', pct };
   return { kind: 'same', pct };
+}
+
+/**
+ * How far under the sheet's prescribed effort this set landed, in kilos.
+ *
+ * The program names an RPE for a reason: RPE 8 means roughly two reps left in
+ * the tank. Coming in at RPE 5 means five were left, so three more reps were
+ * available than the plan intended — the load was too light for the stimulus
+ * the block is asking for. That gap is the progressive-overload instruction,
+ * and it is already sitting in the data the moment a set is logged.
+ *
+ * One RPE point is about one rep, and about 3% of load near working weights.
+ * That is a population rule of thumb, not a law: it is offered as a suggestion
+ * to accept or ignore, never applied on the lifter's behalf.
+ *
+ * Silent unless the case is clear — no target, no logged RPE, unparseable
+ * input, or a gap small enough to be the noise in anybody's self-rating.
+ */
+export interface LoadHint {
+  /** RPE points below target. */
+  under: number;
+  /** Suggested load, rounded to the nearest 2.5. */
+  suggested: number;
+  current: number;
+}
+
+const PCT_PER_RPE = 0.03;
+/** Under a point and a half is within the noise of rating your own effort. */
+const MIN_GAP = 1.5;
+
+export function loadHint(
+  loggedWeight: string | undefined,
+  loggedRpe: string | undefined,
+  targetRpe: string | undefined,
+  step = 2.5,
+): LoadHint | null {
+  const w = num(loggedWeight);
+  const rpe = num(loggedRpe);
+  // Targets are written loosely on a sheet — "8", "8.5", sometimes "7-8".
+  const target = targetRpe ? num(targetRpe.split(/[-–—/]/)[0]?.trim()) : null;
+  if (w == null || rpe == null || target == null) return null;
+  if (w <= 0) return null;
+
+  const under = Math.round((target - rpe) * 10) / 10;
+  if (under < MIN_GAP) return null;
+
+  const suggested = Math.round((w * (1 + under * PCT_PER_RPE)) / step) * step;
+  // Rounding can land back on the weight already used; nothing to suggest then.
+  if (suggested <= w) return null;
+  return { under, suggested, current: w };
 }
