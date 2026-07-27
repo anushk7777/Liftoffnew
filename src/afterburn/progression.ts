@@ -165,3 +165,56 @@ export function loadHint(
   if (suggested <= w) return null;
   return { under, suggested, current: w };
 }
+
+/**
+ * The same suggestion, but grounded in the lifter's own sets when possible.
+ *
+ * `loadHint` applies a flat 3% per RPE point, which is a population average.
+ * When the personal model has enough recent, consistent history for this
+ * exercise it knows the real figure — some lifters move 2% a point, others 5%
+ * — so the suggestion becomes theirs rather than a textbook's.
+ *
+ * Falls back to the flat rule rather than going silent: a rough guide beats no
+ * guide, as long as it says which one it is.
+ */
+export interface LearnedHint extends LoadHint {
+  /** Where the number came from, so the UI can be honest about it. */
+  basis: 'personal' | 'rule';
+  /** The lifter's measured kilos per RPE point, when basis is 'personal'. */
+  kgPerRpe?: number;
+  /** Set when the model exists but is not yet trusted. */
+  tentative?: boolean;
+}
+
+export function learnedLoadHint(
+  loggedWeight: string | undefined,
+  loggedRpe: string | undefined,
+  targetRpe: string | undefined,
+  targetReps: string | undefined,
+  model: { confidence: 'good' | 'low' | 'none'; predict: (r: number, e: number) => number | null; kgPerRpe: number | null },
+  step = 2.5,
+): LearnedHint | null {
+  const base = loadHint(loggedWeight, loggedRpe, targetRpe, step);
+  if (!base) return null;
+  if (model.confidence === 'none') return { ...base, basis: 'rule' };
+
+  const reps = num(targetReps ? targetReps.split(/[-–—/]/)[0]?.trim() : undefined);
+  const target = num(targetRpe ? targetRpe.split(/[-–—/]/)[0]?.trim() : undefined);
+  if (reps == null || target == null) return { ...base, basis: 'rule' };
+
+  const predicted = model.predict(reps, target);
+  if (predicted == null || predicted <= 0) return { ...base, basis: 'rule' };
+
+  const suggested = Math.round(predicted / step) * step;
+  // The model can land on or below what was just lifted — say nothing rather
+  // than suggest a backward step off a curve.
+  if (suggested <= base.current) return { ...base, basis: 'rule' };
+
+  return {
+    ...base,
+    suggested,
+    basis: 'personal',
+    kgPerRpe: model.kgPerRpe ?? undefined,
+    tentative: model.confidence === 'low',
+  };
+}
