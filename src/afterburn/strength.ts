@@ -14,10 +14,10 @@
 //    more stable baseline — minimal-detectable-change work consistently finds
 //    smaller thresholds for average than for best values.
 //
-// 2. The "is it real" threshold was a flat max(2.5kg, 2%), invented. It is now
-//    a t-test on the fitted slope plus a practical floor, which is the standard
-//    typical-error / smallest-worthwhile-change framework: a change has to be
-//    both distinguishable from scatter AND big enough to care about.
+// 2. The "is it real" threshold was a flat max(2.5kg, 2%), invented. A change
+//    now has to be both distinguishable from scatter (Mann-Kendall on the
+//    ordering) AND big enough to care about (a practical floor that grows with
+//    rep drift) — the typical-error / smallest-worthwhile-change framework.
 //
 // 3. Nothing accounted for REP DRIFT. Simulating a lifter whose true strength
 //    never changes: reps drifting 8 -> 15 reports -3.8kg, and 12 -> 8 reports
@@ -50,6 +50,22 @@ export const MIN_MEANINGFUL_KG = 2.5;
  *  false-alarm rate sat near 30% no matter how many sessions were available;
  *  1.25 takes it to about 11% for a modest cost in detection. */
 export const Z_CRITICAL = 1.25;
+
+/**
+ * Fewest sessions that can produce a verdict at all.
+ *
+ * Not a taste call — it falls out of the arithmetic. Mann-Kendall's statistic
+ * is bounded by n(n-1)/2, so the largest z reachable at n = 3 is
+ * (3 - 1) / sqrt(3.67) = 1.044, which is BELOW Z_CRITICAL. Three sessions
+ * therefore cannot be called a trend no matter how cleanly they climb: a
+ * perfect +30 kg run over three sessions still returns real = false. The UI
+ * used to promise a verdict after three, which was simply untrue.
+ *
+ * It is also the honest cut statistically: fitting a slope from three points
+ * leaves one degree of freedom, which is not enough to estimate the scatter
+ * that the verdict depends on.
+ */
+export const MIN_SESSIONS_FOR_VERDICT = 4;
 
 /** A gain worth caring about, as a share of e1RM. Used to ask whether this
  *  lift's data had any chance of showing one. */
@@ -133,9 +149,10 @@ export interface Trend {
   /** The gain has to beat this to be called real: the larger of an absolute
    *  floor and what rep drift alone could have fabricated. */
   threshold: number;
-  /** |slope| / standard error of slope. Above ~2 the trend is distinguishable
-   *  from scatter. Null when there are too few points to compute it. */
-  tStat: number | null;
+  /** Mann-Kendall Z: how consistently the ordering points one way, in standard
+   *  deviations. Bounded by n — see MIN_SESSIONS_FOR_VERDICT. Compared against
+   *  Z_CRITICAL, never against a t table. */
+  tStat: number;
   /** Both tests passed: distinguishable from noise AND big enough to matter. */
   real: boolean;
   /**
@@ -158,11 +175,15 @@ const DAY_MS = 86_400_000;
  *
  * Two independent tests, and a trend must pass both:
  *
- *   statistical — a t-test on the fitted slope. Accounts for scatter, how many
- *                 sessions there are and how far apart they sit, all at once.
- *                 A noisy lift with few sessions simply cannot clear it.
+ *   statistical — Mann-Kendall on the ordering. Noise enters implicitly: the
+ *                 scrambled ordering a noisy lift produces cannot reach a high
+ *                 Z, and the reachable maximum is capped by the session count.
  *   practical   — the gain must exceed an absolute floor and whatever rep drift
  *                 could have manufactured on its own.
+ *
+ * Note the measured scatter (`typicalError`) deliberately does NOT enter the
+ * practical threshold. It gates `underpowered` instead, so that scatter decides
+ * whether an answer is possible rather than how big a gain must be.
  *
  * Significance without a meaningful effect is a statistic, not a result; a big
  * number with no significance is noise. Requiring both is the standard way this
@@ -205,9 +226,24 @@ export function fitTrend(points: SessionPoint[]): Trend | null {
   // Scatter measured robustly too: 1.4826 x median absolute deviation is the
   // standard robust stand-in for a standard deviation, and one bad session
   // cannot inflate it the way a squared residual does.
+  //
+  // But MAD alone COLLAPSES TO ZERO whenever half or more of the residuals are
+  // zero, and Theil-Sen makes that common: its intercept is a median, so it
+  // pins the line through the middle of the data. A lift sitting at the same
+  // weight for four sessions with two wild outliers — the exact shape of real
+  // stalled training data — produced MAD = 0 while scattering from 20 to 180.
+  // That fed `underpowered` below and made it fail OPEN, so the app asserted a
+  // confident "flat" on data it could read nothing from. Precisely the bluff
+  // this rewrite existed to remove.
+  //
+  // The mean absolute residual cannot collapse unless every point is exactly on
+  // the line, so it is used as a floor. Both are consistent estimators of sigma
+  // for normal noise (1.2533 is the scaling for the mean-absolute form), so on
+  // clean data they agree and the max costs nothing.
   const resid = ys.map((y, i) => y - at(xs[i]));
   const mad = median(resid.map(Math.abs));
-  const see = 1.4826 * mad;
+  const meanAbs = mean(resid.map(Math.abs));
+  const see = Math.max(1.4826 * mad, 1.2533 * meanAbs);
 
   // Mann-Kendall: count how many pairs agree on direction. The natural
   // companion to Theil-Sen, and it asks the question that matters — "does the
@@ -216,6 +252,33 @@ export function fitTrend(points: SessionPoint[]): Trend | null {
   let S = 0;
   for (let i = 0; i < n; i++)
     for (let j = i + 1; j < n; j++) S += Math.sign(ys[j] - ys[i]);
+
+  // A limitation that matters, measured rather than assumed. Mann-Kendall
+  // assumes the sessions are INDEPENDENT, and training data is not: a bad week
+  // rather than a bad day makes consecutive sessions sag together, and a run
+  // that drifts together looks monotone — the one thing this test counts. On
+  // simulated AR(1) noise with genuinely flat strength, roughly ONE IN THREE
+  // lifts gets called a mover, against 13% on independent noise.
+  //
+  // The textbook remedy — widening the variance by the series' own
+  // autocorrelation — was implemented and then REMOVED, because measurement
+  // showed it does not work at the sample sizes involved:
+  //
+  //   n     lag-1 measured    variance inflation    false alarm
+  //   6            0.03              1.07x              33%
+  //  12            0.23              1.61x              34%
+  //  20            0.40              2.31x              30%
+  //
+  // Two reasons it fails. Estimating lag-1 from residuals is self-defeating,
+  // because removing the fitted trend removes the correlation too — at n = 6
+  // the residual estimate came out NEGATIVE (-0.18) against a true 0.70. And
+  // as n grows the inflation grows, but so does the raw statistic, and the two
+  // cancel. A correction that does not correct is worse than none: it looks
+  // like the problem is handled.
+  //
+  // So this is a known, quantified failure mode rather than a fixed one. It is
+  // bounded in practice by the second test — the gain must still clear the
+  // drift-aware floor — and it is listed in TRAINING_LOGIC.md's weaknesses.
   const varS = (n * (n - 1) * (2 * n + 5)) / 18;
   const z = varS > 0 ? (Math.abs(S) - 1) / Math.sqrt(varS) : 0;
   const tStat = Math.max(0, z);

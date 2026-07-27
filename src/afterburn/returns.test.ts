@@ -76,19 +76,30 @@ describe('liftReturns', () => {
     expect(find(rs, 'Leg Press').gain).toBeLessThan(0);
   });
 
-  it('is not decided by one bad day at the end', () => {
+  it('keeps the ESTIMATE honest when one session craters, even though confidence drops', () => {
     // Four sessions climbing hard, then one poor one. A least-squares fit let
-    // that single session dominate — squaring its residual wrecked both the
-    // slope and the scatter estimate, so the lift read as no trend at all.
-    // Theil-Sen takes the MEDIAN pairwise slope, so the outlier is outvoted.
+    // that single session dominate — squaring its residual dragged the slope
+    // from 0.676 to 0.212 kg/day and wrecked the scatter estimate too, so the
+    // lift read as no trend at all. Theil-Sen takes the MEDIAN pairwise slope,
+    // so the outlier is outvoted and the gain comes back at +39.9 kg. That
+    // figure was derived by hand from the pairwise slopes, independently of
+    // this code, and matches to 0.1 kg.
     const weights = [100, 108, 116, 124, 104];
     const rs = liftReturns(
       [60, 45, 30, 15, 1].map((d, i) => s(`t${i}`, d, [['Bench Press', weights[i], 8, 3]])),
       null, 90, NOW,
     );
-    expect(find(rs, 'Bench Press').gain).toBeGreaterThan(0);
-    // It must not be called a decline, whatever else it is called.
-    expect(find(rs, 'Bench Press').verdict).not.toBe('declining');
+    const r = find(rs, 'Bench Press');
+    expect(r.gain).toBeCloseTo(39.9, 1);
+
+    // But the CONFIDENCE is a separate question, and it correctly falls. That
+    // late reversal makes 3 of 10 ordered pairs disagree, so Mann-Kendall's Z
+    // is 0.73 — under the threshold. With five sessions one bad day costs the
+    // verdict; by eight sessions it is absorbed. So the honest report here is
+    // "cannot tell", NOT a decline, and not a swap suggestion either.
+    expect(r.verdict).toBe('unknown');
+    expect(r.verdict).not.toBe('declining');
+    expect(r.diagnosis).toBeNull();
   });
 
   it('admits it cannot tell, instead of calling a noisy lift flat', () => {
@@ -217,5 +228,52 @@ describe('diagnosing a flat lift', () => {
   it('does not diagnose a lift that is working', () => {
     const rs = liftReturns([60, 45, 30, 15].map((d, i) => withRpe(`w${i}`, d, 40 + i * 6, '9')), prog, 90, NOW);
     expect(find(rs, 'Pec Deck').diagnosis).toBeNull();
+  });
+});
+
+describe('flaws found auditing the rebuilt engine', () => {
+  const at = (id: string, daysAgo: number, weight: number): WorkoutSession =>
+    ({ id, date: ago(daysAgo), completedAt: ago(daysAgo),
+       entries: [{ name: 'Machine Row', sets: Array.from({ length: 3 }, () => ({ weight: String(weight), reps: '10', rpe: '9', done: true })) }] }) as unknown as WorkoutSession;
+
+  it('never asserts flat when most sessions sit on the line and a few do not', () => {
+    // The scatter estimate was 1.4826 x median absolute deviation alone, and
+    // Theil-Sen pins its line through the middle of the data — so when half or
+    // more of the residuals are zero, MAD is zero. Four sessions at the same
+    // weight plus two wild ones, which is exactly the shape of real stalled
+    // training data, gave a scatter of ZERO and the app confidently reported
+    // FLAT on numbers ranging 20 to 180. The safety net failed open on the
+    // common case. A mean-absolute floor cannot collapse that way.
+    const rs = liftReturns(
+      [[80, 100], [66, 100], [52, 100], [38, 100], [24, 180], [10, 20]].map(
+        ([d, w], i) => at(`m${i}`, d, w),
+      ),
+      null, 90, NOW,
+    );
+    const r = find(rs, 'Machine Row');
+    expect(r.typicalError).toBeGreaterThan(0);
+    expect(r.verdict).toBe('unknown');
+    expect(r.diagnosis).toBeNull(); // and so no swap is suggested
+  });
+
+  it('still calls a genuinely motionless lift flat, with no scatter to hide behind', () => {
+    // The counterpart: identical every session really is flat, and should be
+    // said plainly rather than hidden behind the new caution.
+    const rs = liftReturns([80, 60, 40, 20].map((d, i) => at(`q${i}`, d, 100)), null, 90, NOW);
+    const r = find(rs, 'Machine Row');
+    expect(r.typicalError).toBe(0);
+    expect(r.verdict).toBe('flat');
+  });
+
+  it('does not promise a verdict it cannot deliver from three sessions', () => {
+    // Mann-Kendall's statistic is capped at n(n-1)/2, so the highest z three
+    // sessions can reach is 1.044 — below Z_CRITICAL. A perfect climb over
+    // three sessions could never be called a trend, while the UI promised a
+    // verdict after three. Four is the honest minimum.
+    const perfect = liftReturns([44, 30, 16].map((d, i) => at(`p${i}`, d, 100 + i * 20)), null, 90, NOW);
+    expect(find(perfect, 'Machine Row').verdict).toBe('unknown');
+
+    const four = liftReturns([58, 44, 30, 16].map((d, i) => at(`f${i}`, d, 100 + i * 20)), null, 90, NOW);
+    expect(['working', 'strong']).toContain(find(four, 'Machine Row').verdict);
   });
 });

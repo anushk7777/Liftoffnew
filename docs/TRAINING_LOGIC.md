@@ -367,10 +367,13 @@ ledger's confident verdicts were noise wearing a chip.
 
 | Truth | old engine | now |
 | --- | --- | --- |
-| genuinely stalled | invents a direction **64%** | **15%** |
+| genuinely stalled | invents a direction **64%** | **17%** |
 | flat, very noisy | invents a direction **75%** | **20%** |
-| flat, reps drifting | invents a direction **~67%** | **<25%** |
+| flat, reps drifting | invents a direction **~67%** | **18%** |
 | genuinely progressing | caught 89% | caught 48% |
+
+The rest of the stalled and noisy populations are now returned as *unknown*
+(53% and 78% respectively) rather than as an asserted "flat".
 
 Sensitivity halved, and that is the trade being made deliberately: the old 89%
 is not comparable, because the same engine "found" movement in two thirds of
@@ -383,8 +386,18 @@ wider.
    four sessions climbing hard then one poor one (100, 108, 116, 124, 104) has
    one point 20 kg below the line, and squaring residuals let it dominate both
    the slope and the scatter. The median of pairwise slopes recovers the true
-   slope exactly there. Scatter is measured robustly too, as 1.4826 x median
-   absolute deviation.
+   slope exactly there.
+
+   Scatter is measured robustly too — but **not by MAD alone**, which an audit
+   showed collapses to zero whenever half or more of the residuals are zero.
+   Theil-Sen makes that common, because its intercept is a median and pins the
+   line through the middle of the data: four sessions at one weight plus two
+   outliers, the exact shape of real stalled data, gave a scatter of **zero**
+   while ranging from 20 to 180. That fed `underpowered` and made it fail
+   **open**, so the app asserted a confident "flat" on data it could read
+   nothing from. The estimate is now
+   `max(1.4826 x MAD, 1.2533 x mean absolute residual)`; the second term cannot
+   collapse unless every point lies exactly on the line.
 
 2. *Mann-Kendall in place of a t-test.* The natural partner to Theil-Sen: it
    asks whether the ordering consistently points one way, without assuming a
@@ -392,6 +405,12 @@ wider.
    it against the simulated populations, not chosen. At 1.0 the false-alarm
    rate sat near 30% **no matter how many sessions were available** — that is a
    property of the threshold, not of the evidence.
+
+   *Consequence found on audit:* Mann-Kendall's statistic is capped at
+   `n(n-1)/2`, so the highest Z three sessions can reach is **1.044 — below the
+   threshold**. Three sessions could never be called a trend however cleanly
+   they climbed, while the UI promised a verdict after three. The minimum is now
+   **four**, stated in `MIN_SESSIONS_FOR_VERDICT` and in the UI copy.
 
 3. *A rep-drift penalty.* Simulating a lifter whose true strength never changes:
    reps drifting 8 -> 15 reports **-3.8 kg**, and 12 -> 8 reports **+3.3 kg**,
@@ -424,7 +443,52 @@ diagnosis or swap is offered.
   reported at +9.8 kg, **98% of the truth**, because a constant bias cancels in
   a trend. Only drift matters, and drift is handled directly.
 
-### 5b. Diagnosing a flat lift before blaming the exercise
+### 5b. Is the threshold overfitted?
+
+`Z_CRITICAL` was chosen by sweeping against simulated lifters — and then scored
+against those same lifters. That is tuning on the data and reporting on the
+data, so it was tested properly afterwards (`strength.holdout.test.ts`).
+
+**Not overfitted to the seeds.** Five completely unseen draws reproduce the
+tuning run to within 4 points: 39% caught, 13% false alarm, against the tuned
+41% / 11%.
+
+**Not a knife edge.** Thresholds of 1.15, 1.25 and 1.35 give 41/41/39% caught
+and 14/14/12% false. It sits on a plateau, so the exact value is not load-
+bearing.
+
+**Holds well outside the band it was tuned in.** Noise from 2% to 15%, true
+gains from 3% to 30%, 4 to 20 sessions, rep drift up to 8 — the false-alarm rate
+stays between 8% and 20% throughout.
+
+**But it IS fitted to one assumption, and that assumption is wrong.**
+Mann-Kendall requires the sessions to be independent. Training is not: a bad
+*week* makes consecutive sessions sag together, and a run that drifts together
+looks monotone. On simulated AR(1) noise with genuinely flat strength, the
+false-alarm rate roughly **triples to 35%**. Skewed noise (sessions failing
+worse than they succeed) reaches 21%.
+
+The textbook remedy — widening the variance by the series' own autocorrelation —
+was **implemented and then removed**, because it was measured to do nothing:
+
+| n | lag-1 measured | variance inflation | false alarm |
+| --- | --- | --- | --- |
+| 6 | 0.03 | 1.07× | 33% |
+| 12 | 0.23 | 1.61× | 34% |
+| 20 | 0.40 | 2.31× | 30% |
+
+Two reasons it fails. Estimating lag-1 from residuals is self-defeating, since
+removing the fitted trend removes the correlation with it — at n = 6 the
+residual estimate came out **negative (−0.18) against a true 0.70**. And as n
+grows the inflation grows, but so does the raw statistic, and they cancel. A
+correction that does not correct is worse than none, because it looks like the
+problem is handled.
+
+So this is a **known, quantified failure mode rather than a fixed one**, and the
+hold-out test asserts it at its measured size so a regression shows up as a test
+failure rather than as quietly worse advice.
+
+### 5c. Diagnosing a flat lift before blaming the exercise
 
 `diagnoseFlat` in `strength.ts`. Checked in order: **effort**, then **load
 dropping**, then **load never moving**, then **volume**, and only then the
@@ -485,10 +549,12 @@ Ordered by how likely they are to matter.
    work, a genuinely progressing lift is only caught about half the time from
    4-9 sessions at realistic noise. More sessions help a lot (55% -> 84% at 20),
    but the honest position is that a handful of sessions cannot settle it.
-11. **The simulated populations are the calibration.** Thresholds are tuned
-   against synthetic lifters with Gaussian noise. If real session-to-session
-   noise is skewed or autocorrelated — a bad week rather than a bad day — the
-   calibration is optimistic.
+11. **Correlated noise defeats the trend test, measurably.** With AR(1) session
+   noise and genuinely flat strength, about **one lift in three** is called a
+   mover (35%, against 13% on independent noise); skewed noise reaches 21%. A
+   variance correction was tried and removed for doing nothing — see 5b. If
+   your bad patches last weeks rather than days, treat "working" and "going
+   back" with more suspicion than the chip implies.
 12. **Equipment is guessed from the exercise name.** A gym with 1 kg micro
    plates or 5 kg dumbbell jumps will get the step wrong, and there is no way
    to tell it otherwise. Letting the lifter set the step per lift would fix it.

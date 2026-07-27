@@ -9,6 +9,30 @@ Written for whoever reviews this next. The mistakes are the useful part — a
 decision with no recorded reasoning gets re-litigated, and a mistake with no
 record gets repeated.
 
+## Timeline — read in this order if you are lost
+
+The sections below are in the order the work actually happened, so this doubles
+as a chronology. Each entry names what triggered it, so you can find the thread
+you need without reading the whole file.
+
+| Section | What triggered it | Outcome |
+| --- | --- | --- |
+| **1** Volume classification | volume numbers looked wrong | 169 names audited; 18 counted for nothing, 11 for the wrong muscle |
+| **2** Program-week chart | "I just switched to week 3 — how should that show?" | partial weeks no longer read as a collapse |
+| **3** Liftoff repairs | whole-app review | habit streaks, backup restore, buttons unreachable on a phone |
+| **4** Kairos repairs | whole-app review | diary search; inline photos re-uploaded on every save |
+| **5** Equipment-aware load step | "1 rep at RPE 2.5 should suggest more reps, not more weight" | silence replaced by a double-progression prescription |
+| **6** Return-on-volume ledger | "suggest something that hasn't been done yet" | built, shipped, then found badly miscalibrated |
+| &nbsp;&nbsp;6.2 Research pass | "search modern research, are we building good?" | six findings; two overturned decisions already made |
+| &nbsp;&nbsp;6.4–6.6 Rebuild | the backtest in 6.4 | Theil-Sen, Mann-Kendall, drift penalty, "cannot tell" as its own answer |
+| &nbsp;&nbsp;6.7 Audit | "verify the invention, find flaws" | three defects found in code that had passing tests |
+| **7** Machine learning | "can ML fine-tune our inventions?" | yes — partial pooling; and where it would not help |
+| **8** Independent verification | "make sure we are not hallucinating" | every constant re-derived from first principles; citations re-checked |
+| **9** Overfitting audit | "make sure the model doesn't overfit" | not overfitted to seeds; IS fitted to an independence assumption, measured and left in place |
+
+**Sections 8 and 9 are the ones to trust.** Everything before it is reasoning; that one
+is arithmetic that does not depend on the code being right.
+
 ---
 
 ## 1. Volume: which muscle a lift counts for
@@ -114,7 +138,32 @@ on desktop.
 
 ---
 
-## 4. Suggesting reps when the next weight is unmakeable
+## 4. Kairos: search, and photos re-uploaded on every save
+
+**Search.** A diary you cannot search stops being useful at exactly the point it
+becomes valuable — a few hundred entries in, when scrolling finds nothing.
+`searchMoments` matches words, place, song and the mood's own label. Every term
+must match (narrowing is the point) but a term may match any field, so you need
+not remember which one it was. Case and accents are ignored, done by NFD
+normalising and stripping the combining-diacritics block — written as an escape
+rather than the literal characters, which are invisible in source and easily
+mangled by an editor.
+
+**The sync bug.** Photo migration was guarded by a one-shot flag set at app load.
+So a photo captured *after* load stayed inline as base64 for the rest of the
+session, and a failed upload was never retried. Every debounced save pushes the
+**whole moments array**, so each inline photo — a few hundred KB as base64 — was
+re-uploaded in full on every later change. The guard now only prevents two
+migrations running at once, is released in a `finally`, and capture triggers
+migration immediately.
+
+**Mistake.** The mood chips came out 30 px tall from padding alone. Picking a
+mood is the main interaction on the capture screen. Caught by measuring every
+tap target in a real browser rather than by eye.
+
+---
+
+## 5. Suggesting reps when the next weight is unmakeable
 
 **Why.** The load step was a flat 2.5 kg for everything.
 
@@ -154,12 +203,12 @@ squat gets *"try 105kg"*.
 
 ---
 
-## 5. The return-on-volume ledger, and rebuilding it
+## 6. The return-on-volume ledger, and rebuilding it
 
 This is the one that went wrong and had to be redone. It is the most useful
 entry in this file.
 
-### 5.1 What was built first
+### 6.1 What was built first
 
 Rank each lift by e1RM gained per ten sets over 90 days; where a lift returned
 nothing, name the swaps the program already sanctions. Least-squares slope,
@@ -168,7 +217,7 @@ best-set e1RM per session, and a noise floor of `max(2.5 kg, 2% of e1RM)` —
 
 It looked convincing. Verified in the browser, tests passing, plausible output.
 
-### 5.2 What the research said
+### 6.2 What the research said
 
 | Finding | Consequence here |
 | --- | --- |
@@ -178,7 +227,7 @@ It looked convincing. Verified in the browser, tests passing, plausible output.
 | RIR at 3-4 reps from failure is **systematically underestimated**; above 12 reps ratings degrade | not all logged RPE deserves equal weight |
 | A 2026 equation fit on **303,494 sets** beats Epley by 17-22% | our e1RM formula is from 1985 and was derived on the bench press |
 
-### 5.3 What the measurements said
+### 6.3 What the measurements said
 
 **e1RM formula.** Tested Epley, Brzycki and the 2026 weight-dependent equation
 against published rep-max percentage tables. Epley 1.73% mean error, Brzycki
@@ -187,7 +236,7 @@ against published rep-max percentage tables. Epley 1.73% mean error, Brzycki
 **That test was circular and I said so.** The published percentage tables are
 themselves close to the classical model, so they cannot referee between
 classical formulas and a challenger. The result proves nothing. **Not adopted**
-— see 5.6.
+— see 6.6.
 
 **Rep drift.** Simulating a lifter whose true strength never changes:
 
@@ -204,16 +253,19 @@ one rep of drift is worth up to **0.67% of e1RM** at the 90th percentile.
 1RM goes 100 → 110 is reported at **+9.8 kg, 98% of the truth** — a constant
 bias cancels in a trend. This killed a planned change (5.6).
 
-### 5.4 The backtest — the finding that forced the rebuild
+### 6.4 The backtest — the finding that forced the rebuild
 
 400 simulated lifters per condition, known ground truth, real code.
 
 | Truth | first version | after rebuild |
 | --- | --- | --- |
-| genuinely stalled | invents a direction **64%** | **15%** |
+| genuinely stalled | invents a direction **64%** | **17%** |
 | flat, very noisy | invents a direction **75%** | **20%** |
-| flat, reps drifting | invents a direction **~67%** | **<25%** |
+| flat, reps drifting | invents a direction **~67%** | **18%** |
 | genuinely progressing | caught 89% | caught 48% |
+
+Most of what the new engine no longer asserts becomes *unknown* rather than
+*flat*: 53% of stalled lifters and 78% of very noisy ones.
 
 It called **32% of genuinely stalled lifts "declining"**. The feature I had
 verified in a browser and covered with passing tests was, on anything not
@@ -223,7 +275,7 @@ Sensitivity halved. That trade is deliberate: the old 89% is not comparable when
 the same engine "found" movement in two thirds of lifters who had none. What
 matters is the **gap**, and the gap widened.
 
-### 5.5 What was changed, and why each
+### 6.5 What was changed, and why each
 
 1. **Theil-Sen instead of least squares.** A test failed and was right to:
    100, 108, 116, 124, **104** has one point 20 kg below the line, and squaring
@@ -271,7 +323,7 @@ matters is the **gap**, and the gap widened.
    *dropped* 6 kg was told *"the weight hasn't moved"*. Dropping and never-moving
    are different situations and now have different messages.
 
-### 5.6 Deliberately NOT implemented
+### 6.6 Deliberately NOT implemented
 
 **The 2026 e1RM equation.** Plausibly better — 303,494 sets, beat four classical
 formulas on all 183 exercises tested. Not adopted because the only validation
@@ -295,7 +347,65 @@ agent does not helpfully add one.
 **Weighting sets by RPE reliability** and **swap tracking (before/after)** —
 designed, justified by the research, not yet built.
 
-### 5.7 Small mistakes worth recording
+### 6.7 Audit of the rebuild — three flaws it shipped with
+
+The rebuilt engine was reviewed again before pushing, reading the code against
+its own claims rather than trusting the write-up. Three real defects, two of
+them serious.
+
+**A. The scatter estimate collapsed to zero on the commonest shape of real
+data.** Scatter was `1.4826 x MAD`. MAD is zero whenever half or more of the
+residuals are zero — and Theil-Sen makes that likely, because its intercept is a
+median and therefore pins the line through the middle of the points. Measured:
+
+```
+[70,130,75]                  MAD-scale 0.0   mean|resid| 19.2
+[70,70,130,70]               MAD-scale 0.0   mean|resid| 15.0
+[70,130,70,130,70]           MAD-scale 0.0   mean|resid| 24.0
+[100,100,100,100,180,20]     MAD-scale 0.0   mean|resid| 26.7
+```
+
+The last is four sessions at one weight plus two outliers — *exactly* what a
+stalled lift looks like in practice. A zero scatter made `underpowered` false,
+so the verdict came out **FLAT, asserted**, on data ranging 20 to 180, and a
+swap was suggested off the back of it. **The safety net the whole rewrite was
+built around failed open on the common case.**
+
+Fixed with `max(1.4826 x MAD, 1.2533 x mean absolute residual)`. Both are
+consistent estimators of sigma for normal noise, so they agree on clean data and
+the max costs nothing; the mean-absolute form cannot collapse unless every point
+lies exactly on the line. Verified: all four cases above now report
+`underpowered`, and a genuinely motionless lift (identical every session) still
+correctly reports scatter 0 and a confident *flat*.
+
+**B. Three sessions could never produce a verdict, while the UI promised one
+after three.** Mann-Kendall's S is capped at `n(n-1)/2`, so:
+
+```
+n    max S   max z    can ever clear Z_CRITICAL = 1.25?
+3        3   1.044    NO — impossible
+4        6   1.698    yes
+5       10   2.205    yes
+```
+
+A perfect +30 kg climb across three sessions returned `real = false`. The
+minimum is now **four**, named `MIN_SESSIONS_FOR_VERDICT` and reflected in the
+UI copy. It is also the honest cut: a slope from three points leaves one degree
+of freedom, which cannot support the scatter estimate the verdict depends on.
+
+**C. Comments described an implementation that had been deleted.** The file
+header, the `fitTrend` doc block and the `tStat` field all still described *"a
+t-test on the fitted slope"* and *"|slope| / standard error of slope"*, from the
+least-squares version that Theil-Sen replaced. `tStat` was typed
+`number | null` and could never be null. In a codebase where the docs are the
+contract, a stale comment is a defect — corrected, and the fact that
+`typicalError` deliberately does **not** enter the practical threshold is now
+stated explicitly, because the task description implied it did.
+
+All three are covered by permanent tests in `returns.test.ts` under *"flaws
+found auditing the rebuilt engine"*.
+
+### 6.8 Small mistakes worth recording
 
 - A JSX substitution list was written as `join('</span> or <span>')`, which
   would have rendered literal markup as text. Caught by reading the diff.
@@ -310,7 +420,7 @@ designed, justified by the research, not yet built.
 
 ---
 
-## 6. Can machine learning fine-tune any of this?
+## 7. Can machine learning fine-tune any of this?
 
 Worth answering precisely, because the honest answer is "yes, but not where you
 would expect, and not the parts that look like AI".
@@ -392,10 +502,132 @@ this list is worth less than that one change.
 
 ---
 
+## 8. Independent verification — checking we are not fooling ourselves
+
+Everything above is reasoning about code, and code can pass its own tests while
+being wrong, because a test that computes its expectation *using the function
+under test* proves nothing. This section is the arithmetic that does not depend
+on any of it.
+
+**Determinism.** The suite was run five consecutive times: 301 passed, identical
+every run. The backtests use a seeded LCG, so their numbers are reproducible
+rather than fresh random draws each time.
+
+**Every constant re-derived from its definition**, in a script importing nothing
+from the app:
+
+| Constant | Claimed to be | Independently derived | Result |
+| --- | --- | --- | --- |
+| `1.4826` | `1 / Φ⁻¹(0.75)` | Φ⁻¹(0.75) = 0.6744897501960817 → 1.4826 | match |
+| `1.2533` | `√(π/2)` | 1.2533141... | match |
+| Mann-Kendall `Var(S)` | `n(n−1)(2n+5)/18` | exhaustive enumeration of **all permutations** at n = 3,4,5,6 | match at every n |
+| max z at n=3 | 1.0445 | `(3−1)/√(66/18)` | match — confirms four sessions is the true minimum |
+| `DRIFT_PER_REP` | 0.0067 | 90th percentile recomputed from the rep-max table | 0.667% |
+| Epley inversion | exact | invert then re-apply at three loads | exact to 1e-6 |
+
+Verifying `Var(S)` by enumerating every permutation matters: it confirms the
+textbook formula is being applied correctly rather than merely being quoted,
+which is precisely where a plausible-looking mistake would hide.
+
+**Outputs re-derived by hand and compared to the app.** Four cases, computed
+externally from the pairwise-slope definition:
+
+| Case | Hand | App | |
+| --- | --- | --- | --- |
+| outlier fixture, Theil-Sen gain | 39.9 kg | 39.9 kg | match |
+| linear 100→130 kg: gain / sets / per-10-sets | 40.0 / 12 / 33.3 | 40.0 / 12 / 33.3 | match |
+| no rep drift → threshold | 2.5 (floor) | 2.5 | match |
+| drift of 6 reps at level 133.3 → threshold | 5.4 | 5.4 | match |
+
+The same script also confirmed that least squares would have reported a slope of
+**0.212 kg/day against Theil-Sen's 0.676** on the outlier fixture — the exact
+failure that motivated the change, measured rather than asserted.
+
+**A characteristic this surfaced, now tested explicitly.** On that fixture the
+*estimate* is robust (+39.9 kg) but the *confidence* correctly is not: one late
+reversal makes 3 of 10 ordered pairs disagree, giving Z = 0.73, under threshold.
+So the lift reports **"cannot tell"** rather than a decline — and no swap is
+suggested. At five sessions one bad day costs the verdict; by eight it is
+absorbed. The test that covers this used to be named as though it asserted
+continued progress, which over-promised; it now asserts both halves.
+
+**Citations re-checked at source**, not from memory. The claim the diagnosis
+ordering rests on is verbatim from the conference summary: *"Exercise selection
+can be flexible, whereas training program variables including weekly sets,
+volume-load, rest interval duration, and training proximity to failure
+meaningfully influence hypertrophic outcomes in the general population."* The
+average-versus-best finding is confirmed too: *"MDCs were generally smaller for
+average than best values."* `RPE_SHORTFALL = 1.5` sits inside the reported 1–2
+rep under-prediction band for experienced lifters.
+
+**What this does not prove.** The calibration still rests on *simulated* lifters
+with Gaussian, independent noise. Real session-to-session variation is likely
+autocorrelated (a bad week, not a bad day) and skewed. The arithmetic is
+verified; the population model is an assumption, and it is known weakness #11.
+
+---
+
+## 9. Overfitting audit — was the threshold fitted to its own test data?
+
+`Z_CRITICAL` was chosen by sweeping against simulated lifters, then scored
+against those same lifters. Tune on the data, report on the data — the classic
+way to publish a flattering number. Tested three ways afterwards
+(`strength.holdout.test.ts`).
+
+**Not overfitted to the seeds.** Five unseen draws reproduce the tuning run to
+within four points — 39% caught and 13% false alarm, against the tuned
+41% / 11%. Seed-to-seed spread was 4 points.
+
+**Not a knife edge.** 1.15 / 1.25 / 1.35 give 41 / 41 / 39% caught and
+14 / 14 / 12% false. The choice sits on a plateau, so its exact value is not
+load-bearing — which is the property you want from a tuned constant.
+
+**Survives regimes it never saw.** Noise 2%-15%, true gains 3%-30%, 4 to 20
+sessions, rep drift up to 8: false alarms stayed between **8% and 20%**
+throughout.
+
+**But it IS fitted to an assumption, and the assumption is false.**
+Mann-Kendall requires independent observations. Training is not: a bad *week*
+makes consecutive sessions sag together, and a run that drifts together looks
+monotone — exactly what the test counts.
+
+| noise shape | false alarm |
+| --- | --- |
+| independent (the tuning regime) | 13% |
+| **autocorrelated, AR(1)** | **35%** |
+| skewed | 21% |
+
+**A fix was implemented and then deleted.** The textbook remedy is to widen the
+variance by the series' own autocorrelation. Measured, it did nothing:
+
+| n | lag-1 measured | variance inflation | false alarm |
+| --- | --- | --- | --- |
+| 6 | 0.03 | 1.07× | 33% |
+| 12 | 0.23 | 1.61× | 34% |
+| 20 | 0.40 | 2.31× | 30% |
+
+Two reasons. Estimating lag-1 from residuals is self-defeating — removing the
+fitted trend removes the correlation with it, and at n = 6 the estimate came out
+**negative (−0.18) against a true 0.70**. And as n rises the inflation rises,
+but so does the raw statistic, and they cancel.
+
+**Deleting it was the right call.** A correction that does not correct is worse
+than none, because it looks like the problem is handled — and this log already
+argues that a mechanism which cannot be shown to earn its place should not
+ship. The failure is now asserted at its *measured* size in the hold-out test
+(autocorrelated must stay between 25% and 45%), so a regression surfaces as a
+failing test rather than as quietly worse advice.
+
+**What a user should take from it.** If your bad patches last weeks rather than
+days, roughly one flat lift in three could be mislabelled. Known weakness #11,
+now with a number attached instead of a hedge.
+
+---
+
 ## Testing
 
 ```bash
-npm test        # 298 tests, 27 files
+npm test        # 304 tests, 28 files
 ```
 
 Beyond unit tests, each behavioural claim in this log was checked against

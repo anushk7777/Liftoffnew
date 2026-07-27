@@ -131,7 +131,7 @@ function ReturnRow({ r, unit }: { r: LiftReturn; unit: string }) {
             </>
           ) : (
             <>
-              {r.sessions} session{r.sessions === 1 ? '' : 's'} logged — needs 3 across 2 weeks before this
+              {r.sessions} session{r.sessions === 1 ? '' : 's'} logged — needs 4 across 2 weeks before this
               can say anything.
             </>
           )}
@@ -525,7 +525,7 @@ export default function Progress() {
               </p>
               <p className="text-[11px] text-ink-subtle mt-1">
                 Estimated 1RM gained per set invested, over the last 90 days. Your set budget is
-                finite — this is what each lift bought with its share. A lift needs 3 sessions
+                finite — this is what each lift bought with its share. A lift needs 4 sessions
                 across 2 weeks before it gets a verdict, and rough days are left out.
               </p>
             </div>

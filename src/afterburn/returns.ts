@@ -14,19 +14,23 @@
 //
 //   * fewer than MIN_SESSIONS sessions, or a span under MIN_SPAN_DAYS -> the
 //     verdict is 'unknown', not 'flat'. Absence of evidence is said plainly.
-//   * the trend is a least-squares slope over TIME, not last-minus-first, so
-//     one bad day at either end cannot decide a lift's fate, and unevenly
-//     spaced sessions are handled correctly.
-//   * a gain only counts once it clears a noise floor scaled to the weights
-//     actually used — e1RM is an estimate, and small numbers wobble.
+//   * the trend is a Theil-Sen slope over TIME — the median of every pairwise
+//     slope — so one bad day cannot decide a lift's fate and unevenly spaced
+//     sessions are handled correctly.
+//   * a gain only counts once it clears a floor that grows with rep drift,
+//     because drift alone manufactures fake e1RM movement.
+//   * when the lift's scatter is wider than a gain worth finding, the verdict
+//     is 'unknown' rather than 'flat' — see `underpowered` in strength.ts.
 //   * sessions flagged as a rough day are excluded, exactly as the load model
 //     excludes them.
 import type { WorkoutProgram, WorkoutSession } from './types';
-import { sessionPoints, fitTrend, diagnoseFlat } from './strength';
+import { sessionPoints, fitTrend, diagnoseFlat, MIN_SESSIONS_FOR_VERDICT } from './strength';
 import type { Diagnosis } from './strength';
 
-/** Not enough points to fit a line worth trusting. */
-const MIN_SESSIONS = 3;
+/** Not enough points to fit a line worth trusting. Four, not three: the
+ *  significance test cannot reach its threshold from three sessions however
+ *  cleanly they climb — see MIN_SESSIONS_FOR_VERDICT. */
+const MIN_SESSIONS = MIN_SESSIONS_FOR_VERDICT;
 /** Two weeks is the least that can show a trend rather than a mood. */
 const MIN_SPAN_DAYS = 14;
 const DAY_MS = 86_400_000;
