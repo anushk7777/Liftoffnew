@@ -200,6 +200,38 @@ returns a `reps` verdict — *get the full 5 at this weight first* — not a hea
 suggestion. Only once the reps are met does an easy rating mean the load is
 light.
 
+**Then the equipment gets a veto.** `equipment.ts`.
+
+The step was a flat 2.5 kg for everything. Equipment does not work that way:
+
+| lift | smallest jump | as a share of the load |
+| --- | --- | --- |
+| barbell @ 100 kg | +2.5 kg | 2.5% |
+| machine @ 60 kg | +5 kg | 8.3% |
+| **dumbbell @ 10 kg** | **+2.5 kg** | **25%** |
+
+A dumbbell is logged *per hand*, so the smallest pair in the rack is an enormous
+relative increment on small isolation work. When the RPE gap justifies less than
+half a step, the suggestion used to round back to the current weight and the app
+**said nothing at all**. Silence reads as "all good" — and that is exactly how a
+set stays easy for months: the only jump available is unmakeable, so nothing
+ever changes.
+
+That case now returns `kind: 'more-reps'` — *stay at 10 kg and push past 10 reps*
+— which is plain double progression, and the smaller increment.
+
+- The step is guessed from the exercise name (`equipmentOf`), ordered so a cable
+  movement that names a bar attachment ("Straight-Bar Lat Prayer") is not read
+  as a barbell.
+- Where a gym might have either 2.5 kg or 5 kg jumps, the **smaller** is
+  assumed. Guessing small risks suggesting a weight that turns out unmakeable,
+  which the lifter sees instantly. Guessing large silently converts a real load
+  increase into "add reps", which is invisible and would stall progression.
+- An unrecognised name keeps the old flat 2.5 kg, so nothing regresses.
+- The personal model gets a **second opinion** on a `more-reps` verdict: the flat
+  3%-per-point rule may fail to clear the step where this lifter's own figure
+  clears it easily. Only when both fail does `more-reps` stand.
+
 Guards, all deliberate:
 
 - Silent below a **1.5-point gap** — inside the noise of rating your own effort.

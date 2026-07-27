@@ -6,6 +6,7 @@ import { cn } from '../lib/utils';
 import { pop, springSoft, fast, useReducedMotion } from '../lib/motion';
 import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance, restToSeconds, detectPRs } from './store';
 import { setVerdict, ghostLabel, exerciseProgress, learnedLoadHint } from './progression';
+import { equipmentOf, loadStep, EQUIPMENT_LABEL } from './equipment';
 import { buildLoadModel } from './loadModel';
 import { recoveryReadiness } from './recovery';
 import { analyzeVolume } from './volume';
@@ -986,7 +987,11 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
             // Learned from this lifter's own sets where there is enough recent,
             // consistent history; the textbook rule otherwise.
             const model = buildLoadModel(sessions, ex.name);
-            const step = unit === 'kg' ? 2.5 : 5;
+            // The step depends on what the lift is loaded on. A flat 2.5 kg is
+            // right for a barbell and nonsense for a 10 kg dumbbell, where the
+            // smallest pair up is a 25% jump.
+            const eq = equipmentOf(ex.name);
+            const step = loadStep(eq, unit);
             // Read the HEAVIEST set, not the largest RPE gap. Picking by gap
             // systematically picks the lightest set on the card — a 40kg opener
             // logged at RPE 3 would produce a confident "try 45kg" for a lift
@@ -1020,6 +1025,17 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
                     get the full {h.targetReps} at {h.current}
                     {unit} before adding load.
                   </>
+                ) : h.kind === 'more-reps' ? (
+                  <>
+                    That felt easy ({h.under} under RPE {target}), but the next weight up on{' '}
+                    {EQUIPMENT_LABEL[eq]} is <span className="font-semibold">+{h.step}{unit}</span> —
+                    a <span className="font-semibold">{h.stepPct}% jump</span>. Stay at {h.current}
+                    {unit} and{' '}
+                    <span className="font-semibold">
+                      push past {h.targetReps ?? h.loggedReps ?? 'your'} reps
+                    </span>{' '}
+                    instead.
+                  </>
                 ) : (
                   <>
                     Sheet asks for <span className="font-semibold">RPE {target}</span>, you logged{' '}
@@ -1031,6 +1047,8 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
                 <span className="block mt-1 text-ink-subtle">
                   {h.kind === 'reps' ? (
                     'Reps first — an easy set that fell short of the target says nothing about the weight.'
+                  ) : h.kind === 'more-reps' ? (
+                    'Double progression — add reps at this weight until the next jump is earned.'
                   ) : h.basis === 'personal' ? (
                     <>
                       From your own {ex.name.toLowerCase()} sets — about{' '}
