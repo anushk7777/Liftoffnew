@@ -75,10 +75,15 @@ export interface LiftReturn {
  */
 export function substitutionIndex(program: WorkoutProgram | null | undefined): Map<string, string[]> {
   const out = new Map<string, string[]>();
+  // Every level is guarded, not just the outermost. The program is persisted to
+  // localStorage and restored verbatim, so a partial write, an older schema or
+  // a bad sync can hand back an object whose `days` or `exercises` is missing.
+  // Fuzzing found both cases throwing "is not iterable", which would take down
+  // the whole Progress screen rather than degrade one section.
   for (const w of program?.weeks ?? [])
-    for (const d of w.days)
-      for (const e of d.exercises) {
-        if (!e.substitutions?.length) continue;
+    for (const d of w?.days ?? [])
+      for (const e of d?.exercises ?? []) {
+        if (!e?.name || !e.substitutions?.length) continue;
         const family = [e.name, ...e.substitutions];
         for (const member of family) {
           if (out.has(member)) continue;
@@ -95,9 +100,9 @@ export function substitutionIndex(program: WorkoutProgram | null | undefined): M
 export function targetRpeIndex(program: WorkoutProgram | null | undefined): Map<string, number> {
   const out = new Map<string, number>();
   for (const w of program?.weeks ?? [])
-    for (const d of w.days)
-      for (const e of d.exercises) {
-        if (out.has(e.name) || !e.rpe) continue;
+    for (const d of w?.days ?? [])
+      for (const e of d?.exercises ?? []) {
+        if (!e?.name || out.has(e.name) || !e.rpe) continue;
         const first = parseFloat(String(e.rpe).replace(/[^0-9.\-–]/g, '').split(/[-–]/)[0]);
         if (Number.isFinite(first) && first > 0) out.set(e.name, first);
       }
