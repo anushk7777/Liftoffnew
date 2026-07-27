@@ -230,3 +230,35 @@ describe('analyzeVolume — program-week (microcycle) mode', () => {
     expect(chest.status).toBe('excessive');
   });
 });
+
+describe('muscles with no minimum effective volume', () => {
+  const w1 = { id: 'w1', name: 'Week 1' };
+  const legs = (lifts: [string, number][]) =>
+    analyzeVolume([sess('a', '2026-03-09T10:00:00.000Z', lifts, w1)]);
+
+  it('never calls an untrained optional muscle a shortfall', () => {
+    // Adductors have MEV 0 — the compounds cover them. Skipping them is a
+    // choice, so they must not appear as a missed muscle every single week.
+    const r = legs([['Back Squat', 4]]);
+    const add = r.muscles.find((m) => m.muscle === 'adductors')!;
+    expect(add.sets).toBe(0);
+    expect(add.status).not.toBe('untrained');
+    expect(add.status).not.toBe('below');
+    expect(r.neglected).not.toContain('adductors');
+    // …and it must not pad the "dialed in" tally either.
+    expect(r.headline).not.toContain('1 dialed in');
+  });
+
+  it('still counts the direct work when it is done', () => {
+    const r = legs([['Machine Hip Adduction', 3]]);
+    expect(r.muscles.find((m) => m.muscle === 'adductors')!.sets).toBe(3);
+    expect(r.trained.map((m) => m.muscle)).toContain('adductors');
+  });
+
+  it('still enforces the ceiling on an optional muscle', () => {
+    const r = legs([['Machine Hip Adduction', 20]]);
+    const add = r.muscles.find((m) => m.muscle === 'adductors')!;
+    expect(add.sets).toBeGreaterThan(LANDMARKS.adductors.mrv);
+    expect(add.status).toBe('excessive');
+  });
+});

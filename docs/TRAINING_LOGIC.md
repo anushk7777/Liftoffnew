@@ -56,6 +56,62 @@ weekly rate. The UI shows both: `15 sets/wk · 24 logged`.
   reverted: two existing tests encoded the reset deliberately, it matches the UI
   copy, and it matches how a lifter thinks about a block.
 
+### 1b. Which muscle a lift counts for
+
+`classifyExercise` in `volume.ts`. Exercises are logged as free text with no
+muscle tag, so each name is matched against an ordered rule table — first match
+wins — crediting 1.0 set to each primary muscle and 0.5 to each secondary.
+
+**This is the weakest link in the whole volume feature**, because a name that
+matches nothing is worth **zero sets** and simply disappears. That does not look
+like a bug; it looks like you under-trained a muscle. A name that matches the
+*wrong* rule is worse still — it moves the sets to another muscle, so one reads
+high and the other low, and both recommendations are wrong.
+
+Auditing all 169 names the loaded program can put on screen found **18 counting
+for nothing and 11 counted as the wrong muscle**:
+
+| Name | Was | Now | Why it went wrong |
+| --- | --- | --- | --- |
+| Reverse DB Flye | chest | shoulders | `"Flye"` contains `"fly"`, and `"reverse fly"` never matched as one substring because the equipment sits between the words |
+| DB Incline Curl | chest | biceps | the `incline` rule ran before the biceps rule and read it as a bench press |
+| Low Incline DB Press | shoulders | chest | `"db press"` meant an overhead press and swallowed the incline bench too |
+| …Row + Kelso Shrug | traps only | back + traps | the shrug rule claimed the whole movement and the row vanished |
+| Reverse Nordic | hamstrings | quads | `"nordic"` matched, but the knee *extends* — it is the opposite movement |
+| Bench Dip | chest | triceps | matched on `"bench"` |
+| Decline Barbell Press | *nothing* | chest | no rule mentioned decline |
+| Straight-Bar Lat Prayer | *nothing* | back | a week-1 exercise, counting for zero |
+| Hip adduction ×4 | *nothing* | adductors | no such muscle existed |
+| Hyperextension, Pallof press, vacuums, rollouts, Y-raise, band walks | *nothing* | as labelled | simply absent |
+
+Two mechanisms were added to the rule table to make this expressible:
+
+- **A keyword may be an array**, meaning *all of these words appear, in any
+  order*. `['reverse', 'fly']` catches "Reverse DB Flye" and "Reverse Cable
+  Flye" without also catching a chest flye.
+- **A rule may carry `not`**, an exclusion list. The overhead-press rule now
+  refuses any name containing incline, decline, bench, chest or pec.
+
+**Adductors became a thirteenth muscle.** The program trains them directly and
+often — machine, cable and Copenhagen adduction, three sets, twice a cycle.
+Folding that into glutes would both overstate glutes and hide the work.
+
+**MEV 0 means optional.** Adductors are the first muscle whose minimum effective
+volume is zero: the compounds cover them, so skipping them is a choice, not a
+shortfall. A muscle with no MEV is never reported as under-trained or neglected,
+and does not pad the "dialed in" count when untouched — but its MRV ceiling
+still applies.
+
+A superset prefix (`A1: Machine Hip Adduction`) is stripped before matching; it
+labels the pairing, not the movement. Unfilled weak-point picker slots are
+recognised as placeholders so they are not reported as unknown lifts.
+
+The guard against regression is a test that walks **every name in the loaded
+program** — main slots, substitutions and weak-point options — and asserts the
+list of unclassified names is empty. Neck work is the one deliberate exception:
+there is no neck landmark, so it stays unclassified rather than being credited
+somewhere false. (The trap it guards: "Neck Curls" contains "curl".)
+
 ---
 
 ## 2. The set verdict
@@ -185,10 +241,13 @@ Ordered by how likely they are to matter.
    across singles and sets of fifteen, where the true relationship flattens at
    the high-rep end. Predictions near the edges of the logged range are the
    least trustworthy.
-3. **`classifyExercise` is keyword matching.** An unrecognised custom exercise
-   name returns `null` and that exercise **vanishes from volume tracking
-   entirely** — silently making a muscle look under-trained. `unclassified` is
-   surfaced in the report, but the count is still wrong.
+3. **`classifyExercise` is still keyword matching.** Every name the loaded
+   program can produce is now covered and locked down by a test, but a *custom*
+   exercise typed by hand can still match nothing — and an unmatched name is
+   worth zero sets, silently making a muscle look under-trained. `unclassified`
+   is surfaced in the report, but the count is still wrong until it is renamed.
+   The real fix is letting the lifter tag an exercise with its muscles once and
+   remembering it.
 4. **`3%` per RPE point is a population constant** used whenever the model is
    not confident. It is roughly right in the mid range and worse at the extremes.
 5. **RPE ratings are self-reported and drift.** Someone whose calibration
@@ -204,10 +263,10 @@ Ordered by how likely they are to matter.
 
 ## Testing
 
-`src/afterburn/{volume,progression,loadModel}.test.ts` — the behavioural claims
-above are covered, including the 11-day-cycle miscalibration, one rough session
-barely moving the prescription, a sustained real drop still being followed, and
-every refusal case.
+`src/afterburn/{volume,classify,progression,loadModel}.test.ts` — the behavioural
+claims above are covered, including the 11-day-cycle miscalibration, one rough
+session barely moving the prescription, a sustained real drop still being
+followed, every refusal case, and every exercise name the program can show.
 
 ```bash
 npm test

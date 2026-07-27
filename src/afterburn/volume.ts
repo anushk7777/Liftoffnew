@@ -22,6 +22,7 @@ export type Muscle =
   | 'quads'
   | 'hamstrings'
   | 'glutes'
+  | 'adductors'
   | 'shoulders'
   | 'biceps'
   | 'triceps'
@@ -36,6 +37,7 @@ export const MUSCLE_LABEL: Record<Muscle, string> = {
   quads: 'Quads',
   hamstrings: 'Hamstrings',
   glutes: 'Glutes',
+  adductors: 'Adductors',
   shoulders: 'Shoulders',
   biceps: 'Biceps',
   triceps: 'Triceps',
@@ -60,6 +62,10 @@ export const LANDMARKS: Record<Muscle, Landmark> = {
   quads: { mev: 8, mav: 16, mrv: 20 },
   hamstrings: { mev: 6, mav: 14, mrv: 20 },
   glutes: { mev: 4, mav: 12, mrv: 16 },
+  // Adductors get their own row because this program trains them directly and
+  // often (machine/cable/Copenhagen adduction, up to 3 sets twice a cycle).
+  // Folding that into glutes would both overstate glutes and hide the work.
+  adductors: { mev: 0, mav: 12, mrv: 16 },
   shoulders: { mev: 8, mav: 18, mrv: 26 },
   biceps: { mev: 8, mav: 16, mrv: 26 },
   triceps: { mev: 6, mav: 14, mrv: 18 },
@@ -71,8 +77,18 @@ export const LANDMARKS: Record<Muscle, Landmark> = {
 
 export const ALL_MUSCLES = Object.keys(LANDMARKS) as Muscle[];
 
+/** One keyword. A plain string matches as a substring; an ARRAY matches only if
+ *  every word in it appears somewhere in the name, in any order. The array form
+ *  exists because real exercise names interleave equipment: "Reverse DB Flye"
+ *  and "Reverse Cable Flye" are the same rear-delt movement, and no single
+ *  substring catches both without also catching a chest flye. */
+type Term = string | string[];
+
 interface Rule {
-  kw: string[]; // any of these substrings (lowercased) matches
+  kw: Term[]; // any of these matches
+  /** …unless one of these appears. Guards greedy keywords: "DB Press" means a
+   *  shoulder press, but "Low Incline DB Press" is a chest press. */
+  not?: string[];
   primary: Muscle[];
   secondary?: Muscle[];
 }
@@ -83,41 +99,73 @@ interface Rule {
 const RULES: Rule[] = [
   // Forearms first (so "reverse curl" / "wrist curl" don't fall to biceps).
   { kw: ['wrist curl', 'reverse curl', 'forearm', 'wrist roller'], primary: ['forearms'] },
-  // Hamstring isolation before the generic "curl" and the squat group.
-  { kw: ['leg curl', 'lying curl', 'seated leg curl', 'hamstring curl', 'nordic'], primary: ['hamstrings'] },
+  // Hamstring isolation before the generic "curl" and the squat group. A Reverse
+  // Nordic is the opposite movement — knee EXTENSION under load — so it is
+  // excluded here and picked up as quads below.
+  // A glute-ham raise extends the hip as well as flexing the knee, so it earns
+  // glute credit; a machine leg curl is knee flexion alone and does not.
+  { kw: ['glute-ham raise', 'glute ham raise', 'ghr'], primary: ['hamstrings'], secondary: ['glutes'] },
+  { kw: ['leg curl', 'lying curl', 'seated leg curl', 'hamstring curl', 'nordic'], not: ['reverse nordic'], primary: ['hamstrings'] },
+  // Every remaining "curl" is an arm curl. Claimed HERE, above the press rules,
+  // because "Incline DB Curl" was being read as an incline bench press and
+  // credited to chest.
+  { kw: ['curl'], not: ['neck'], primary: ['biceps'], secondary: ['forearms'] },
   { kw: ['romanian', 'rdl', 'stiff leg', 'stiff-leg', 'stiff legged', 'good morning'], primary: ['hamstrings'], secondary: ['glutes', 'back'] },
-  { kw: ['hip thrust', 'glute bridge', 'glute', 'hip-thrust'], primary: ['glutes'], secondary: ['hamstrings'] },
+  // A 45° hyperextension is programmed on a pull day and cued as "mid- and
+  // lower-back", so the erectors lead and the hips assist.
+  { kw: ['hyperextension', 'hyper extension', 'back extension', '45 degree extension'], primary: ['back'], secondary: ['glutes', 'hamstrings'] },
+  { kw: ['adduction', 'adductor', 'copenhagen', 'inner thigh'], primary: ['adductors'] },
+  { kw: ['abduction', 'abductor', 'band walk', 'monster walk'], primary: ['glutes'] },
+  { kw: ['hip thrust', 'glute bridge', 'glute', 'hip-thrust', 'kickback machine'], primary: ['glutes'], secondary: ['hamstrings'] },
   { kw: ['calf', 'calve', 'soleus'], primary: ['calves'] },
-  { kw: ['leg extension', 'quad extension', 'knee extension', 'sissy'], primary: ['quads'] },
+  { kw: ['leg extension', 'quad extension', 'knee extension', 'sissy', 'reverse nordic'], primary: ['quads'] },
   { kw: ['squat', 'leg press', 'hack', 'lunge', 'split squat', 'bulgarian', 'step up', 'step-up', 'pendulum'], primary: ['quads'], secondary: ['glutes'] },
   { kw: ['deadlift', 'dead lift'], primary: ['back'], secondary: ['hamstrings', 'glutes'] },
+  // A row supersetted with a shrug (Kelso) is both; without this the shrug rule
+  // claimed the whole thing and the back work vanished.
+  { kw: [['row', 'shrug']], primary: ['back'], secondary: ['traps', 'biceps'] },
   { kw: ['shrug'], primary: ['traps'] },
   { kw: ['upright row'], primary: ['shoulders'], secondary: ['traps'] },
-  { kw: ['face pull', 'rear delt', 'reverse fly', 'rear fly', 'reverse pec', 'rear-delt'], primary: ['shoulders'], secondary: ['traps'] },
+  { kw: ['face pull', 'rear delt', 'rear-delt', 'reverse pec', ['reverse', 'fly'], ['rear', 'fly'], ['reverse', 'flye'], 'y-raise', 'y raise'], primary: ['shoulders'], secondary: ['traps'] },
+  // Straight-arm lat isolation. Pullover-shaped, but done on a cable with the
+  // torso upright there is no real pec contribution, so no chest credit.
+  { kw: ['lat prayer', 'pull-around', 'pull around', 'pull-in', 'pull in'], primary: ['back'] },
   { kw: ['pullover'], primary: ['back'], secondary: ['chest'] },
   { kw: ['pulldown', 'pull down', 'pull-down', 'pull up', 'pull-up', 'pullup', 'chin up', 'chin-up', 'chinup', 'lat pull'], primary: ['back'], secondary: ['biceps'] },
   { kw: ['row'], primary: ['back'], secondary: ['biceps'] },
   { kw: ['lateral raise', 'lat raise', 'side raise', 'side lateral', 'lateral'], primary: ['shoulders'] },
-  { kw: ['overhead press', 'shoulder press', 'military', 'arnold', 'push press', 'ohp', 'db press', 'z press'], primary: ['shoulders'], secondary: ['triceps'] },
+  { kw: ['overhead press', 'shoulder press', 'military', 'arnold', 'push press', 'ohp', 'db press', 'z press'], not: ['incline', 'decline', 'bench', 'chest', 'pec'], primary: ['shoulders'], secondary: ['triceps'] },
   // Triceps before chest so "close grip bench" / pressdowns aren't read as chest.
-  { kw: ['tricep', 'pushdown', 'pressdown', 'skull', 'kickback', 'jm press', 'close grip', 'close-grip', 'overhead extension', 'french press', 'dip machine'], primary: ['triceps'] },
+  { kw: ['tricep', 'pushdown', 'pressdown', 'skull', 'kickback', 'jm press', 'close grip', 'close-grip', 'overhead extension', 'french press', 'dip machine', ['bench', 'dip']], primary: ['triceps'] },
   { kw: ['fly', 'pec deck', 'pec fly', 'cable crossover', 'chest fly'], primary: ['chest'] },
   { kw: ['incline'], primary: ['chest'], secondary: ['shoulders', 'triceps'] },
-  { kw: ['bench', 'chest press', 'chest', 'pec', 'dip', 'push up', 'push-up', 'pushup'], primary: ['chest'], secondary: ['triceps', 'shoulders'] },
-  // Biceps last among the arm rules (generic "curl" only reaches here once leg/
-  // wrist/reverse curls are excluded above).
-  { kw: ['bicep', 'preacher', 'hammer', 'concentration', 'curl'], primary: ['biceps'], secondary: ['forearms'] },
-  { kw: ['crunch', 'sit up', 'sit-up', 'situp', 'plank', 'leg raise', 'hanging', 'ab wheel', 'ab-wheel', 'woodchop', 'russian twist', 'oblique', 'toes to bar', 'knee raise', 'cable crunch'], primary: ['abs'] },
+  { kw: ['bench', 'chest press', 'chest', 'pec', 'dip', 'push up', 'push-up', 'pushup', ['decline', 'press']], primary: ['chest'], secondary: ['triceps', 'shoulders'] },
+  // Biceps last among the arm rules — for names with no "curl" in them at all.
+  { kw: ['bicep', 'preacher', 'concentration'], primary: ['biceps'], secondary: ['forearms'] },
+  { kw: ['crunch', 'sit up', 'sit-up', 'situp', 'plank', 'leg raise', 'hanging', 'ab wheel', 'ab-wheel', 'rollout', 'roll-out', 'woodchop', 'russian twist', 'oblique', 'toes to bar', 'knee raise', 'cable crunch', 'pallof', 'vacuum', 'dead bug', 'hollow'], primary: ['abs'] },
 ];
+
+const hits = (name: string, t: Term): boolean =>
+  typeof t === 'string' ? name.includes(t) : t.every((w) => name.includes(w));
 
 /** Classify a logged exercise name to the muscle(s) it trains, or null if we
  *  can't recognize it (surfaced so the user knows what isn't being counted). */
 export function classifyExercise(name: string): { primary: Muscle[]; secondary: Muscle[] } | null {
-  const n = name.toLowerCase();
+  // Strip a superset prefix ("A1: Machine Hip Adduction") — it labels the
+  // pairing, not the movement.
+  const n = name.toLowerCase().replace(/^[a-d][12]:\s*/, '');
   for (const r of RULES) {
-    if (r.kw.some((k) => n.includes(k))) return { primary: r.primary, secondary: r.secondary ?? [] };
+    if (r.not?.some((k) => n.includes(k))) continue;
+    if (r.kw.some((k) => hits(n, k))) return { primary: r.primary, secondary: r.secondary ?? [] };
   }
   return null;
+}
+
+/** Program placeholder slots the lifter hasn't filled in yet (the Weak Point
+ *  picker). Not a real movement, so it should never be reported as an
+ *  unrecognized lift. */
+export function isPlaceholderExercise(name: string): boolean {
+  return /^weak point exercise/i.test(name.trim());
 }
 
 /** A logged set counts as a "hard set" if it was actually performed — it has a
@@ -207,12 +255,22 @@ const round5 = (n: number) => Math.round(n * 2) / 2;
 const SEVERITY: Record<VolumeStatus, number> = { excessive: 0, below: 1, untrained: 2, high: 3, optimal: 4 };
 
 function judge(sets: number, lm: Landmark): { status: VolumeStatus; suggestedSets: number; recommendation: string } {
+  // An MEV of zero means the muscle needs no direct work to be fine — it gets
+  // enough from the compounds. Skipping it is a choice, not a shortfall, so it
+  // is never called under-trained; only the ceiling still applies.
+  const optional = lm.mev <= 0;
   if (sets <= 0)
-    return {
-      status: 'untrained',
-      suggestedSets: lm.mev,
-      recommendation: `Not trained this week. If it's a target, start around ${lm.mev} sets/wk (its minimum effective volume).`,
-    };
+    return optional
+      ? {
+          status: 'optimal',
+          suggestedSets: 0,
+          recommendation: 'No direct work needed — the compounds cover this. Add sets only if you want it to grow.',
+        }
+      : {
+          status: 'untrained',
+          suggestedSets: lm.mev,
+          recommendation: `Not trained this week. If it's a target, start around ${lm.mev} sets/wk (its minimum effective volume).`,
+        };
   if (sets < lm.mev) {
     const add = Math.max(1, Math.round(lm.mev - sets));
     return {
@@ -391,14 +449,18 @@ export function analyzeVolume(sessions: WorkoutSession[]): VolumeReport {
 
   const sorted = [...muscles].sort((a, b) => SEVERITY[a.status] - SEVERITY[b.status] || b.sets - a.sets || a.label.localeCompare(b.label));
   const trained = sorted.filter((m) => m.sets > 0);
-  const neglected = muscles.filter((m) => m.sets === 0).map((m) => m.muscle);
+  // A muscle with no MEV isn't "neglected" when it's untouched — nothing was
+  // owed. Listing it would put Adductors in the missed-muscle chips every week.
+  const neglected = muscles.filter((m) => m.sets === 0 && m.landmark.mev > 0).map((m) => m.muscle);
 
   // Distinct unrecognized exercise names (so under-counting is transparent).
-  const unclassified = [...new Set(sessions.flatMap((s) => s.entries.filter((e) => !classifyExercise(e.name) && e.sets.some((st) => isHardSet(st.reps, st.done))).map((e) => e.name)))].sort();
+  const unclassified = [...new Set(sessions.flatMap((s) => s.entries.filter((e) => !classifyExercise(e.name) && !isPlaceholderExercise(e.name) && e.sets.some((st) => isHardSet(st.reps, st.done))).map((e) => e.name)))].sort();
 
   const under = muscles.filter((m) => m.status === 'below' || m.status === 'untrained').length;
   const over = muscles.filter((m) => m.status === 'excessive').length;
-  const dialed = muscles.filter((m) => m.status === 'optimal' || m.status === 'high').length;
+  // Only count muscles actually worked as "dialed in" — an untouched optional
+  // muscle is 'optimal' by definition and would pad the number.
+  const dialed = muscles.filter((m) => m.sets > 0 && (m.status === 'optimal' || m.status === 'high')).length;
   const parts: string[] = [];
   if (over) parts.push(`${over} over your recoverable limit`);
   if (under) parts.push(`${under} under-trained`);

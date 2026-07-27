@@ -56,9 +56,13 @@ function VolumeBar({ m }: { m: MuscleAnalysis }) {
         animate={{ width: pct(m.sets) }}
         transition={{ duration: 0.7, ease: [0.21, 1, 0.4, 1], delay: 0.1 }}
       />
-      {[m.landmark.mev, m.landmark.mav, m.landmark.mrv].map((v, i) => (
-        <div key={i} className="absolute inset-y-0 w-px bg-ink/40" style={{ left: pct(v) }} title={`${['MEV', 'MAV', 'MRV'][i]} ${v}`} />
-      ))}
+      {/* A zero MEV (an optional muscle) has no tick — it would sit on the left
+          edge of the bar and mark nothing. */}
+      {([['MEV', m.landmark.mev], ['MAV', m.landmark.mav], ['MRV', m.landmark.mrv]] as const)
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => (
+          <div key={k} className="absolute inset-y-0 w-px bg-ink/40" style={{ left: pct(v) }} title={`${k} ${v}`} />
+        ))}
     </div>
   );
 }
@@ -363,7 +367,9 @@ export default function Progress() {
 
             {vol.neglected.length > 0 && (
               <div className="pt-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-1.5">Not trained (last 7 days)</p>
+                {/* Was hardcoded to "last 7 days" even in microcycle mode,
+                    where the window above is a program week of 10-11 days. */}
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-1.5">Not trained ({vol.windowLabel})</p>
                 <div className="flex flex-wrap gap-1.5">
                   {vol.neglected.map((mu) => (
                     <span key={mu} className="chip text-ink-subtle bg-elevated border-0 !text-[11px]">{MUSCLE_LABEL[mu]}</span>
