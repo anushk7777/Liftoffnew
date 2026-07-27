@@ -33,7 +33,7 @@
 // tables from 3 to 12 reps, and the newer weight-dependent equation could not
 // be validated here well enough to justify changing a number that also drives
 // PR detection.
-import type { WorkoutSession } from './types';
+import type { WorkoutSession } from '../types';
 
 /** Epley. Kept deliberately — see the note above. */
 export const epley = (w: number, r: number): number => (w > 0 && r > 0 ? w * (1 + r / 30) : 0);

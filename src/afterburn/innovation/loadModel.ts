@@ -22,7 +22,7 @@
 // memorise the history rather than generalise from it. A weighted line fit on
 // the lifter's own recent sets is both more accurate here and explainable,
 // which matters when it is telling someone what to put on a bar.
-import type { WorkoutSession, LoggedSet } from './types';
+import type { WorkoutSession, LoggedSet } from '../types';
 
 const DAY_MS = 86_400_000;
 

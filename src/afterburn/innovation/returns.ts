@@ -23,7 +23,7 @@
 //     is 'unknown' rather than 'flat' — see `underpowered` in strength.ts.
 //   * sessions flagged as a rough day are excluded, exactly as the load model
 //     excludes them.
-import type { WorkoutProgram, WorkoutSession } from './types';
+import type { WorkoutProgram, WorkoutSession } from '../types';
 import { sessionPoints, fitTrend, diagnoseFlat, MIN_SESSIONS_FOR_VERDICT } from './strength';
 import type { Diagnosis } from './strength';
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { fitTrend, sessionPoints, Z_CRITICAL } from './strength';
-import type { WorkoutSession } from './types';
+import type { WorkoutSession } from '../types';
 
 // Is Z_CRITICAL overfitted?
 //

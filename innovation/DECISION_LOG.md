@@ -636,7 +636,7 @@ the actual program, the chart at 3-of-8 and 8-of-8 days, the habit streak at 12,
 the double-progression hint with a dumbbell and a squat on one card, the hover
 fix on touch and desktop contexts, and the ledger over a six-session block.
 
-The backtests live in `src/afterburn/strength.backtest.test.ts` and
+The backtests live in `src/afterburn/innovation/strength.backtest.test.ts` and
 `strength.compare.test.ts` and are permanent — the second asserts that the new
 engine invents fewer directions than the one it replaced, so that regression
 cannot come back quietly.

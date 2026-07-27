@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { fitTrend, sessionPoints } from './strength';
-import type { WorkoutSession } from './types';
+import type { WorkoutSession } from '../types';
 
 // OLD engine, reproduced exactly: best-set e1RM, OLS slope, flat 2.5kg/2% floor.
 const epley = (w: number, r: number) => w * (1 + r / 30);

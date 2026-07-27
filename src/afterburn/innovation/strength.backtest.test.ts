@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { fitTrend, sessionPoints, DRIFT_PER_REP, MIN_MEANINGFUL_KG, Z_CRITICAL } from './strength';
-import type { WorkoutSession } from './types';
+import type { WorkoutSession } from '../types';
 
 // Calibration by backtest.
 //

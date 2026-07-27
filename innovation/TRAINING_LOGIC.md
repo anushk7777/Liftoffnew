@@ -15,7 +15,7 @@ lifter plans their own deloads.
 | --- | --- |
 | Per-muscle volume vs landmarks | `src/afterburn/volume.ts` |
 | Set-vs-set progress, RPE gap → load | `src/afterburn/progression.ts` |
-| Personal load-per-RPE model | `src/afterburn/loadModel.ts` |
+| Personal load-per-RPE model | `src/afterburn/innovation/loadModel.ts` |
 | Workout screen wiring | `src/afterburn/Afterburn.tsx` |
 
 ---
@@ -561,7 +561,8 @@ Ordered by how likely they are to matter.
 
 ## Testing
 
-`src/afterburn/{volume,classify,progression,loadModel,equipment,returns}.test.ts`
+`src/afterburn/{volume,classify,progression}.test.ts and
+src/afterburn/innovation/{loadModel,equipment,returns,strength}*.test.ts`
 — the behavioural claims above are covered, including the 11-day-cycle miscalibration, one rough
 session barely moving the prescription, a sustained real drop still being
 followed, every refusal case, and every exercise name the program can show.

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { liftReturns, deadWeight, substitutionIndex } from './returns';
-import type { WorkoutProgram, WorkoutSession } from './types';
+import type { WorkoutProgram, WorkoutSession } from '../types';
 
 const NOW = new Date('2026-07-27T12:00:00.000Z');
 const ago = (d: number) => new Date(NOW.getTime() - d * 86_400_000).toISOString();
