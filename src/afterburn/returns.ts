@@ -22,15 +22,13 @@
 //   * sessions flagged as a rough day are excluded, exactly as the load model
 //     excludes them.
 import type { WorkoutProgram, WorkoutSession } from './types';
-import { exerciseProgress } from './store';
+import { sessionPoints, fitTrend, diagnoseFlat } from './strength';
+import type { Diagnosis } from './strength';
 
 /** Not enough points to fit a line worth trusting. */
 const MIN_SESSIONS = 3;
 /** Two weeks is the least that can show a trend rather than a mood. */
 const MIN_SPAN_DAYS = 14;
-/** e1RM is an estimate; below this a "gain" is arithmetic, not strength. */
-const MIN_MEANINGFUL_KG = 2.5;
-const NOISE_SHARE = 0.02; // 2% of the working weight
 const DAY_MS = 86_400_000;
 
 export type ReturnVerdict = 'unknown' | 'declining' | 'flat' | 'working' | 'strong';
@@ -51,21 +49,15 @@ export interface LiftReturn {
   verdict: ReturnVerdict;
   /** What the program offers instead, when this one has stopped paying. */
   substitutions: string[];
-}
-
-/** Least-squares slope of y against x. Null when x never varies. */
-function slope(xs: number[], ys: number[]): number | null {
-  const n = xs.length;
-  if (n < 2) return null;
-  const mx = xs.reduce((a, b) => a + b, 0) / n;
-  const my = ys.reduce((a, b) => a + b, 0) / n;
-  let num = 0;
-  let den = 0;
-  for (let i = 0; i < n; i++) {
-    num += (xs[i] - mx) * (ys[i] - my);
-    den += (xs[i] - mx) ** 2;
-  }
-  return den === 0 ? null : num / den;
+  /** This lift's own scatter, in kilos — what it has to beat to count. */
+  typicalError: number;
+  /** How far the rep count moved; drift manufactures fake e1RM change. */
+  repDrift: number;
+  /** The bar the gain had to clear. */
+  threshold: number;
+  /** Why it is flat, when it is. Effort and load are checked before the
+   *  exercise itself is blamed. */
+  diagnosis: Diagnosis | null;
 }
 
 /**
@@ -92,6 +84,22 @@ export function substitutionIndex(program: WorkoutProgram | null | undefined): M
   return out;
 }
 
+/** The RPE the sheet asks for, per exercise. Needed to judge whether a flat
+ *  lift was actually being trained hard enough to expect anything from it.
+ *  A ranged value ("~9-10") is read at its lower bound, so a lifter is never
+ *  told they under-performed a target they in fact met. */
+export function targetRpeIndex(program: WorkoutProgram | null | undefined): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const w of program?.weeks ?? [])
+    for (const d of w.days)
+      for (const e of d.exercises) {
+        if (out.has(e.name) || !e.rpe) continue;
+        const first = parseFloat(String(e.rpe).replace(/[^0-9.\-–]/g, '').split(/[-–]/)[0]);
+        if (Number.isFinite(first) && first > 0) out.set(e.name, first);
+      }
+  return out;
+}
+
 /**
  * Rank every lift by strength returned per set invested.
  *
@@ -113,6 +121,7 @@ export function liftReturns(
   });
 
   const subs = substitutionIndex(program);
+  const targets = targetRpeIndex(program);
   const names = new Set<string>();
   for (const s of usable) for (const e of s.entries) names.add(e.name);
 
@@ -128,56 +137,73 @@ export function liftReturns(
             if ((Number.isFinite(r) && r > 0) || st.done) sets++;
           }
 
-    const series = exerciseProgress(usable, name);
-    const base: Omit<LiftReturn, 'gain' | 'perTenSets' | 'verdict' | 'from' | 'to'> = {
+    const points = sessionPoints(usable, name);
+    const unknown = (spanDays = 0): LiftReturn => ({
       name,
       sets,
-      sessions: series.length,
-      spanDays: 0,
+      sessions: points.length,
+      spanDays,
       substitutions: subs.get(name) ?? [],
-    };
+      from: 0,
+      to: 0,
+      gain: 0,
+      perTenSets: 0,
+      verdict: 'unknown',
+      typicalError: 0,
+      repDrift: 0,
+      threshold: 0,
+      diagnosis: null,
+    });
 
-    if (series.length < MIN_SESSIONS) {
-      out.push({ ...base, from: 0, to: 0, gain: 0, perTenSets: 0, verdict: 'unknown' });
+    if (points.length < MIN_SESSIONS) {
+      out.push(unknown());
       continue;
     }
-
-    const ts = series.map((p) => Date.parse(p.date));
-    const spanDays = Math.round((Math.max(...ts) - Math.min(...ts)) / DAY_MS);
-    const ys = series.map((p) => p.est1RM);
-
+    const spanDays = Math.round((points[points.length - 1].t - points[0].t) / DAY_MS);
     if (spanDays < MIN_SPAN_DAYS) {
-      out.push({ ...base, spanDays, from: 0, to: 0, gain: 0, perTenSets: 0, verdict: 'unknown' });
+      out.push(unknown(spanDays));
       continue;
     }
 
-    // Slope per day, then read the fitted line at each end of the window.
-    const days = ts.map((t) => (t - Math.min(...ts)) / DAY_MS);
-    const m = slope(days, ys);
-    if (m == null) {
-      out.push({ ...base, spanDays, from: 0, to: 0, gain: 0, perTenSets: 0, verdict: 'unknown' });
+    const trend = fitTrend(points);
+    if (!trend) {
+      out.push(unknown(spanDays));
       continue;
     }
-    const meanY = ys.reduce((a, b) => a + b, 0) / ys.length;
-    const meanX = days.reduce((a, b) => a + b, 0) / days.length;
-    const intercept = meanY - m * meanX;
-    const from = Math.round((intercept + m * Math.min(...days)) * 10) / 10;
-    const to = Math.round((intercept + m * Math.max(...days)) * 10) / 10;
-    const gain = Math.round((to - from) * 10) / 10;
 
-    // A gain has to clear the wobble in an e1RM estimate before it is called one.
-    const noise = Math.max(MIN_MEANINGFUL_KG, meanY * NOISE_SHARE);
-    const verdict: ReturnVerdict =
-      gain < -noise ? 'declining' : gain <= noise ? 'flat' : gain > noise * 2 ? 'strong' : 'working';
+    // Three outcomes, not two. `real` is the two-part test — distinguishable
+    // from this lift's own scatter AND bigger than rep drift could have
+    // manufactured. Failing it splits: if the scatter is small enough that a
+    // gain worth having would have shown, "flat" is a finding. If the scatter
+    // swamps that, nothing could have been seen, and saying "flat" would be a
+    // bluff — so it stays unknown and no swap is suggested.
+    const verdict: ReturnVerdict = trend.real
+      ? trend.gain < 0
+        ? 'declining'
+        : trend.gain > trend.threshold * 2
+          ? 'strong'
+          : 'working'
+      : trend.underpowered
+        ? 'unknown'
+        : 'flat';
 
     out.push({
-      ...base,
-      spanDays,
-      from,
-      to,
-      gain,
-      perTenSets: sets > 0 ? Math.round((gain / sets) * 10 * 10) / 10 : 0,
+      name,
+      sets,
+      sessions: points.length,
+      spanDays: trend.spanDays,
+      substitutions: subs.get(name) ?? [],
+      from: trend.from,
+      to: trend.to,
+      gain: trend.gain,
+      perTenSets: sets > 0 ? Math.round((trend.gain / sets) * 10 * 10) / 10 : 0,
       verdict,
+      typicalError: trend.typicalError,
+      repDrift: trend.repDrift,
+      threshold: trend.threshold,
+      // Only worth diagnosing when it is not moving. A lift that is working
+      // needs no explanation.
+      diagnosis: verdict === 'flat' || verdict === 'declining' ? diagnoseFlat(points, targets.get(name) ?? null) : null,
     });
   }
 

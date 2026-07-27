@@ -354,6 +354,95 @@ its siblings.
   high-rep pump work will not move e1RM much, and this does not know that. It
   reports what the numbers did, not whether that was the plan.
 
+### 5a. How "did it get stronger" is actually decided
+
+`strength.ts`. Split out from the ledger because the hard part is not whether
+the number went up — it is whether that beats this lift's own noise.
+
+**What the first version got wrong.** Backtested against 400 simulated lifters
+per condition with known ground truth, the original engine asserted a direction
+for **64% of lifters whose strength never moved at all** — and 75% of flat-but-
+noisy ones. It called 32% of genuinely stalled lifts "declining". Most of the
+ledger's confident verdicts were noise wearing a chip.
+
+| Truth | old engine | now |
+| --- | --- | --- |
+| genuinely stalled | invents a direction **64%** | **15%** |
+| flat, very noisy | invents a direction **75%** | **20%** |
+| flat, reps drifting | invents a direction **~67%** | **<25%** |
+| genuinely progressing | caught 89% | caught 48% |
+
+Sensitivity halved, and that is the trade being made deliberately: the old 89%
+is not comparable, because the same engine "found" movement in two thirds of
+lifters who had none. What matters is the gap between the two, and the gap got
+wider.
+
+**Four changes, each forced by a measurement rather than an opinion.**
+
+1. *Theil-Sen instead of least squares.* A test that failed was right to fail:
+   four sessions climbing hard then one poor one (100, 108, 116, 124, 104) has
+   one point 20 kg below the line, and squaring residuals let it dominate both
+   the slope and the scatter. The median of pairwise slopes recovers the true
+   slope exactly there. Scatter is measured robustly too, as 1.4826 x median
+   absolute deviation.
+
+2. *Mann-Kendall in place of a t-test.* The natural partner to Theil-Sen: it
+   asks whether the ordering consistently points one way, without assuming a
+   shape for the noise. The threshold `Z_CRITICAL = 1.25` was set by sweeping
+   it against the simulated populations, not chosen. At 1.0 the false-alarm
+   rate sat near 30% **no matter how many sessions were available** — that is a
+   property of the threshold, not of the evidence.
+
+3. *A rep-drift penalty.* Simulating a lifter whose true strength never changes:
+   reps drifting 8 -> 15 reports **-3.8 kg**, and 12 -> 8 reports **+3.3 kg**,
+   against real gains of +6 to +7 kg in the same data. Drift alone produces half
+   a real gain. Measured across the rep range, one rep of drift is worth up to
+   **0.67% of e1RM**, and that is now added to the bar a gain must clear.
+
+4. *The mean of the working sets, not the best one.* One lucky opening set could
+   carry a session where the other two fell. Minimal-detectable-change work
+   consistently finds smaller thresholds for average than for best values.
+
+**"Flat" and "cannot tell" are now different answers.** Failing the trend test
+means one of two very different things — *I looked and there is nothing there*
+or *I could not have seen it either way*. Calling both FLAT is a bluff, and it
+was leading to swap suggestions built on nothing. When a lift's scatter is wider
+than a gain worth finding (5% of e1RM), the verdict is `unknown` and no
+diagnosis or swap is offered.
+
+**Two things were deliberately NOT changed**, both after testing:
+
+- *Epley stays.* It sits within 2.3% of published rep-max tables from 3 to 12
+  reps. The 2026 weight-dependent equation (fit on 303,494 sets) is plausibly
+  better, but the one validation available here was circular — published
+  percentage tables are themselves close to the classical model, so they cannot
+  referee between them. Adopting an unvalidated formula that also drives PR
+  detection was not worth it. **The kg/lb question is unresolved**: `ln(w)` is
+  unit-dependent and the source is a US app, so feeding it kilos may be wrong.
+- *High-rep sets stay in.* An earlier plan was to discard sets above 12 reps.
+  Testing killed it: a lifter always doing 15s whose true 1RM goes 100 -> 110 is
+  reported at +9.8 kg, **98% of the truth**, because a constant bias cancels in
+  a trend. Only drift matters, and drift is handled directly.
+
+### 5b. Diagnosing a flat lift before blaming the exercise
+
+`diagnoseFlat` in `strength.ts`. Checked in order: **effort**, then **load
+dropping**, then **load never moving**, then **volume**, and only then the
+exercise itself.
+
+This exists because the original feature had the priority backwards. The 2025
+consensus on training-response heterogeneity is that weekly sets, proximity to
+failure and rest drive outcomes while exercise **selection is comparatively
+flexible** — so "swap this" is the least likely explanation, and swapping a lift
+you train too easily just gets you a new lift you train too easily.
+
+A dropping load and a static load get different messages. Telling someone the
+weight "hasn't moved" when they have taken 6 kg off it is simply false, and
+hides the thing they would most want to notice.
+
+The effort gap has to reach 1.5 RPE before it is raised: ratings 3-4 reps from
+failure are systematically underestimated, so a small shortfall is not evidence.
+
 ---
 
 ## 6. Known weaknesses — start here
@@ -392,7 +481,15 @@ Ordered by how likely they are to matter.
    programmed for high-rep pump work, or one carried through a deload, will read
    flat because e1RM did not move — which is true, and not the same as the lift
    being useless.
-10. **Equipment is guessed from the exercise name.** A gym with 1 kg micro
+10. **Detection is weak with few sessions, and honestly so.** Even after this
+   work, a genuinely progressing lift is only caught about half the time from
+   4-9 sessions at realistic noise. More sessions help a lot (55% -> 84% at 20),
+   but the honest position is that a handful of sessions cannot settle it.
+11. **The simulated populations are the calibration.** Thresholds are tuned
+   against synthetic lifters with Gaussian noise. If real session-to-session
+   noise is skewed or autocorrelated — a bad week rather than a bad day — the
+   calibration is optimistic.
+12. **Equipment is guessed from the exercise name.** A gym with 1 kg micro
    plates or 5 kg dumbbell jumps will get the step wrong, and there is no way
    to tell it otherwise. Letting the lifter set the step per lift would fix it.
 

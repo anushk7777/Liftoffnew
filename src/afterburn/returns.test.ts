@@ -77,15 +77,32 @@ describe('liftReturns', () => {
   });
 
   it('is not decided by one bad day at the end', () => {
-    // Four sessions climbing hard, then one poor one. Last-minus-first would
-    // call this flat; a fitted slope still reads the trend.
+    // Four sessions climbing hard, then one poor one. A least-squares fit let
+    // that single session dominate — squaring its residual wrecked both the
+    // slope and the scatter estimate, so the lift read as no trend at all.
+    // Theil-Sen takes the MEDIAN pairwise slope, so the outlier is outvoted.
     const weights = [100, 108, 116, 124, 104];
     const rs = liftReturns(
       [60, 45, 30, 15, 1].map((d, i) => s(`t${i}`, d, [['Bench Press', weights[i], 8, 3]])),
       null, 90, NOW,
     );
-    expect(find(rs, 'Bench Press').verdict).not.toBe('flat');
     expect(find(rs, 'Bench Press').gain).toBeGreaterThan(0);
+    // It must not be called a decline, whatever else it is called.
+    expect(find(rs, 'Bench Press').verdict).not.toBe('declining');
+  });
+
+  it('admits it cannot tell, instead of calling a noisy lift flat', () => {
+    // Strength never moves, but the sessions scatter wildly. "Flat" would be a
+    // finding; the honest answer is that nothing could have been seen either
+    // way — and crucially this must NOT trigger a swap suggestion.
+    const noisy = [70, 130, 75, 125, 80, 120];
+    const rs = liftReturns(
+      [75, 60, 45, 30, 15, 1].map((d, i) => s(`n${i}`, d, [['Cable Fly', noisy[i], 10, 3]])),
+      null, 90, NOW,
+    );
+    const r = find(rs, 'Cable Fly');
+    expect(r.verdict).toBe('unknown');
+    expect(r.diagnosis).toBeNull();
   });
 
   it('ignores sessions flagged as a rough day', () => {
@@ -155,5 +172,50 @@ describe('deadWeight', () => {
     const dead = deadWeight(rs, 6).map((r) => r.name);
     expect(dead).toContain('Pec Deck'); // 12 sets for nothing
     expect(dead).not.toContain('Calf Raise'); // only 4 sets — not worth a nudge
+  });
+});
+
+describe('diagnosing a flat lift', () => {
+  const prog = {
+    name: 'P', unit: 'kg', custom: [],
+    weeks: [{ id: 'w1', name: 'W1', days: [{ id: 'd1', name: 'D1', source: 'powerbuilding', exercises: [
+      { id: 'e1', name: 'Pec Deck', warmup: '1', workingSets: 3, reps: '12', rpe: '~9', lastSetRpe: '10', rest: '1m', substitutions: ['DB Flye'] },
+    ] }] }],
+  } as unknown as WorkoutProgram;
+
+  const withRpe = (id: string, daysAgo: number, weight: number, rpe: string): WorkoutSession =>
+    ({ id, date: ago(daysAgo), completedAt: ago(daysAgo),
+       entries: [{ name: 'Pec Deck', sets: Array.from({ length: 3 }, () => ({ weight: String(weight), reps: '12', rpe, done: true })) }] }) as unknown as WorkoutSession;
+
+  it('blames effort first when the sets were nowhere near failure', () => {
+    // Sheet asks RPE 9, logged at 7 throughout. Swapping the exercise would
+    // just get you a new exercise done at RPE 7.
+    const rs = liftReturns([60, 45, 30, 15].map((d, i) => withRpe(`e${i}`, d, 40, '7')), prog, 90, NOW);
+    const r = find(rs, 'Pec Deck');
+    expect(r.verdict).toBe('flat');
+    expect(r.diagnosis?.cause).toBe('effort');
+    expect(r.diagnosis?.targetRpe).toBe(9); // "~9" parsed
+  });
+
+  it('separates a weight that dropped from one that never moved', () => {
+    const dropped = liftReturns([60, 45, 30, 15].map((d, i) => withRpe(`d${i}`, d, 50 - i * 2, '9')), prog, 90, NOW);
+    expect(find(dropped, 'Pec Deck').diagnosis?.cause).toBe('load-dropping');
+    expect(find(dropped, 'Pec Deck').diagnosis?.loadChange).toBeLessThan(0);
+
+    const stuckLoad = liftReturns([60, 45, 30, 15].map((d, i) => withRpe(`s${i}`, d, 40, '9')), prog, 90, NOW);
+    expect(find(stuckLoad, 'Pec Deck').diagnosis?.cause).toBe('load-static');
+  });
+
+  it('only blames the exercise once effort and load are ruled out', () => {
+    // Trained hard, load nudged up, and the strength still did not follow.
+    const rs = liftReturns([60, 45, 30, 15].map((d, i) => withRpe(`x${i}`, d, 40 + i * 0.2, '9')), prog, 90, NOW);
+    const r = find(rs, 'Pec Deck');
+    expect(r.diagnosis?.cause).toBe('exercise');
+    expect(r.substitutions).toContain('DB Flye');
+  });
+
+  it('does not diagnose a lift that is working', () => {
+    const rs = liftReturns([60, 45, 30, 15].map((d, i) => withRpe(`w${i}`, d, 40 + i * 6, '9')), prog, 90, NOW);
+    expect(find(rs, 'Pec Deck').diagnosis).toBeNull();
   });
 });
