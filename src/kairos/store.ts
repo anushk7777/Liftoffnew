@@ -72,8 +72,12 @@ interface KairosState {
   migrateInlinePhotos: () => Promise<void>;
 }
 
-// Runs at most once per session (across every entry point that loads moments).
-let migrationStarted = false;
+// Guards against two migrations running at once — NOT against ever running
+// again. It used to be a one-shot flag, which meant a photo captured after the
+// app loaded stayed inline for the rest of the session, and a failed upload was
+// never retried. Inline photos are base64 in the synced JSON, so every one left
+// behind was re-uploaded in full on every later save.
+let migrationRunning = false;
 
 // Upsert the whole moments list to the user's cloud row. Shared by the debounced
 // subscribe and the after-load "seed the cloud" flush.
@@ -170,6 +174,10 @@ export const useKairos = create<KairosState>()(
           songUrl: m.songUrl?.trim() || undefined,
         };
         set((s) => ({ moments: [moment, ...s.moments] }));
+        // Move it to Storage now rather than at the next app load. Until it
+        // moves, the photo rides along as base64 inside every cloud save — a
+        // 1024px JPEG is a few hundred KB re-uploaded on every later change.
+        if (moment.photo?.startsWith('data:')) void get().migrateInlinePhotos();
         return moment;
       },
 
@@ -201,14 +209,20 @@ export const useKairos = create<KairosState>()(
       // Best-effort: an upload that can't run (offline / bucket missing) leaves
       // the base64 in place, so nothing is lost and it retries next session.
       migrateInlinePhotos: async () => {
-        if (!isSupabaseConfigured || migrationStarted) return;
-        migrationStarted = true;
-        const pending = inlinePhotoMoments(get().moments);
-        for (const m of pending) {
-          const path = await uploadMomentPhoto(m.id, m.photo!);
-          if (path && get().moments.some((x) => x.id === m.id)) {
-            get().updateMoment(m.id, { photo: path });
+        if (!isSupabaseConfigured || migrationRunning) return;
+        migrationRunning = true;
+        try {
+          const pending = inlinePhotoMoments(get().moments);
+          for (const m of pending) {
+            const path = await uploadMomentPhoto(m.id, m.photo!);
+            if (path && get().moments.some((x) => x.id === m.id)) {
+              get().updateMoment(m.id, { photo: path });
+            }
           }
+        } finally {
+          // Released either way, so a failed upload is retried rather than
+          // stranding the photo inline for the rest of the session.
+          migrationRunning = false;
         }
       },
     }),

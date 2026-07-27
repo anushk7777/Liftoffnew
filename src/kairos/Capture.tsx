@@ -175,7 +175,10 @@ export default function Capture({ onSaved }: { onSaved?: () => void }) {
               transition={pop}
               onClick={() => setMood((cur) => (cur === m.id ? undefined : m.id))}
               className={cn(
-                'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                // min-h so these are a comfortable thumb target — as padding
+                // alone they came out 30px tall, and picking a mood is the main
+                // interaction on this screen.
+                'inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-full text-xs font-medium border transition-colors',
                 mood === m.id ? 'text-ink' : 'text-ink-muted border-border hover:border-border-strong',
               )}
               style={mood === m.id ? { borderColor: m.color, background: `color-mix(in srgb, ${m.color} 14%, transparent)` } : undefined}
