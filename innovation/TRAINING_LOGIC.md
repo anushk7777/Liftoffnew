@@ -66,6 +66,14 @@ weekly rate. The UI shows both: `15 sets/wk · 24 logged`.
   the partial week forward was tried on paper and rejected: one push day
   multiplied by eight reports chest **over MRV**, which is the same error with
   the sign flipped. Detail in `DECISION_LOG.md` §11.1.
+- *"In progress" expires after one microcycle plus seven days.* Without an
+  expiry, skipping a single day and stopping there left the card reporting the
+  week BEFORE it, permanently — real logged sessions invisible with no way back.
+  A week that has had its whole cycle plus a week of grace is not being trained
+  any more, so whatever is in it is read as-is. The cycle length comes from the
+  lifter's own finished weeks, so the rule calibrates itself rather than being
+  tuned to one program. Ending a workout early does NOT hold a week open — the
+  day still counts as done. `DECISION_LOG.md` §11.6.
 
 ### 1a. The volume-by-program-week chart
 

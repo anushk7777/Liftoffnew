@@ -392,7 +392,19 @@ function setsInRange(sessions: WorkoutSession[], startMs: number, endMs: number)
  *  comparison window is the previous microcycle — volume concludes when the
  *  program week ends and starts anew with the next. Untagged training falls
  *  back to a trailing 7-day window anchored to the latest session. */
-export function analyzeVolume(sessions: WorkoutSession[], program?: WorkoutProgram | null): VolumeReport {
+/** Grace beyond one microcycle before an unfinished week stops being treated as
+ *  "in progress". A week you skipped a day of, or walked away from, would
+ *  otherwise wait forever to be finished — and while it waited, the card showed
+ *  the week BEFORE it, permanently. One extra calendar week is generous enough
+ *  for illness or travel to interrupt a real cycle without the reading changing
+ *  under you, and short enough that an abandoned week resolves on its own. */
+export const WEEK_GRACE_DAYS = 7;
+
+export function analyzeVolume(
+  sessions: WorkoutSession[],
+  program?: WorkoutProgram | null,
+  now: Date = new Date(),
+): VolumeReport {
   const stamped = sessions
     .map((s) => ({ s, t: Date.parse(s.completedAt ?? s.date) }))
     .filter((x) => !Number.isNaN(x.t))
@@ -432,7 +444,21 @@ export function analyzeVolume(sessions: WorkoutSession[], program?: WorkoutProgr
       (Array.isArray(program?.weeks) ? program.weeks : []).find((w) => w?.id === id)?.days?.length ?? 0;
     const planned = plannedOf(latestWeekId);
     const done = doneOf(latestWeekId);
-    const latestUnfinished = planned > 0 && done < planned;
+
+    // "In progress" has to expire, or skipping a single day traps the card on
+    // the week before, forever. Measured across five real interruption patterns:
+    // ending a workout early is harmless (the day still counts as done, so the
+    // week still completes), and skipping a day then starting the next week is
+    // harmless too (the short week becomes the subject as soon as a newer week
+    // exists). But skipping a day and simply stopping there — or walking away
+    // from a week after one session — left the reading frozen on an older week
+    // with no way back. A week that has had its whole cycle plus a week of grace
+    // is not being trained any more; whatever is in it is what happened.
+    const latestStart = Math.min(...stamped.filter((x) => x.s.weekId === latestWeekId).map((x) => x.t));
+    const cycleDays = latestWeekId ? microcycleDays(sessions) : 7;
+    const daysRunning = (now.getTime() - latestStart) / DAY_MS;
+    const stillLive = daysRunning <= cycleDays + WEEK_GRACE_DAYS;
+    const latestUnfinished = planned > 0 && done < planned && stillLive;
 
     // The most recent week that is either finished or the only one there is.
     const priorTagged = stamped.find((x) => x.s.weekId && x.s.weekId !== latestWeekId);

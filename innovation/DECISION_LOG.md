@@ -31,6 +31,7 @@ you need without reading the whole file.
 | **9** Overfitting audit | "make sure the model doesn't overfit" | not overfitted to seeds; IS fitted to an independence assumption, measured and left in place |
 | **10** Block report + app-wide fuzz | "add sets to failure, the card looks bad, find any other bugs" | card rebuilt; three more crashes found, one in the core store |
 | **11** UI/UX audit on a real phone | screenshots from the user's own device | a half-finished week was being judged as a shortfall; the header had no background; two tabs unreachable |
+| &nbsp;&nbsp;11.6 Interruptions | "what if I end early or skip a workout?" | a week you never finish used to freeze the card on the week before it, forever |
 
 **Sections 8 and 9 are the ones to trust.** Everything before it is reasoning; that one
 is arithmetic that does not depend on the code being right.
@@ -766,6 +767,74 @@ tonnage and volume, because that work was done.
 
 ---
 
+
+### 11.6 "What if I end early, or skip a workout?" — the follow-up that found a second bug
+
+Asked immediately after 11.1 shipped, and it was the right question: the rule in
+11.1 keys off *"has this week finished?"*, so anything that stops a week from
+ever finishing was a live risk. Five interruption patterns were simulated
+against the real engine rather than reasoned about.
+
+| What the lifter does | What the app did | Verdict |
+| --- | --- | --- |
+| Ends a workout early (2 sets instead of 12) | day still counts as done, week completes normally | fine — `completionMap` keys on `completedAt`, not on how much was logged |
+| Pauses mid-workout and comes back | draft is not a session; nothing counts until finished | fine |
+| Skips a day, then starts the next week | the short week is read as soon as a newer week exists | fine |
+| **Skips a day and stops there** | **stuck on the PREVIOUS week, permanently** | **bug** |
+| **Abandons a week after one session** | **stuck on the PREVIOUS week, permanently** | **bug** |
+
+The last two are the same failure: a week that will never be finished waits
+forever to be finished, and while it waits the card reports the week *before*
+it. Three logged sessions of real training become permanently invisible. Worse
+than the bug in 11.1, because 11.1 at least corrected itself once the week
+completed — this one had no exit.
+
+**Fix: "in progress" expires.** A week stops being treated as live once it has
+had one full microcycle plus `WEEK_GRACE_DAYS = 7` of grace. After that,
+whatever is in it is what happened, and it is read as the current window.
+
+Why that shape, and what was rejected:
+
+- **Rejected: a percentage threshold** ("judge it once 75% of the days are
+  done"). Invents a constant with nothing behind it, and still strands the
+  abandoned-after-one-session case forever.
+- **Rejected: time since the last session in the week.** Cannot work — the
+  analyser anchors to the newest session in the log, so an abandoned week's
+  "time since" never grows. This needed real wall-clock time, so `analyzeVolume`
+  now takes an optional `now`, matching `liftReturns` and `blockReport`.
+- **Adopted: one microcycle plus a calendar week.** The cycle length is already
+  measured from the lifter's own finished weeks (`microcycleDays`), so the rule
+  self-calibrates to whoever is using it — nothing is hardcoded to Pure
+  Bodybuilding. The 7-day grace is generous enough that illness or travel does
+  not change the reading underneath a real, slow week, and short enough that an
+  abandoned one resolves on its own.
+
+Measured after the fix, on a week left at 3 of 4 days: **one day later** it
+still shows the last complete week (you might yet finish it); **thirty days
+later** it reads the short week itself, with the pending note gone. A genuinely
+slow week five days past its last session is untouched.
+
+**The tonnage chart had the identical bug.** `latestInProgress` in
+`Progress.tsx` tested only `done < total`, so an abandoned week kept its final
+point dashed and captioned *"day 3 of 4 · on pace for 92 t"* — a forecast for a
+week that ended months ago. Same expiry now applies to both, so the chart and
+the volume card can never disagree about whether a week is still running.
+
+Five permanent tests cover the five patterns above.
+
+**Performance, since it was asked in the same breath.** Measured on two years of
+training (160 sessions, 3,840 logged sets, 20 program weeks):
+
+| | |
+| --- | --- |
+| `analyzeVolume` without the program (old path) | 3.73 ms |
+| `analyzeVolume` with the program (new path) | 3.27 ms |
+| `liftReturns` | 0.10 ms |
+| `blockReport` | 35 ms |
+
+The new work is a day count per week and one date comparison — below the noise
+floor. `blockReport` is the expensive one and always was; it is memoised on
+`[sessions, program]`, so it runs when the data changes, not on every render.
 
 ## Testing
 

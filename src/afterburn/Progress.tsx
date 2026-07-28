@@ -5,7 +5,7 @@ import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus,
 import { cn } from '../lib/utils';
 import { useAfterburn, volumeByProgramWeek, volumeTrend, weekAdherence, detectPRs, formatVolume } from './store';
 import type { PRHit } from './store';
-import { analyzeVolume, MUSCLE_LABEL } from './volume';
+import { analyzeVolume, microcycleDays, MUSCLE_LABEL, WEEK_GRACE_DAYS } from './volume';
 import type { MuscleAnalysis, VolumeStatus } from './volume';
 import { liftReturns, deadWeight } from './innovation/returns';
 import { blockReport } from './innovation/blockReport';
@@ -348,12 +348,18 @@ export default function Progress() {
     () => (latestWeek?.weekId ? weekAdherence(program, sessions, latestWeek.weekId) : null),
     [latestWeek, program, sessions],
   );
-  // Latest bucket is "in progress" while its program week still has undone days.
+  // Latest bucket is "in progress" while its program week still has undone days
+  // AND could still plausibly be finished. Without the second half, skipping one
+  // day and stopping left the final point dashed and captioned "on pace for
+  // 92 t" indefinitely — a forecast for a week that ended months ago. Same
+  // expiry the volume analyser uses: one cycle, plus a week of grace.
   const latestInProgress = useMemo(() => {
     if (!latestWeek) return false;
-    if (latestAdherence) return latestAdherence.total > 0 && latestAdherence.done < latestAdherence.total;
-    return new Date(latestWeek.start).getTime() > mountedAt - 7 * 86_400_000;
-  }, [latestWeek, latestAdherence, mountedAt]);
+    const startedAgo = (mountedAt - new Date(latestWeek.start).getTime()) / 86_400_000;
+    const live = startedAgo <= microcycleDays(sessions) + WEEK_GRACE_DAYS;
+    if (latestAdherence) return live && latestAdherence.total > 0 && latestAdherence.done < latestAdherence.total;
+    return live;
+  }, [latestWeek, latestAdherence, mountedAt, sessions]);
 
   // A program week's point only reaches its real height once every day in it is
   // logged. Plotted plain, the first session of a new week looks like volume
