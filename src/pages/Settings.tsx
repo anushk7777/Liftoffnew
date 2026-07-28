@@ -19,6 +19,7 @@ import { enablePush, disablePush, isPushSupported, isPushConfigured, pushPermiss
 import { getApiKey, setApiKey, getModel, setModel, AI_MODELS } from '../lib/aicoach';
 import type { AiModelId } from '../lib/aicoach';
 import { useAppMode } from '../afterburn/mode';
+import { useAfterburn } from '../afterburn/store';
 import { useSessionEmail, isCoach } from '../coaching/api';
 import { AccountRow } from '../components/AccountMenu';
 import { cn } from '../lib/utils';
@@ -43,6 +44,8 @@ export default function Settings() {
   } = useStore();
 
   const setAppMode = useAppMode((s) => s.setMode);
+  const noteRecallDays = useAfterburn((s) => s.noteRecallDays);
+  const setNoteRecallDays = useAfterburn((s) => s.setNoteRecallDays);
   const resetIntros = useAppMode((s) => s.resetIntros);
   const [introStatus, setIntroStatus] = useState('');
   // Templates is the coaching workspace: coach's account only.
@@ -133,6 +136,26 @@ export default function Settings() {
                 Picker
               </button>
             </div>
+          </Row>
+          {/* How long a note you leave on a lift keeps coming back. One week by
+              default — about one microcycle, so you meet the lift again while
+              the note still applies, and then it expires instead of piling up. */}
+          <Row
+            label="Repeat workout notes for"
+            desc="A note you leave on an exercise shows again next time you train it, until it expires."
+          >
+            <select
+              value={String(noteRecallDays)}
+              onChange={(e) => setNoteRecallDays(Number(e.target.value))}
+              aria-label="How long workout notes repeat"
+              className="input !w-auto !py-1.5 !px-2 text-xs min-h-[44px]"
+            >
+              <option value="0">Don't repeat</option>
+              <option value="7">1 week</option>
+              <option value="14">2 weeks</option>
+              <option value="28">4 weeks</option>
+              <option value="3650">Never expire</option>
+            </select>
           </Row>
         </Section>
 

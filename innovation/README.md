@@ -67,6 +67,8 @@ Three standing constraints, set by the app's owner and never violated:
 | 12 | **Interruptions handled** | skipping one day and stopping froze the volume card on the previous week forever | "in progress" expires after a cycle plus a week; ending early was already safe |
 | 13 | **Second look at the fixes** | the repairs above shipped five defects of their own, and the transparent-bar bug existed in four more places | all fixed; two earlier claims corrected rather than dropped |
 | 14 | **Focus dashboard rebuilt** | completing a task put it back on your home screen; the biggest card said "Not started" to an active user; a 120-day countdown printed twice | Today / momentum / consistency / this week, each tied to a named study |
+| 15 | **Morning CO2 nudge** | the test is only useful as a trend, and a trend needs a fixed time of day — one taken "whenever" is worth much less | a window 09:30-11:00, a different line each slot, silent the moment it's logged |
+| 16 | **Note recall** | a note written on a lift was filed where you'd never see it again — least of all standing in front of that machine next week | shown on the exercise itself, plus a weekly digest; expires after a week |
 
 Also repaired along the way, outside Afterburn: habit streaks that could never
 exceed 2 for a Mon/Wed/Fri habit, a backup restore that reported success
@@ -154,6 +156,14 @@ bought. The unused `scheduledTime` field turned out to be the highest-evidence
 change in the app — d = 0.65 — and nothing could set it. →
 `FOCUS_LOGIC.md` §6
 
+**"Remind me every morning to do the CO2 test, and tell me next week what notes I left."**
+Both built. The nudge is windowed rather than a single alarm, because the test
+only means anything as a trend and a trend needs a fixed time of day. Notes come
+back on the exercise they belong to, for a week, then expire. The interesting
+part was that both passed their unit tests while the reminder was invisible in a
+real browser — the check ran before the banner had mounted. →
+`TRAINING_LOGIC.md` §7
+
 **"Make sure the model doesn't overfit."**
 It is **not** overfitted to the seeds it was tuned on — five unseen draws
 reproduce it within 4 points — and it sits on a plateau rather than a knife
@@ -191,7 +201,7 @@ Full ranked lists live at the end of each document.
 ## Running it
 
 ```bash
-npm test     # 356 tests, 32 files
+npm test     # 404 tests, 35 files
 npm run lint
 npm run build
 ```

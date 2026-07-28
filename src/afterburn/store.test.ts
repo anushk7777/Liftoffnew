@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weeklyVolume, volumeByProgramWeek, volumeTrend, detectPRs, formatVolume, exerciseProgress } from './store';
+import { weeklyVolume, volumeByProgramWeek, volumeTrend, detectPRs, formatVolume, exerciseProgress, useAfterburn } from './store';
 import type { WorkoutSession } from './types';
 
 // Minimal session builder — only the fields weeklyVolume/detectPRs read.
@@ -122,5 +122,30 @@ describe('exerciseProgress e1RM', () => {
 
   it('skips a session where the lift was never loaded', () => {
     expect(exerciseProgress([s('a', '2026-07-01T10:00:00.000Z', [['', '']])], 'Squat')).toEqual([]);
+  });
+});
+
+describe('note recall setting', () => {
+  it('defaults to one week', () => {
+    expect(useAfterburn.getState().noteRecallDays).toBe(7);
+  });
+
+  it('accepts the offered values, including off', () => {
+    const { setNoteRecallDays } = useAfterburn.getState();
+    for (const v of [0, 7, 14, 28, 3650]) {
+      setNoteRecallDays(v);
+      expect(useAfterburn.getState().noteRecallDays).toBe(v);
+    }
+  });
+
+  it('falls back to the default rather than storing nonsense', () => {
+    const { setNoteRecallDays } = useAfterburn.getState();
+    // A corrupted import or a hand-edited backup must not put NaN in here —
+    // `windowDays > 0` would be false and recall would silently switch off.
+    for (const bad of [NaN, -1, Infinity, undefined as unknown as number]) {
+      setNoteRecallDays(bad);
+      expect(useAfterburn.getState().noteRecallDays).toBe(7);
+    }
+    setNoteRecallDays(7);
   });
 });

@@ -581,7 +581,80 @@ failure" would punish you for leaving the box empty.
 
 ---
 
-## 6. Known weaknesses — start here
+## 7. Two things the app knew but never told you
+
+### 7a. The morning CO2 nudge
+
+The CO2 tolerance test is only useful as a **trend**, and a trend needs the
+measurement taken at roughly the same time each day — resting, before food and
+caffeine, before training. A score taken at 9am and one taken at 9pm are not
+readings of the same thing. So a test you remember "at some point" is worth much
+less than one taken in a fixed window.
+
+`co2Nudge` in `innovation/recall.ts`.
+
+- **Window, not an alarm.** Opens 09:30, asks again on a slot every 30 minutes,
+  closes 11:00. Past 11:00 it goes quiet for the day: a reading at 3pm would
+  pollute the very trend the reminder exists to protect, and an app that nags
+  all day gets muted.
+- **Silent the instant it is logged.** Nothing kills a reminder faster than one
+  that fires after you have already done the thing. Checked against the local
+  calendar day, so a reading at 00:05 counts for that day.
+- **A different line each slot**, tightening as the window closes — by 11:00 it
+  genuinely is the last useful moment.
+- **Pure and parameterised on `now`**, so the whole schedule is testable without
+  a clock.
+
+**Decisions worth challenging**
+
+- *30-minute slots, four nudges maximum.* Arbitrary. Fewer risks missing the
+  window; more is nagging.
+- *Silence is keyed to the calendar day, not to 24 hours.* A test at 23:55 does
+  not silence the next morning, which is right — but a shift worker logging at
+  02:00 silences that day rather than the one they think of as "last night".
+- *The window is hardcoded.* Someone who trains at 6am wants it earlier. It
+  should be a setting.
+
+**The honest limitation:** this fires while the app is open or its tab is alive.
+It is not a server push, so a phone with the app fully closed gets the nudge on
+the next open **inside** the window rather than at 09:30 sharp. Delivering it
+cold needs a push subscription and a server firing at 09:30 in the user's
+timezone; `public/push-sw.js` already exists if that is wanted.
+
+### 7b. Note recall
+
+You write "left knee felt off on the last set" into an exercise note and the app
+files it where you will never see it again. The next time that lift comes round
+— exactly when the note is worth something — it is eight screens deep in
+History.
+
+`noteForExercise` and `noteDigest` in `innovation/recall.ts`.
+
+- **On the exercise, in the logger**, at the moment you are standing in front of
+  the machine.
+- **A weekly digest on Progress**, so a note about something with no obvious
+  home ("logged this weight but the machine was set differently") still surfaces.
+- **One week by default**, then it expires. Roughly one microcycle: you meet the
+  lift again while the note still applies, and it does not accumulate into a wall
+  of stale text. Configurable in Settings — off, 1/2/4 weeks, or never expire.
+- **Only the latest note per exercise.** A note from three sessions ago has
+  usually been superseded; stacking them turns a reminder into a diary.
+- **Renders nothing at all when nothing was noted**, so the app is exactly as it
+  was for anyone who does not use notes.
+
+**Decisions worth challenging**
+
+- *Latest only.* If you write two genuinely different notes on the same lift a
+  week apart, the older is lost from recall (it stays in History).
+- *Matching is by exercise NAME.* Rename a lift and its notes stop following it —
+  the same weakness the volume classifier has.
+- *Future-dated sessions are ignored*, so a clock skew or hand-edited backup
+  cannot show you a note before you wrote it.
+
+---
+
+
+## 8. Known weaknesses — start here
 
 Ordered by how likely they are to matter.
 

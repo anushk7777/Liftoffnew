@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid, TrendingUp, Timer, Calculator, ArrowRight, Search, Sparkles, Dumbbell, Wind } from 'lucide-react';
+import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid, TrendingUp, Timer, Calculator, ArrowRight, Search, Sparkles, Dumbbell, Wind, StickyNote } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { pop, springSoft, fast, useReducedMotion } from '../lib/motion';
 import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerformance, restToSeconds, detectPRs } from './store';
 import { setVerdict, ghostLabel, exerciseProgress, learnedLoadHint } from './progression';
 import { equipmentOf, loadStep, EQUIPMENT_LABEL } from './innovation/equipment';
+import { noteForExercise, agoLabel } from './innovation/recall';
 import { buildLoadModel } from './innovation/loadModel';
 import { recoveryReadiness } from './recovery';
 import { analyzeVolume } from './volume';
@@ -738,6 +739,7 @@ const END_REASONS = ["Didn't feel recovered", 'Out of time', 'Pain / niggle', 'O
 const NO_WEAK_POINTS: never[] = []; // stable identity so selectors/useMemo don't churn
 
 function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean; note?: string; roughDay?: boolean }) => void; onBack: () => void }) {
+  const noteRecallDays = useAfterburn((s) => s.noteRecallDays);
   const draft = useAfterburn((s) => s.draft)!;
   const unit = useAfterburn((s) => s.program.unit);
   const sessions = useAfterburn((s) => s.sessions);
@@ -1088,11 +1090,33 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
             )}
           </div>
 
+          {/* The note you left on THIS lift last time, shown at the moment it
+              is worth something — standing in front of the machine — instead of
+              buried eight screens deep in History. Expires after
+              `noteRecallDays` so it cannot pile up into a wall of stale text. */}
+          {(() => {
+            const past = noteForExercise(sessions, ex.name, noteRecallDays);
+            if (!past) return null;
+            return (
+              <div
+                className="mt-2 rounded-lg px-3 py-2 text-xs flex items-start gap-2"
+                style={{ background: 'var(--accent-soft)', color: 'var(--text)' }}
+              >
+                <StickyNote className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[var(--accent)]" />
+                <span>
+                  <span className="text-ink-muted">You noted {agoLabel(past.daysAgo)}:</span>{' '}
+                  <span className="italic">{past.text}</span>
+                </span>
+              </div>
+            );
+          })()}
+
           <input
             value={ex.notes}
             onChange={(e) => setExerciseNotes(exIdx, e.target.value)}
             placeholder="Notes for this exercise…"
-            className="input !py-1.5 text-sm mt-2"
+            aria-label={`Notes for ${ex.name}`}
+            className="input !py-1.5 text-sm mt-2 min-h-[44px]"
           />
         </div>
         );
@@ -1311,6 +1335,15 @@ export default function Afterburn() {
 
   const showLogger = !!draft && !minimized;
   const showTabs = !draft || minimized;
+
+  // The morning CO2 banner asks to be taken straight to the test. Without this
+  // the button switched workspace and dropped you on whatever tab you left
+  // open, which is exactly the friction the reminder exists to remove.
+  useEffect(() => {
+    const open = () => setTab('progress');
+    window.addEventListener('afterburn:open-co2', open);
+    return () => window.removeEventListener('afterburn:open-co2', open);
+  }, []);
 
   // The five tabs are wider than a phone. Two problems follow: the selected tab
   // can sit off-screen after a jump from a link or a restored session, and the
