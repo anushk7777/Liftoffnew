@@ -18,6 +18,7 @@ innovation/
   KAIROS_LOGIC.md      ← the diary: search, resurfacing, photos
 
 src/afterburn/innovation/
+  blockReport.ts       ← what the whole block actually bought
   strength.ts          ← did this lift actually get stronger? (the hard one)
   returns.ts           ← which lifts are earning their sets
   equipment.ts         ← what you can actually add to the bar
@@ -60,6 +61,7 @@ Three standing constraints, set by the app's owner and never violated:
 | 6 | **Strength verdict rebuilt** | the ledger was inventing directions for lifts that never moved | false direction on genuinely stalled lifts: **64% → 17%** |
 | 7 | **"Cannot tell" as its own answer** | "flat" was being asserted where nothing could be read either way | 53% of stalled and 78% of very noisy lifts now return *unknown* instead of a bluff |
 | 8 | **Diagnosis before blame** | "swap this exercise" was the first suggestion and the least likely cause | effort → load → volume → exercise, in that order |
+| 9 | **Block report** | ten weeks of work left no mark; every number was in the log but never added up | one screen: weeks, sessions, tonnage, adherence, biggest gain, what bought least, PRs |
 
 Also repaired along the way, outside Afterburn: habit streaks that could never
 exceed 2 for a Mon/Wed/Fri habit, a backup restore that reported success
@@ -103,6 +105,11 @@ but your lifts are not independent. Where it would *not* help is also recorded �
 the signal-to-noise limit is information-theoretic, and a confident model at the
 same true accuracy is strictly worse than admitting uncertainty. →
 `DECISION_LOG.md` §7
+
+**"What do these features contribute to a normal person?"**
+Mostly: the app used to quietly tell you wrong things. It never crashed, so
+nothing looked broken — it just gave bad advice with a straight face. →
+`README.md` "What was achieved"
 
 **"Is the innovation actually correct, or are we hallucinating?"**
 Partly hallucinating, as it turned out. An audit of code that had *passing
@@ -148,7 +155,7 @@ Full ranked lists live at the end of each document.
 ## Running it
 
 ```bash
-npm test     # 304 tests, 28 files
+npm test     # 319 tests, 30 files
 npm run lint
 npm run build
 ```

@@ -509,6 +509,52 @@ failure are systematically underestimated, so a small shortfall is not evidence.
 
 ---
 
+## 5d. The block report
+
+`blockReport` in `innovation/blockReport.ts`, shown on Progress.
+
+A block ends and nothing happens. You close the app on the last session of week
+10 exactly as you closed it on the first session of week 1, and ten weeks of
+work leaves no mark. Every number needed to say what happened was already in the
+log — it had just never been added up.
+
+Nothing here is a new measurement. It reads engines that already exist — the
+strength verdict, program-week tonnage, PR detection, adherence — so the report
+and the charts can never disagree about the same figure.
+
+**Deload weeks are excluded from the strength trend, and only from that.**
+
+This is **not** deload detection, which the app deliberately does not do. The
+program *names* those weeks itself ("Week 5 · Deload") and deliberately drops the
+load in them. A strength trend spanning one measures the taper, not the block.
+
+It matters because Pure Bodybuilding ends **both** of its blocks with a deload —
+so the report would show no "biggest gain" at exactly the moment it is read.
+Verified by seeding four weeks (a gain is found: +16 kg) and then five (it
+vanishes).
+
+The deload still counts in tonnage, sets, adherence and the weekly bars, because
+that work was done.
+
+**Read from the program, not the session.** A session keeps whatever `weekName`
+it was stamped with when logged, which can be missing, stale, or from an older
+revision of the sheet — and the filter would then silently do nothing. Deload
+week *ids* are resolved from the program and matched on `weekId`. A test covers
+exactly this: sessions carrying a non-matching `weekName` must still be excluded.
+
+**Decisions worth challenging**
+
+- *It stays quiet rather than guessing.* One logged session gets a headline and
+  nothing else — no "biggest gain" computed from a single point.
+- *A stall is only named when it cost something* (6+ sets). A lift you did twice
+  is not a finding.
+- *"Complete" means every week of the program*, not every week you touched —
+  otherwise one finished week would read as a finished block.
+- *Only sessions whose `weekId` belongs to this program count*, so stale
+  sessions from a previous program cannot inflate the tonnage.
+
+---
+
 ## 6. Known weaknesses — start here
 
 Ordered by how likely they are to matter.
@@ -568,5 +614,5 @@ session barely moving the prescription, a sustained real drop still being
 followed, every refusal case, and every exercise name the program can show.
 
 ```bash
-npm test
+npm test        # 319 tests, 30 files
 ```

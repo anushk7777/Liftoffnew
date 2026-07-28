@@ -7,6 +7,7 @@ import { useAfterburn, volumeByProgramWeek, volumeTrend, weekAdherence, detectPR
 import { analyzeVolume, MUSCLE_LABEL } from './volume';
 import type { MuscleAnalysis, VolumeStatus } from './volume';
 import { liftReturns, deadWeight } from './innovation/returns';
+import { blockReport } from './innovation/blockReport';
 import type { LiftReturn, ReturnVerdict } from './innovation/returns';
 import { recoveryReadiness, co2Band } from './recovery';
 import type { ReadinessVerdict } from './recovery';
@@ -317,6 +318,9 @@ export default function Progress() {
 
   // ---- "Volume IQ" — hard sets per muscle vs scientific landmarks ----
   const vol = useMemo(() => analyzeVolume(sessions), [sessions]);
+
+  // ---- Block report — the ten weeks added up ----
+  const block = useMemo(() => blockReport(sessions, program), [sessions, program]);
 
   // ---- Return on volume — which lifts are earning their sets ----
   const returns = useMemo(() => liftReturns(sessions, program), [sessions, program]);
@@ -641,6 +645,121 @@ export default function Progress() {
           </div>
         )}
       </section>
+
+      {/* Block report — what the whole program actually bought. A block ends
+          and nothing happens: you close the app on the last session of week 10
+          exactly as you closed it on the first of week 1. Every number here was
+          already in the log, just never added up. */}
+      {block.hasData && block.sessions >= 3 && (
+        <motion.section
+          initial={rm ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
+          className="space-y-3"
+        >
+          <h2 className="section-label flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5" /> {block.complete ? 'Block complete' : 'Block so far'}
+          </h2>
+          <div
+            className={cn('neo-card p-5 space-y-4', block.complete && 'border-ember')}
+            style={block.complete ? { boxShadow: '0 0 0 1px var(--ember), 0 8px 30px -12px var(--ember)' } : undefined}
+          >
+            <div>
+              <p className="font-display text-2xl font-bold text-ink leading-tight">
+                {block.complete ? `${block.programName} — done.` : block.programName}
+              </p>
+              <p className="text-sm text-ink mt-1">
+                <span className="font-medium">{block.weeks.length}</span> week
+                {block.weeks.length === 1 ? '' : 's'} ·{' '}
+                <span className="font-medium">{block.sessions}</span> session
+                {block.sessions === 1 ? '' : 's'} ·{' '}
+                <span className="font-medium">{formatVolume(block.tonnage, unit)}</span> moved
+              </p>
+              <p className="text-[11px] text-ink-subtle mt-1">
+                {block.spanDays} days · {block.sets} sets across {block.lifts} lifts ·{' '}
+                {block.daysDone} of {block.daysPlanned} prescribed days ({block.adherencePct}%)
+              </p>
+            </div>
+
+            {/* Per-week tonnage, so the shape of the block is visible at a glance */}
+            {block.weeks.length > 1 && (
+              <div className="space-y-1.5">
+                {block.weeks.map((w) => {
+                  const peak = Math.max(...block.weeks.map((x) => x.tonnage), 1);
+                  return (
+                    <div key={w.id} className="flex items-center gap-2">
+                      <span className="text-[11px] text-ink-subtle w-24 shrink-0 truncate">{w.name}</span>
+                      <div className="flex-1 h-2 rounded-full bg-elevated overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full"
+                          style={{ background: 'var(--ember)' }}
+                          initial={rm ? { width: `${(w.tonnage / peak) * 100}%` } : { width: 0 }}
+                          animate={{ width: `${(w.tonnage / peak) * 100}%` }}
+                          transition={{ duration: 0.6, ease: [0.21, 1, 0.4, 1] }}
+                        />
+                      </div>
+                      <span className="text-[11px] text-ink-subtle tabular-nums w-20 text-right shrink-0">
+                        {formatVolume(w.tonnage, unit)}
+                        {w.done < w.planned && <span className="opacity-60"> · {w.done}/{w.planned}</span>}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-2.5 pt-1">
+              {block.bestLift && (
+                <div className="rounded-xl bg-elevated border border-border p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Biggest gain</p>
+                  <p className="text-sm text-ink font-medium mt-0.5">{block.bestLift.name}</p>
+                  <p className="text-[11px] text-ink-subtle mt-0.5">
+                    <span className="text-ember font-medium">
+                      +{block.bestLift.gain}{unit}
+                    </span>{' '}
+                    estimated 1RM over {block.bestLift.spanDays} days, on {block.bestLift.sets} sets
+                  </p>
+                </div>
+              )}
+
+              {block.stalledLift && (
+                <div className="rounded-xl bg-elevated border border-border p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Bought the least</p>
+                  <p className="text-sm text-ink font-medium mt-0.5">{block.stalledLift.name}</p>
+                  <p className="text-[11px] text-ink-subtle mt-0.5">
+                    {block.stalledLift.sets} sets, no movement it could measure.
+                    {block.wastedSets > block.stalledLift.sets && (
+                      <> {block.wastedSets} sets across every stalled lift.</>
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {block.prs.length > 0 && (
+                <div className="rounded-xl bg-elevated border border-border p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">
+                    {block.prs.length} personal best{block.prs.length === 1 ? '' : 's'}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {block.prs.map((pr, i) => (
+                      <span key={i} className="chip text-ember border-ember bg-ember-soft !text-[11px]">
+                        <Trophy className="w-3 h-3" /> {pr.lift} {pr.value}
+                        {pr.kind === 'weight' ? unit : ' e1RM'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-ink-subtle border-t border-border pt-2">
+              {block.complete
+                ? 'Every prescribed day logged. Everything here is read from your own sessions — nothing is estimated on your behalf.'
+                : 'Updates as you log. "Biggest gain" and "bought the least" stay empty until there is enough to say either honestly.'}
+            </p>
+          </div>
+        </motion.section>
+      )}
 
       {/* Weekly training volume — overall progress, not per-exercise */}
       <section className="space-y-3">
