@@ -896,11 +896,144 @@ rule in `index.css` still holds.
 - The "Supabase isn't configured" warning is **2.80:1** in light mode. Real, but
   it only appears when the environment is misconfigured.
 
+## 12. Getting the CO2 nudge to a phone that is switched off
+
+§11 built the morning nudge; this made it arrive. The in-app reminder could only
+fire while a tab was alive, which is the one situation a 09:30 reminder is not
+in: the app is shut and the phone is in a pocket. It arrived on the next open
+*inside* the window, which on most mornings meant not at all.
+
+`supabase/functions/send-co2-nudge/index.ts`, on a 5-minute `pg_cron`, pushing
+through the VAPID setup that already existed for task reminders.
+
+### 12.1 The server does not know when your morning is
+
+The window is local — 09:30 to 11:00 where you are — and the sender runs on UTC.
+Nothing in the database said where any device was.
+
+The zone is now stored **per subscription, not per account** (`push_subscriptions
+.time_zone`), written on subscribe and refreshed on every app open. The phone is
+the thing that buzzes, so a phone that flies somewhere starts nudging on the new
+local morning the first time Liftoff is opened there. No setting, no prompt.
+
+A subscription with no zone yet is **skipped and counted**, never assumed to be
+UTC. Guessing would buzz someone at 3am; skipping self-heals on the next open,
+and the response reports `missingZone` so the cause is visible rather than
+mysterious.
+
+### 12.2 The de-dup key has to carry the zone
+
+The obvious ledger key is (user, local day, slot). It is wrong, and the way it is
+wrong is easy to miss: two devices belonging to one person in two countries are
+in genuinely different mornings, but their local *date strings* are usually the
+same. Whichever fired first would claim the key and silence the other for the
+rest of the day.
+
+The key is (user, **zone**, local day, slot), and it is **claimed before
+sending**. Claiming after would turn any provider blip into a loop that re-sends
+every 5 minutes for 90 minutes. Both are asserted by tests that fail when the
+behaviour is reverted (see 12.5).
+
+### 12.3 Five minutes, and five minutes of grace
+
+The cron runs every 5 minutes, not every minute. The window is 90 minutes long
+and the ledger makes overlapping ticks harmless, so a minute of precision buys
+nothing and costs 288 extra invocations a day. Five also divides every real UTC
+offset — including the 30-minute ones (India, Adelaide) and the 45-minute ones
+(Nepal, Chatham) — so 09:30 local is always a tick the cron lands on.
+
+The sender allows 5 minutes of grace past 11:00, because without it a tick that
+ran late would drop the last call silently. The grace cannot produce a fifth
+nudge: the slot index is unchanged for the whole half hour after 11:00, and the
+slot is part of the key. A minute-by-minute sweep asserts exactly four.
+
+### 12.4 One rule, two runtimes
+
+The Edge Function is deployed by pasting one file into the Supabase dashboard, so
+it cannot import from `src/`. The scheduling rule therefore exists twice — the
+classic way a reminder ends up firing at the right hour in the browser and the
+wrong hour on a phone, invisible in review and noticed only in bed.
+
+It is written once in `src/afterburn/innovation/co2Server.ts`, copied verbatim by
+`scripts/sync-co2-shared.mjs`, and `co2ServerParity.test.ts` fails the build if
+the two differ by a character. The parity test re-implements the extraction
+rather than importing it from the script: a check that shares its parser with the
+tool it checks agrees with that tool even when both are wrong.
+
+The rule was also rewritten to take a zone and an instant instead of reading the
+clock, which is what made DST, half-hour offsets and travel testable rather than
+hoped-for. One test hands the browser rule and the server rule the same instant
+and requires identical wording, so the screen and the push can never disagree.
+
+### 12.5 Testing an Edge Function that cannot be run
+
+Everything that can actually go wrong here lives in the orchestration, not the
+arithmetic, and none of it is reachable from a unit test of the schedule.
+
+So vitest aliases the function's `npm:` specifiers to in-memory fakes
+(`src/test/stubs/`) and the test imports **the real file** — the exact bytes that
+get pasted into the dashboard — stubs `Deno.serve` to capture the handler, and
+drives whole requests against a fake Postgres that enforces the migration's
+primary keys. 22 tests cover two phones in two countries, five overlapping cron
+ticks in one slot, a reading logged mid-window, a dead subscription, a database
+that refuses, and test mode leaving no trace.
+
+Three mutations were introduced deliberately to check the tests have teeth, and
+each was caught by exactly the test that should have caught it:
+
+| Mutation | Caught by |
+| --- | --- |
+| zone dropped from the de-dup key | *does not let a phone in one country silence a phone in another* |
+| missing zone defaulted to UTC | *skips a subscription with no timezone rather than guessing UTC* |
+| cron grace removed | *still delivers the 11:00 last call when a tick runs 4 minutes late* |
+
+### 12.6 The bug the browser found
+
+Tapping the banner **from Focus** landed on the Programs tab, not the test.
+
+The banner switched workspace and then dispatched `afterburn:open-co2`
+immediately — but in Focus the whole Afterburn tree is lazy and unmounted, so
+nothing was listening. The event went nowhere. This is the third time in this
+feature that the same shape of bug has appeared: code that raises an intent runs
+before the code that handles it exists. It passed every unit test, and it was
+only visible by driving a real browser and reading which tab came up.
+
+Both paths now latch the intent (`deepLink.ts`) rather than shouting it: the URL
+one for a tapped notification, the in-app one for the banner. The URL flag is
+stripped from the address bar on the way through, or a refresh next Tuesday
+reopens the test.
+
+### 12.7 Only one notification
+
+With push on, the server sends the nudge whether the app is open or shut — so the
+client raising its own OS notification would put a duplicate card in the shade.
+The client now suppresses its copy when a subscription exists and draws only the
+in-app banner, which is the one thing push cannot do. Both use the same
+notification tag as a second line of defence, and `push-sw.js` sets `renotify` so
+a replacing notification still alerts (without it, the 10:00 nudge would silently
+overwrite the 09:30 one and the reminder would appear to have stopped).
+
+Verified in a browser across 12 combinations of time, workspace and subscription
+state: banner counts and OS notification counts both as intended, and nothing at
+all once the test is logged.
+
+### 12.8 What is still weak
+
+- A laptop left at home nudges on its own morning too. Arguably it should not.
+- `missingZone` is invisible in the app — a device that has not been opened since
+  the migration will not be nudged and nothing says so.
+- The server trusts `workout_data.recovery` for "already logged". Sync is about a
+  second behind logging, so a nudge could in principle be sent in that gap.
+- The grace is 5 minutes because the cron is. Change one and the other has to
+  change too; only a comment says so.
+- **iOS delivers web push only to a PWA installed to the Home Screen.** In a
+  plain Safari tab there is no push at all and the in-app nudge is the only path.
+
 
 ## Testing
 
 ```bash
-npm test        # 324 tests, 31 files
+npm test        # 475 tests, 38 files
 ```
 
 Beyond unit tests, each behavioural claim in this log was checked against

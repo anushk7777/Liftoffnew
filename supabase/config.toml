@@ -8,3 +8,9 @@ verify_jwt = false
 # The Kairos anniversary resurfacer is likewise called by pg_cron (once a day).
 [functions.send-journal-resurfacing]
 verify_jwt = false
+
+# The morning CO2 nudge sender, called by pg_cron every 5 minutes. It works out
+# each device's local 09:30 from the timezone stored on its subscription, so it
+# has to run far more often than it sends.
+[functions.send-co2-nudge]
+verify_jwt = false

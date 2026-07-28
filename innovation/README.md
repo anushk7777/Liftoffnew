@@ -69,6 +69,7 @@ Three standing constraints, set by the app's owner and never violated:
 | 14 | **Focus dashboard rebuilt** | completing a task put it back on your home screen; the biggest card said "Not started" to an active user; a 120-day countdown printed twice | Today / momentum / consistency / this week, each tied to a named study |
 | 15 | **Morning CO2 nudge** | the test is only useful as a trend, and a trend needs a fixed time of day — one taken "whenever" is worth much less | a window 09:30-11:00, a different line each slot, silent the moment it's logged |
 | 16 | **Note recall** | a note written on a lift was filed where you'd never see it again — least of all standing in front of that machine next week | shown on the exercise itself, plus a weekly digest; expires after a week |
+| 17 | **The nudge reaches a closed phone** | the reminder could only fire while a tab was alive — which is precisely not the situation at 09:30, when the app is shut and the phone is in a pocket | a server push on a 5-minute cron, using the timezone stored on each device; four slots a morning, keyed per zone so two countries cannot silence each other |
 
 Also repaired along the way, outside Afterburn: habit streaks that could never
 exceed 2 for a Mon/Wed/Fri habit, a backup restore that reported success
@@ -164,6 +165,17 @@ part was that both passed their unit tests while the reminder was invisible in a
 real browser — the check ran before the banner had mounted. →
 `TRAINING_LOGIC.md` §7
 
+**"Set up the server push so it works when the app is closed."**
+Done. The zone lives on each push subscription rather than on the account, so
+09:30 means 09:30 where the *phone* is, and travelling corrects itself on the
+next open; a subscription with no zone is skipped rather than assumed to be UTC,
+because guessing buzzes someone at 3am. The de-dup key carries the zone, or two
+devices in two countries silence each other. The scheduling rule now exists in
+two runtimes and is held byte-identical by a test. Driving a real browser found a
+third instance of this feature's recurring bug: tapping the banner from Focus
+landed on the Programs tab, because the Afterburn tree is lazy and nothing was
+listening yet. → `TRAINING_LOGIC.md` §7c, `DECISION_LOG.md` §12
+
 **"Make sure the model doesn't overfit."**
 It is **not** overfitted to the seeds it was tuned on — five unseen draws
 reproduce it within 4 points — and it sits on a plateau rather than a knife
@@ -201,7 +213,7 @@ Full ranked lists live at the end of each document.
 ## Running it
 
 ```bash
-npm test     # 404 tests, 35 files
+npm test     # 475 tests, 38 files
 npm run lint
 npm run build
 ```

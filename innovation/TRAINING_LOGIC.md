@@ -581,7 +581,7 @@ failure" would punish you for leaving the box empty.
 
 ---
 
-## 7. Two things the app knew but never told you
+## 7. Two things the app knew but never told you — and getting one of them out
 
 ### 7a. The morning CO2 nudge
 
@@ -615,11 +615,8 @@ less than one taken in a fixed window.
 - *The window is hardcoded.* Someone who trains at 6am wants it earlier. It
   should be a setting.
 
-**The honest limitation:** this fires while the app is open or its tab is alive.
-It is not a server push, so a phone with the app fully closed gets the nudge on
-the next open **inside** the window rather than at 09:30 sharp. Delivering it
-cold needs a push subscription and a server firing at 09:30 in the user's
-timezone; `public/push-sw.js` already exists if that is wanted.
+**Delivery** is covered in 7c: the in-app half only fires while a tab is alive,
+so the cold path — a phone fully closed at 09:30 — is served by a server push.
 
 ### 7b. Note recall
 
@@ -650,6 +647,70 @@ History.
   the same weakness the volume classifier has.
 - *Future-dated sessions are ignored*, so a clock skew or hand-edited backup
   cannot show you a note before you wrote it.
+
+### 7c. Getting it to a closed phone
+
+The in-app nudge had one flaw that mattered more than everything else in 7a: at
+09:30 the app is shut and the phone is in a pocket, which is precisely the
+situation it could not handle. It arrived on the next open *inside* the window,
+which on most mornings meant not at all.
+
+`send-co2-nudge` (Supabase Edge Function) on a 5-minute `pg_cron`, pushing
+through the VAPID setup that already existed for task reminders.
+
+- **The zone lives on the subscription, not on the account.** The phone is the
+  thing that buzzes, so `push_subscriptions.time_zone` is per device, written on
+  subscribe and refreshed on every app open. A phone that flies to another
+  country starts nudging on the new local morning the first time Liftoff is
+  opened there — no setting, no prompt.
+- **A missing zone sends nothing.** A subscription made before the column
+  existed is skipped and counted in the response as `missingZone`, rather than
+  defaulting to UTC and buzzing someone at 3am. It self-heals on the next open.
+- **The de-dup key is (user, zone, local day, slot)** and is *claimed before
+  sending*. The zone is in the key on purpose: two devices in different countries
+  are in genuinely different mornings, and keying on the day alone would let the
+  first to fire silence the second for the rest of the day.
+- **Five minutes, not one.** The window is 90 minutes long and the ledger makes
+  overlapping ticks harmless, so a minute of precision would buy nothing and cost
+  288 extra invocations a day. Five also divides every real UTC offset —
+  including the 30-minute ones (India, Adelaide) and the 45-minute ones (Nepal,
+  Chatham) — so 09:30 local is always a tick the cron lands on.
+- **Five minutes of grace past 11:00**, so a cron tick that runs late still
+  delivers the last call instead of dropping it silently. It cannot add a fifth
+  nudge: the slot index is unchanged for the whole half hour after 11:00, and the
+  slot is part of the key.
+- **Only one of the two halves raises an OS notification.** When a push
+  subscription exists the server owns that job and the client draws only the
+  in-app banner — the thing push cannot do. Both use the same notification tag as
+  a second line of defence, so a duplicate would replace rather than stack.
+- **Tapping it opens the test**, via `/?co2=1` → switch to Afterburn → Progress.
+  A service worker can only hand the app a URL, so the intent is latched at boot
+  and claimed when the lazily-loaded Afterburn tree mounts. The flag is stripped
+  from the address bar on the way through, or a refresh next Tuesday reopens it.
+
+**The duplication, and why it is safe.** The Edge Function is deployed by pasting
+one file into the Supabase dashboard, so it cannot import from `src/`. The
+scheduling rule therefore exists twice — the classic way a reminder ends up
+firing at the right hour in the browser and the wrong hour on a phone. It is
+written once in `innovation/co2Server.ts`, copied verbatim by
+`scripts/sync-co2-shared.mjs`, and `co2ServerParity.test.ts` fails the build if
+the two differ by a single character.
+
+**Decisions worth challenging**
+
+- *Per-device zone rather than per-account.* Two devices in two countries both
+  nudge, each on its own morning. Arguably a laptop left at home should not.
+- *`missingZone` skips silently.* Correct, but invisible — there is no in-app
+  sign that a device will not be nudged until it has been opened once.
+- *The server trusts `workout_data.recovery` for "already logged".* Sync is
+  ~1 second after logging, so a nudge could in principle be sent in the gap.
+  Never observed, and the window is a 5-minute tick wide.
+- *The grace is 5 minutes because the cron is.* If the cron period changes, the
+  grace has to change with it; nothing enforces that beyond a comment.
+
+**The honest limitation that remains:** iOS delivers web push only to a PWA
+**installed to the Home Screen** (iOS 16.4+). In a plain Safari tab there is no
+push at all, and the in-app nudge is still the only path.
 
 ---
 
@@ -706,12 +767,25 @@ Ordered by how likely they are to matter.
 
 ## Testing
 
-`src/afterburn/{volume,classify,progression}.test.ts and
-src/afterburn/innovation/{loadModel,equipment,returns,strength}*.test.ts`
+`src/afterburn/{volume,classify,progression,co2Reminder,deepLink}.test.ts and
+src/afterburn/innovation/{loadModel,equipment,returns,strength,recall,co2Server,co2ServerParity}*.test.ts`
 — the behavioural claims above are covered, including the 11-day-cycle miscalibration, one rough
 session barely moving the prescription, a sustained real drop still being
 followed, every refusal case, and every exercise name the program can show.
 
+The nudge's schedule is tested against real zones rather than against UTC: the
+window opens at 09:30 local in seven zones including the 45-minute (Kathmandu)
+and +14 (Kiritimati) offsets, keeps opening on six DST-transition mornings
+including Lord Howe's 30-minute shift, and a minute-by-minute sweep of three
+whole days per zone asserts it never fires outside the window and never exceeds
+four slots in a local day. One test hands the browser rule and the server rule
+the same instant and requires identical wording, so the screen and the push can
+never disagree.
+
 ```bash
-npm test        # 324 tests, 31 files
+npm test        # 475 tests, 38 files
+
+# The schedule is timezone logic, so run it somewhere else too:
+TZ=Asia/Kathmandu npm test
+TZ=Australia/Lord_Howe npm test
 ```

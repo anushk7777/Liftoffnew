@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Wind, X } from 'lucide-react';
 import { useAppMode } from './mode';
 import { subscribeCo2Nudge, getCo2Nudge, clearCo2Nudge } from './co2Reminder';
+import { requestCo2DeepLink } from './deepLink';
 import { useReducedMotion } from '../lib/motion';
 
 export default function Co2Banner() {
@@ -44,6 +45,11 @@ export default function Co2Banner() {
                 // Straight to the test — a reminder you have to go hunting for
                 // is a reminder you dismiss. Switching workspace is a no-op when
                 // you are already in Afterburn.
+                //
+                // Latch the intent as well as dispatching it: from Focus the
+                // Afterburn tree is lazy and has no listener yet, so the event
+                // alone was lost and the tap landed on Programs.
+                requestCo2DeepLink();
                 setAppMode('afterburn');
                 window.dispatchEvent(new Event('afterburn:open-co2'));
               }}

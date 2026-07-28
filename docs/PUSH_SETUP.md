@@ -14,6 +14,10 @@ The sender, tables, schedule, and config are all version-controlled:
 - `supabase/migrations/20260619_schedule_send_reminders.sql` — the every-minute cron
 - `supabase/config.toml` — sets `verify_jwt = false` for the function
 
+**Steps 0–5 below set up task reminders. [Step 7](#7-the-morning-co2-nudge)
+adds the morning CO2 nudge** — it reuses the same VAPID keys and the same
+subscriptions, so do it after this is working.
+
 ## 0. Generate VAPID keys
 
 ```bash
@@ -94,6 +98,75 @@ and tasks still fire exactly once.
 - `ok: false, step: "secrets"` → the VAPID secrets aren't set (step 3).
 - `401` on the test URL → Verify JWT wasn't turned off (step 4).
 - Still nothing → check the function's **Logs** in the dashboard.
+
+## 7. The morning CO2 nudge
+
+Sends the 09:30–11:00 CO2 tolerance reminder to a **closed** app. Reuses the
+VAPID keys and `push_subscriptions` rows from the steps above — no new secrets.
+~5 minutes.
+
+- `supabase/functions/send-co2-nudge/index.ts` — the sender
+- `supabase/migrations/20260728_co2_push.sql` — the `time_zone` column + `co2_nudge_log` ledger
+- `supabase/migrations/20260728_schedule_co2_nudge.sql` — the 5-minute cron
+
+**7a. Tables** (SQL Editor) — run `supabase/migrations/20260728_co2_push.sql`.
+It adds `push_subscriptions.time_zone` and creates the de-dup ledger. Safe to
+re-run.
+
+**7b. Deploy** (Edge Functions) — "Deploy a new function" → **Via Editor** →
+name it **`send-co2-nudge`** → paste `supabase/functions/send-co2-nudge/index.ts`
+→ **Deploy** → turn **Verify JWT OFF**.
+
+> Paste the file **as it is in the repo**. It carries a copy of the scheduling
+> rule between two `SHARED WITH …` markers, kept byte-identical to
+> `src/afterburn/innovation/co2Server.ts` by `node scripts/sync-co2-shared.mjs`
+> and enforced by `co2ServerParity.test.ts`. Editing the copy by hand is how the
+> browser ends up saying 09:30 and the phone buzzing at 08:30.
+
+**7c. Schedule** (SQL Editor) — run
+`supabase/migrations/20260728_schedule_co2_nudge.sql`. Confirm with
+`select jobname, schedule, active from cron.job;`.
+
+**7d. Give it your timezone.** The nudge fires at 09:30 *local*, and the sender
+runs on UTC — so it reads the IANA zone stored on each subscription. Existing
+subscriptions have none yet. **Open Liftoff once on each device**: the app writes
+the zone on boot (`syncPushSubscription` in `src/lib/push.ts`) and refreshes it
+every time, so travelling corrects itself. Settings → Reminders shows which zone
+this device is sending as.
+
+**7e. Test.**
+
+1. `https://<project-ref>.supabase.co/functions/v1/send-co2-nudge?test=1` →
+   expect `{ ok: true, sent: ≥1 }` and a notification within seconds. Test mode
+   ignores the window, the "already logged" check and the ledger.
+2. A real run: `…/send-co2-nudge` with no query string. Between 09:30 and 11:00
+   local, with today's test not yet logged, expect `due: 1` and `sent: ≥1`.
+   Outside that window expect `skippedLoggedOrClosed: ≥1` and `sent: 0` — that is
+   the function working, not failing.
+3. Tap the notification: it should open Liftoff on Afterburn → Progress.
+
+### What the response fields mean
+
+| Field | Meaning |
+|-------|---------|
+| `subscriptions` | Devices found across all users. `0` → nobody has push on. |
+| `missingZone` | Subscriptions with no timezone yet — **open the app on that device** (7d). These are skipped, never guessed. |
+| `due` | Zone-groups owed a nudge on this tick. |
+| `sent` | Pushes actually delivered. |
+| `skippedAlreadySent` | This slot was already pushed — the ledger doing its job. Normal. |
+| `skippedLoggedOrClosed` | Outside the window, or the test is already logged today. Normal for all but 90 minutes a day. |
+
+### Behaviour worth knowing
+
+- **Four nudges a morning, maximum** — 09:30, 10:00, 10:30 and an 11:00 last
+  call, each with its own line. It stops the moment the test is logged.
+- **The cron runs every 5 minutes**, so a nudge can land up to ~4 minutes late.
+  The sender allows 5 minutes of grace past 11:00 so a late tick still delivers
+  the last call; that cannot produce a fifth nudge.
+- **Two devices in one country share a nudge; two in different countries each
+  get their own morning** — the de-dup key is (user, zone, local day, slot).
+- **Only one OS notification.** With push on, the app stops raising its own copy
+  and shows only the in-app banner.
 
 ## Notes
 

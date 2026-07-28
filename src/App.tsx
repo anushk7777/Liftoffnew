@@ -18,6 +18,8 @@ import QuickAdd from './components/QuickAdd';
 import AlarmOverlay from './components/AlarmOverlay';
 import Co2Banner from './afterburn/Co2Banner';
 import { useCo2Reminder } from './afterburn/co2Reminder';
+import { readCo2DeepLink } from './afterburn/deepLink';
+import { syncPushSubscription } from './lib/push';
 import InstallPrompt from './components/InstallPrompt';
 import OfflineBanner from './components/OfflineBanner';
 
@@ -68,11 +70,24 @@ function Shell() {
   const rm = useReducedMotion();
   const isMobile = useIsMobile();
   const appMode = useAppMode((s) => s.mode);
+  const setAppMode = useAppMode((s) => s.setMode);
   useReminders();
   // Morning CO2 nudge — windowed 09:30-11:00, silent once the test is logged.
   useCo2Reminder();
 
   const [authChecking, setAuthChecking] = useState(true);
+
+  useEffect(() => {
+    // A tapped CO2 notification arrives as a URL (`/?co2=1`), because a service
+    // worker can only hand the app a location. The test lives in Afterburn, so
+    // switch workspace here; the Afterburn tree claims the same latch when it
+    // mounts and lands on the right tab.
+    if (readCo2DeepLink()) setAppMode('afterburn');
+    // Keep this device's push subscription and its timezone current — that is
+    // what lets the 09:30 nudge follow you across a timezone, and what stops a
+    // revoked permission leaving the app waiting for a push that cannot come.
+    void syncPushSubscription();
+  }, [setAppMode]);
 
   useEffect(() => {
     supabase.auth

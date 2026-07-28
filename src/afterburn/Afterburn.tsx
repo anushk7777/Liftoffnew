@@ -8,6 +8,7 @@ import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerforma
 import { setVerdict, ghostLabel, exerciseProgress, learnedLoadHint } from './progression';
 import { equipmentOf, loadStep, EQUIPMENT_LABEL } from './innovation/equipment';
 import { noteForExercise, agoLabel } from './innovation/recall';
+import { readCo2DeepLink, consumeCo2DeepLink } from './deepLink';
 import { buildLoadModel } from './innovation/loadModel';
 import { recoveryReadiness } from './recovery';
 import { analyzeVolume } from './volume';
@@ -1341,6 +1342,12 @@ export default function Afterburn() {
   // open, which is exactly the friction the reminder exists to remove.
   useEffect(() => {
     const open = () => setTab('progress');
+    // Same intent arriving from outside the app: a push notification tapped on
+    // the lock screen, which reaches us as `/?co2=1`. Reading first makes this
+    // ordering-proof — whichever of the shell and this tree runs earlier claims
+    // the URL, and the other finds the latch already set.
+    readCo2DeepLink();
+    if (consumeCo2DeepLink()) open();
     window.addEventListener('afterburn:open-co2', open);
     return () => window.removeEventListener('afterburn:open-co2', open);
   }, []);

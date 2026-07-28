@@ -17,6 +17,11 @@ self.addEventListener('push', (event) => {
       icon: '/pwa-192.png',
       badge: '/pwa-192.png',
       tag: data.tag || 'liftoff-reminder',
+      // A tag makes a later notification REPLACE an earlier one instead of
+      // stacking. Without renotify that replacement is silent, so the CO2
+      // window's 10:00 nudge would quietly overwrite the 09:30 one and never
+      // alert — the reminder would appear to have stopped working.
+      renotify: true,
       data: { url: data.url || '/' },
     }),
   );

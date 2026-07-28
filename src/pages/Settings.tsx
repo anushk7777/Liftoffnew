@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import { useStore } from '../store/useStore';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { requestNotificationPermission, notificationPermission, notificationsSupported } from '../lib/reminders';
-import { enablePush, disablePush, isPushSupported, isPushConfigured, pushPermission } from '../lib/push';
+import { enablePush, disablePush, isPushSupported, isPushConfigured, pushPermission, deviceTimeZone } from '../lib/push';
 import { getApiKey, setApiKey, getModel, setModel, AI_MODELS } from '../lib/aicoach';
 import type { AiModelId } from '../lib/aicoach';
 import { useAppMode } from '../afterburn/mode';
@@ -283,7 +283,7 @@ export default function Settings() {
           {isPushSupported() && (
             <Row
               label="Push reminders"
-              desc="Get reminders even when Liftoff is closed (requires server setup)."
+              desc="Due tasks and the 09:30 CO2 nudge, delivered even when Liftoff is closed."
             >
               <Toggle
                 checked={push}
@@ -308,10 +308,20 @@ export default function Settings() {
               Push isn’t configured for this deployment yet. See docs/PUSH_SETUP.md to add VAPID keys and the sender function.
             </p>
           )}
+          {isPushSupported() && push && (
+            /* The CO2 window is local, so the server sends by this zone. Shown
+               because a wrong one is otherwise invisible — the only symptom is a
+               nudge at the wrong hour, which reads as "the reminder is broken". */
+            <p className="text-xs text-ink-subtle mb-2">
+              Morning nudges use this device’s timezone: <strong>{deviceTimeZone()}</strong>. Open Liftoff
+              once after travelling and it follows you.
+            </p>
+          )}
           <div className="bg-elevated p-3 rounded-md text-xs text-ink-subtle space-y-2 border border-border">
             <p><strong>1. In-App Alarms:</strong> Trigger immediately when Liftoff is open.</p>
             <p><strong>2. Browser Notifications:</strong> Trigger natively if permission is granted.</p>
-            <p><strong>3. Email & Mobile Push:</strong> Delivered via your Calendar app. Use 'Add to Calendar' on a scheduled task to sync it.</p>
+            <p><strong>3. Push:</strong> Sent from the server, so they arrive with the app closed. Each device subscribes separately — turn this on again on your phone.</p>
+            <p><strong>4. Email &amp; Calendar:</strong> Use 'Add to Calendar' on a scheduled task to sync it.</p>
           </div>
           <button
             onClick={() => {

@@ -2,16 +2,20 @@
 // `innovation/recall.ts` as a pure function; this is only the plumbing that
 // runs it on a timer and remembers what it has already asked.
 //
-// Honest limitation, stated here because it matters: this fires while the app
-// is open or in the background with the tab alive. It is not a server push, so
-// a phone with the app fully closed will get the nudge on the next open inside
-// the window, not at 09:30 sharp. Delivering it cold would need a push
-// subscription and a server sending at 09:30 in the user's timezone — a much
-// larger change, and `public/push-sw.js` already exists if that is wanted later.
+// This is the IN-APP half of the reminder, and it can only fire while a tab is
+// alive. The cold path — a phone with the app fully closed at 09:30 — is served
+// by the `send-co2-nudge` Edge Function, which pushes on a 5-minute cron using
+// the timezone stored on each device's push subscription.
+//
+// The two halves are deliberately not both allowed to raise an OS notification:
+// when a push subscription exists, the server owns that job and this file only
+// draws the in-app banner. See the notification block below.
 import { useEffect } from 'react';
 import { useAfterburn } from './store';
 import { co2Nudge } from './innovation/recall';
+import { CO2_TAG } from './innovation/co2Server';
 import { notificationsSupported } from '../lib/reminders';
+import { isPushActive } from '../lib/push';
 
 const FIRED_KEY = 'liftoff_co2_nudged';
 
@@ -102,11 +106,17 @@ export function useCo2Reminder(enabled = true) {
       // itself reads the store, so it cannot miss one raised before it mounted.
       window.dispatchEvent(new CustomEvent('liftoff:co2-nudge', { detail: pending }));
 
-      if (notificationsSupported() && Notification.permission === 'granted') {
+      // When this device has a live push subscription, the server sends this
+      // same nudge itself — and it does so whether the app is open or shut, so
+      // raising a second identical notification here would only put a duplicate
+      // card in the shade. The in-app banner above still shows, because that is
+      // the one thing push cannot do: land on the screen you are already
+      // looking at.
+      if (!isPushActive() && notificationsSupported() && Notification.permission === 'granted') {
         try {
           // One tag for the whole feature: a later slot REPLACES the earlier
           // notification rather than stacking four of them in the shade.
-          new Notification(nudge.title, { body: nudge.body, tag: 'afterburn-co2' });
+          new Notification(nudge.title, { body: nudge.body, tag: CO2_TAG });
         } catch {
           /* ignore */
         }
