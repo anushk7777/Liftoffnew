@@ -357,7 +357,7 @@ function ScheduledItem({
       <StatusToggle status={task.status} onToggle={onToggle} />
       <span className="font-mono-data text-[11px] text-primary w-14 shrink-0">{format(new Date(task.scheduledAt!), 'h:mm a')}</span>
       <PriorityDot priority={task.priority} />
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left text-sm text-on-surface hover:text-primary truncate">
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left text-sm text-on-surface hover:text-primary line-clamp-2 leading-snug">
         {task.title}
       </button>
       <button onClick={onUnschedule} title="Remove time" className="opacity-0 group-hover/item:opacity-100 transition-opacity p-1 rounded text-on-surface-variant hover:text-danger">
@@ -392,7 +392,7 @@ function LooseItem({
       <PriorityDot priority={task.priority} />
       <button
         onClick={onEdit}
-        className={cn('flex-1 min-w-0 text-left text-sm truncate', done ? 'line-through text-text-subtle' : 'text-on-surface hover:text-primary')}
+        className={cn('flex-1 min-w-0 text-left text-sm line-clamp-2 leading-snug', done ? 'line-through text-text-subtle' : 'text-on-surface hover:text-primary')}
       >
         {task.title}
       </button>
@@ -431,7 +431,7 @@ function BacklogItem({
   return (
     <div className="group/item glass-panel rounded-xl px-3 py-2 flex items-center gap-2 hover:border-border-strong transition-colors">
       <PriorityDot priority={task.priority} />
-      <button onClick={onEdit} className="flex-1 min-w-0 text-left text-sm text-on-surface hover:text-primary truncate">
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left text-sm text-on-surface hover:text-primary line-clamp-2 leading-snug">
         {task.title}
       </button>
       <button

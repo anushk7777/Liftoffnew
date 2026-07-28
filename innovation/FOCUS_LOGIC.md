@@ -133,7 +133,216 @@ at 0 until hover.
 
 ---
 
-## 5. Known weaknesses — start here
+## 6. The dashboard rebuild — and the evidence behind each piece
+
+Triggered by the owner, verbatim: *"the Liftoff Focus app really looks bad — I'm
+not able to use it. If I mark a task as done I can see the same task marked done
+on my dashboard, it's cluttered and doesn't make sense. Afterburn is very easy to
+use and informative. If we're not able to improve we'll have to shut it down."*
+
+### 6.1 What was wrong, measured
+
+Seeded with a realistic week (9 tasks, 3 habits, focus sessions, a 6-day streak)
+and rendered at 390x844:
+
+| Problem | Detail |
+| --- | --- |
+| **Completed tasks came back** | `recentWins(tasks)` rendered a "Recent wins" list of exactly the tasks already shown on the Tasks page under Completed. Finishing work ADDED to the home screen instead of clearing it. This was the owner's specific complaint and it was real. |
+| **The biggest card said "Not started"** | `hasRoadmap` is false without a roadmap, so the largest card read *"Progress — Not started / Map out your plan"* to someone with nine tasks, three habits, 3.9 hours of focus and a six-day streak. It could only read a roadmap and ignored everything else. |
+| **The countdown appeared twice** | "120 days to go" in the headline and "120 / Days left" as a stat, on one screen. |
+| **Habits were absent** | Three habits configured, none on the home screen. The daily loop had no home. |
+| **The main action was dismissal** | One task under "Up next" with a full-width "Mark complete" button — the primary action on the home screen was to make something disappear. |
+
+**Two things that looked like bugs and were not.** The streak and focus-hours
+tiles both read 0 on the first pass. That was the test fixture writing
+`{startedAt, minutes}` and setting `streak` directly, when the real shapes are
+`{date, durationMins, kind}` and `streak` is DERIVED from `activityHistory`.
+Reported as bugs they would have been fabrications; both work correctly.
+
+### 6.2 What replaced it
+
+New engine at `src/focus/today.ts` — pure, deterministic, every function takes
+`now` so nothing depends on the clock.
+
+| Card | What it answers | Evidence |
+| --- | --- | --- |
+| **Your day** | tasks and habits due now, one tickable list | Masicampo & Baumeister (2011, JPSP): unfinished goals produce intrusive thoughts and worse performance on unrelated tasks; making a SPECIFIC PLAN eliminated the effect |
+| **This week vs last** | what moved, against your own previous week | Amabile & Kramer, ~12,000 diary entries from 238 people: progress on meaningful work is the single strongest marker of a good day |
+| **Consistency** | a rate over 14 days, with a dot row | Lally et al. (2010), 96 people over 12 weeks: median 66 days to automaticity (range 18-254), and **missing one day did not alter the curve** |
+| **This week** | a finish line close enough to pull toward | Kivetz, Urminsky & Zheng (2006), 948 café-card holders: gaps between visits shrank ~20% as the card filled |
+
+Plus `scheduledTime` on habits, which had existed on the type and in `addHabit`
+since the beginning with **no UI that could set it**. Gollwitzer & Sheeran's
+meta-analysis — 94 tests, ~8,000 participants — puts "when situation X, I will
+do Y" at **d = 0.65** on goal attainment. It is now in the add-habit form and
+shown on the habit row and in the Today list.
+
+### 6.3 Decisions worth challenging
+
+- *Overdue tasks are pulled INTO today, and lead the list.* A task you missed is
+  still today's problem; leaving it on another screen is how it stays missed.
+  The cost is that a long-neglected task nags daily. Marked "N days late" rather
+  than silently merged.
+- *A task with no due date never appears.* Otherwise every unscheduled idea
+  piles into today and the list stops meaning anything. The cost is that the
+  dashboard is empty until you schedule something — which the empty state says.
+- *A task ticked TODAY stays in the list; one finished on an earlier day drops.*
+  Ticking something must not make it vanish under your finger.
+- *Done items are NOT sorted to the bottom.* Same reason: reordering under the
+  finger is disorienting. Strikethrough carries the distinction instead.
+- *The comparison is to your own last week, never to a target.* A target set
+  months ago mostly measures how optimistic you were that day.
+- *No arrow at all until there is a real previous week.* Inventing a direction
+  from one week of data is the mistake the training side had to be rebuilt to
+  stop (`DECISION_LOG.md` §6.4).
+
+### 6.4 Deliberately NOT built
+
+- **Points, badges, levels.** Nothing in the evidence supports them for personal
+  goals, and they would cheapen an app used seriously.
+- **A streak that resets to zero.** Directly contradicted by Lally et al. The
+  old `streak` field still exists and still feeds the coach; it is simply no
+  longer what the dashboard leads with.
+- **AI-written encouragement on the dashboard.** There is a Coach tab for that.
+  A dashboard should show facts.
+- **Any rebuild of Tasks or Focus.** Both measured clean; they work.
+
+### 6.5 A bug introduced and caught in the same pass
+
+`weekReview` first compared a task's due date against the current INSTANT, so
+everything due today counted as "slipped" from the moment the screen loaded —
+telling you that you had failed at tasks you still had all afternoon to do.
+Now compares against the start of today. Covered by a regression test.
+
+### 6.6 Timezone: two fixtures that passed only in UTC
+
+The first test run went green immediately, which was suspicious. Run under
+`TZ=Pacific/Auckland` two tests failed: `NOW` was built from a `Z` timestamp
+whose LOCAL weekday is Wednesday at UTC+12, while the fixture asserted Tuesday,
+and day keys were produced by slicing an ISO string (UTC) while `dayKey()`
+formats local. The production code was correct throughout — it reads the user's
+local day everywhere — but the tests would have passed in CI and failed on the
+owner's machine in UTC+5:30. `NOW` is now constructed in local time and day keys
+go through `date-fns`. The suite runs green under UTC, Asia/Kolkata,
+America/Los_Angeles, Pacific/Auckland and Pacific/Kiritimati (UTC+14).
+
+### 6.7 UI audit across the workspace
+
+Every Focus screen measured in both themes.
+
+| Fixed | Detail |
+| --- | --- |
+| Contrast on cards | `--text-subtle` was tuned against `--bg` only, so it passed on the page and still failed on every card. Re-tuned against `--elevated` in all four theme scopes. |
+| Light-mode semantic colours | `--success`, `--danger`, `--warning` and `--cozy` are tuned to glow against black and measured **2.9-4.4:1 on white**, where they carry "2 days late", "Overdue", the week deltas. Darkened for the two LIGHT scopes only; same hue, dark mode untouched. |
+| **Opacity on a var() colour, a third time** | `text-ink-subtle/40` computes to `rgb(244,243,241)` — that is `--text`, the BRIGHTEST token. Every one of these asked for "dimmer" and got "brightest". Three sites, now using real `opacity-*` utilities. |
+| 7px text | The habit strip drew its weekday letter at 7px, under half the 11px floor. Cell 14px -> 20px, letter 7px -> 11px. |
+| Floating buttons over content | The panic button sat bottom-LEFT, exactly where headings are — measured covering the word "CONSISTENCY". Moved to the right column above the FAB; bottom padding raised from 112px to 208px so both clear the last card. |
+| Unlabelled fields | Habit name, habit emoji, focus task, brain-dump capture — four fields a screen reader announced as blank. |
+| Truncated task titles | Wrapped to two lines instead. The distinguishing half of a title was being cut. |
+| Stats stepper buttons | Unlabelled and under 44px. |
+
+### 6.8 Known weaknesses of the rebuild
+
+1. ~~The accent coral reads at 4.0-4.4:1 as small text on white.~~ **Fixed** —
+   approved by the owner and deepened in light mode only; see §6a.
+2. **Schedule day cells are 39x64.** Seven columns cannot be 44px wide on a
+   390px screen without a 2px gutter. Passes WCAG 2.5.8 (24x24 minimum); fails
+   the 44px AAA guidance. Left as is.
+3. **"This week" is Monday-start and hardcoded.** No setting for people whose
+   week starts Sunday.
+4. **Consistency reads `activityHistory`, which the app writes on any activity.**
+   It measures "opened and did something", not "did the work". A day where you
+   ticked one trivial task counts the same as a full one.
+5. **The roadmap is still a separate, unintegrated feature.** The dashboard no
+   longer nags about it, but it also no longer surfaces it at all.
+
+---
+
+
+## 6a. Dark mode, and the colour system underneath it
+
+Asked for directly: *"I want the dark mode to be nicely implemented."* It was
+not a matter of taste — the problem measured.
+
+### The finding
+
+**A card was invisible against the page.**
+
+| | before | after |
+| --- | --- | --- |
+| Focus: page -> card | **1.05:1** | 1.16:1 |
+| Focus: card border | **1.18:1** | 1.41:1 |
+| Afterburn: page -> card | **1.07:1** | 1.16:1 |
+| Afterburn: card border vs card | **1.09:1** | 1.31:1 |
+
+At 1.05:1 there is no visible boundary at all. Every screen read as one flat
+black sheet with text floating on it, which is most of what "looks bad" meant.
+
+**Why it happened.** The theme leans on shadows for elevation —
+`--shadow-md: 0 8px 28px rgba(0,0,0,0.55)`. A black shadow on a near-black page
+renders nothing. In dark mode elevation has to come from **surface lightness**,
+which is what Material's dark theme does: composite white over the base rather
+than picking greys by eye (1dp = 5%, 8dp = 12%). Their #121212 base at 8dp gives
+1.38:1; ours now gives 1.30:1 from a considerably darker base.
+
+**The page colour is unchanged.** `#08080a` and `#0a0a0b` are the obsidian
+identity. Only the things sitting *on* the page were lifted.
+
+### The trap this walked into twice
+
+Raising the surfaces **breaks the text on them**. `--text-subtle` had been tuned
+against `--elevated` and measured 4.58:1; against the new lighter `--elevated` it
+fell to 3.66:1. Fixing contrast in one direction broke it in the other. Both had
+to be solved together, and every text token was re-derived against the final
+surface, not the old one.
+
+The same trap, one level down, caught the light theme: `--success`, `--danger`
+and `--warning` were tuned against **white** and passed at 4.57:1, but the stat
+tiles are `--elevated`, not white, where they measured 3.8-4.2:1.
+
+**The rule that came out of it:** tune a text token against the *darkest surface
+in dark mode and the darkest surface in light mode* that it will ever sit on —
+never against the page.
+
+### The accent
+
+`--accent` in light Focus was `#e14b34`, measuring **3.99:1** as text on white.
+It carries the active nav label and "Today". `--cozy` was worse: the active
+bottom-tab label sits on a `--cozy-soft` pill that composites to
+rgb(245,232,230), where it measured **3.82:1** — the label you look at most
+often was the least legible element in the workspace.
+
+Both deepened, same hue: accent 4.57:1 against the page and 4.76:1 on a card;
+cozy 4.61:1 on its own pill. White-on-accent buttons improve by the same amount,
+so nothing was traded away. **Dark mode defines its own lighter accent and was
+not touched.**
+
+### The Focus timer's Start button
+
+White bold text on `linear-gradient(#ffb07a, #ff7a5c, #ff5c8a)` measured
+**1.79:1** on the peach end and 2.94:1 on the rose — the primary button of the
+timer was the least readable thing on its screen, in both themes.
+
+Two ways out: dull the gradient enough to carry white, or change the text. The
+gradient is the workspace's signature, so the text changed — deep brown
+`#2b1206` clears **6.00:1 at its worst stop** with the sunset left exactly as
+designed.
+
+*(Note for future audits: this button now reports ~1.1:1 to any tool that reads
+`backgroundColor`, because the fill is a `background-image`. That reading is
+wrong — there is no opaque colour in the DOM chain to find. Verified by hand.)*
+
+### Method note
+
+Light mode was initially tested by removing the `dark` class from `<html>`. That
+leaves `<body>` on the dark background, so several "light mode" contrast numbers
+were taken on a half-switched page. The theme is driven by `theme` in the store;
+switching it there and reloading is the only reading worth trusting.
+
+---
+
+
+## 7. Known weaknesses — start here
 
 Ordered by how likely they are to matter.
 

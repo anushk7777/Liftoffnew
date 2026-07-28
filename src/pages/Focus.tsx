@@ -336,8 +336,18 @@ export default function Focus() {
                   whileHover={{ scale: 1.05, boxShadow: '0 0 30px color-mix(in srgb, var(--timer-glow) 45%, transparent)' }}
                   whileTap={{ scale: 0.95 }}
                   onClick={start}
-                  className="px-12 py-5 rounded-full text-white font-bold tracking-[0.2em] uppercase"
-                  style={{ background: 'linear-gradient(90deg, var(--timer-1), var(--timer-2), var(--timer-3))' }}
+                  /* Dark ink on the sunset, not white. White measured 1.79:1
+                     on the peach end of this gradient and 2.94:1 on the rose —
+                     the primary button of the whole timer was the least legible
+                     thing on the screen, in both themes. Deep brown clears 6:1
+                     at every stop and keeps the gradient exactly as designed;
+                     dulling the sunset to carry white would have cost the
+                     workspace its signature. */
+                  className="px-12 py-5 min-h-[56px] rounded-full font-bold tracking-[0.2em] uppercase"
+                  style={{
+                    background: 'linear-gradient(90deg, var(--timer-1), var(--timer-2), var(--timer-3))',
+                    color: '#2b1206',
+                  }}
                 >
                   Start {MODE_META[mode].label}
                 </motion.button>
@@ -411,7 +421,8 @@ export default function Focus() {
                 setTaskId(null); // free-form text unlinks any picked task
               }}
               placeholder="What are you working on?"
-              className="input w-full text-center"
+              aria-label="What are you working on?"
+              className="input w-full min-h-[44px] text-center"
             />
             {openTasks.length > 0 && (
               <select

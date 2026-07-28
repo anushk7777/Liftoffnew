@@ -104,7 +104,11 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
 
       {/* Scrollable content with pull-to-refresh sync */}
       <PullToRefresh onRefresh={() => useStore.getState().syncNow()} className="flex-1 min-h-0">
-        <div className="px-4 py-5 pb-28">
+        {/* pb-52. Two controls float over this region, now stacked in the same
+            right-hand column: the quick-add FAB reaches 144px up from the bottom
+            edge and the panic button above it reaches 196px. At the original
+            112px both sat on top of the last card. */}
+        <div className="px-4 py-5 pb-52">
           <Suspense fallback={<div className="py-16 text-center text-ink-subtle animate-pulse">Loading…</div>}>
             <AnimatePresence mode="wait">
               <motion.div

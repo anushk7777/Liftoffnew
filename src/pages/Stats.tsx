@@ -183,14 +183,14 @@ function Counter({
         </div>
         <div>
           <p className="font-display text-2xl font-bold text-ink">{value}</p>
-          <p className="text-[11px] uppercase tracking-wider text-ink-subtle">{label}</p>
+          <p className="text-[11px] uppercase tracking-wider text-ink-muted">{label}</p>
         </div>
       </div>
       <div className="flex items-center gap-1">
-        <button onClick={onDec} className="btn btn-secondary p-2">
+        <button onClick={onDec} aria-label={`Decrease ${label}`} className="btn btn-secondary p-2 min-w-[44px] min-h-[44px]">
           <Minus className="w-4 h-4" />
         </button>
-        <button onClick={onInc} className="btn btn-primary p-2">
+        <button onClick={onInc} aria-label={`Increase ${label}`} className="btn btn-primary p-2 min-w-[44px] min-h-[44px]">
           <Plus className="w-4 h-4" />
         </button>
       </div>

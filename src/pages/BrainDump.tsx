@@ -106,6 +106,7 @@ function Inbox() {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(e);
           }}
           placeholder="Type an idea and hit ⌘/Ctrl + Enter…"
+          aria-label="Capture an idea"
           rows={3}
           className="input resize-none border-0 focus:ring-0 focus:shadow-none bg-transparent"
         />
