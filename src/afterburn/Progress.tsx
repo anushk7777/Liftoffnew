@@ -660,36 +660,77 @@ export default function Progress() {
           <h2 className="section-label flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5" /> {block.complete ? 'Block complete' : 'Block so far'}
           </h2>
+
           <div
-            className={cn('neo-card p-5 space-y-4', block.complete && 'border-ember')}
-            style={block.complete ? { boxShadow: '0 0 0 1px var(--ember), 0 8px 30px -12px var(--ember)' } : undefined}
+            className={cn('neo-card overflow-hidden', block.complete && 'border-ember')}
+            style={block.complete ? { boxShadow: '0 0 0 1px var(--ember), 0 10px 40px -18px var(--ember)' } : undefined}
           >
-            <div>
-              <p className="font-display text-2xl font-bold text-ink leading-tight">
-                {block.complete ? `${block.programName} — done.` : block.programName}
+            {/* Hero. One number carries the card; the program name is a label
+                above it rather than a two-line headline competing with it. */}
+            <div
+              className="px-5 pt-5 pb-4"
+              style={{ background: 'linear-gradient(180deg, var(--ember-soft) 0%, transparent 100%)' }}
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle truncate">
+                {block.programName}
+                {block.complete && <span className="text-ember"> · done</span>}
               </p>
-              <p className="text-sm text-ink mt-1">
-                <span className="font-medium">{block.weeks.length}</span> week
-                {block.weeks.length === 1 ? '' : 's'} ·{' '}
-                <span className="font-medium">{block.sessions}</span> session
-                {block.sessions === 1 ? '' : 's'} ·{' '}
-                <span className="font-medium">{formatVolume(block.tonnage, unit)}</span> moved
+              <p className="font-display text-4xl font-bold text-ink leading-none mt-1.5 tabular-nums">
+                {formatVolume(block.tonnage, unit)}
               </p>
-              <p className="text-[11px] text-ink-subtle mt-1">
-                {block.spanDays} days · {block.sets} sets across {block.lifts} lifts ·{' '}
-                {block.daysDone} of {block.daysPlanned} prescribed days ({block.adherencePct}%)
+              <p className="text-[11px] text-ink-subtle mt-1.5">
+                moved across {block.weeks.length} week{block.weeks.length === 1 ? '' : 's'} · {block.spanDays} days
               </p>
             </div>
 
-            {/* Per-week tonnage, so the shape of the block is visible at a glance */}
+            {/* Stat grid. Six small facts read faster than three fat boxes. */}
+            <div className="grid grid-cols-3 border-t border-border divide-x divide-border">
+              {[
+                { v: String(block.sessions), l: 'sessions' },
+                { v: `${block.adherencePct}%`, l: 'of plan' },
+                { v: String(block.sets), l: 'sets' },
+              ].map((x) => (
+                <div key={x.l} className="px-2 py-3 text-center">
+                  <p className="font-display text-lg font-bold text-ink leading-none tabular-nums">{x.v}</p>
+                  <p className="text-[10px] text-ink-subtle mt-1">{x.l}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 border-t border-border divide-x divide-border">
+              {[
+                // Accent only a number worth celebrating — a highlighted zero
+                // reads as an achievement and is worse than plain text.
+                { v: String(block.lifts), l: 'lifts', accent: false },
+                { v: String(block.failureSets), l: 'to failure', accent: block.failureSets > 0 },
+                { v: String(block.prs.length), l: `PR${block.prs.length === 1 ? '' : 's'}`, accent: block.prs.length > 0 },
+              ].map((x) => (
+                <div key={x.l} className="px-2 py-3 text-center">
+                  <p className={cn('font-display text-lg font-bold leading-none tabular-nums', x.accent ? 'text-ember' : 'text-ink')}>
+                    {x.v}
+                  </p>
+                  <p className="text-[10px] text-ink-subtle mt-1">{x.l}</p>
+                </div>
+              ))}
+            </div>
+
+            {block.failureSets > 0 && (
+              <p className="px-5 py-2.5 text-[11px] text-ink-subtle border-t border-border">
+                <span className="text-ink">{block.failureSets} sets</span> taken to RPE 10 across{' '}
+                <span className="text-ink">{block.failureLifts}</span> lift
+                {block.failureLifts === 1 ? '' : 's'} — {block.failureRate}% of every set you rated.
+              </p>
+            )}
+
+            {/* The shape of the block. Deload weeks show as the dip they are. */}
             {block.weeks.length > 1 && (
-              <div className="space-y-1.5">
+              <div className="px-5 py-4 space-y-2 border-t border-border">
                 {block.weeks.map((w) => {
                   const peak = Math.max(...block.weeks.map((x) => x.tonnage), 1);
+                  const short = w.name.replace(/^Week\s*/i, 'W').replace(/\s*·\s*/, ' ');
                   return (
-                    <div key={w.id} className="flex items-center gap-2">
-                      <span className="text-[11px] text-ink-subtle w-24 shrink-0 truncate">{w.name}</span>
-                      <div className="flex-1 h-2 rounded-full bg-elevated overflow-hidden">
+                    <div key={w.id} className="flex items-center gap-2.5">
+                      <span className="text-[10px] text-ink-subtle w-16 shrink-0 truncate">{short}</span>
+                      <div className="flex-1 h-1.5 rounded-full bg-elevated overflow-hidden">
                         <motion.div
                           className="h-full rounded-full"
                           style={{ background: 'var(--ember)' }}
@@ -698,64 +739,76 @@ export default function Progress() {
                           transition={{ duration: 0.6, ease: [0.21, 1, 0.4, 1] }}
                         />
                       </div>
-                      <span className="text-[11px] text-ink-subtle tabular-nums w-20 text-right shrink-0">
+                      <span className="text-[10px] text-ink-subtle tabular-nums w-14 text-right shrink-0">
                         {formatVolume(w.tonnage, unit)}
-                        {w.done < w.planned && <span className="opacity-60"> · {w.done}/{w.planned}</span>}
                       </span>
+                      {w.done < w.planned && (
+                        <span className="text-[10px] text-ink-subtle/60 tabular-nums w-7 text-right shrink-0">
+                          {w.done}/{w.planned}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-2.5 pt-1">
-              {block.bestLift && (
-                <div className="rounded-xl bg-elevated border border-border p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Biggest gain</p>
-                  <p className="text-sm text-ink font-medium mt-0.5">{block.bestLift.name}</p>
-                  <p className="text-[11px] text-ink-subtle mt-0.5">
-                    <span className="text-ember font-medium">
-                      +{block.bestLift.gain}{unit}
-                    </span>{' '}
-                    estimated 1RM over {block.bestLift.spanDays} days, on {block.bestLift.sets} sets
-                  </p>
-                </div>
-              )}
-
-              {block.stalledLift && (
-                <div className="rounded-xl bg-elevated border border-border p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Bought the least</p>
-                  <p className="text-sm text-ink font-medium mt-0.5">{block.stalledLift.name}</p>
-                  <p className="text-[11px] text-ink-subtle mt-0.5">
-                    {block.stalledLift.sets} sets, no movement it could measure.
-                    {block.wastedSets > block.stalledLift.sets && (
-                      <> {block.wastedSets} sets across every stalled lift.</>
-                    )}
-                  </p>
-                </div>
-              )}
-
-              {block.prs.length > 0 && (
-                <div className="rounded-xl bg-elevated border border-border p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">
-                    {block.prs.length} personal best{block.prs.length === 1 ? '' : 's'}
-                  </p>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {block.prs.map((pr, i) => (
-                      <span key={i} className="chip text-ember border-ember bg-ember-soft !text-[11px]">
-                        <Trophy className="w-3 h-3" /> {pr.lift} {pr.value}
-                        {pr.kind === 'weight' ? unit : ' e1RM'}
-                      </span>
-                    ))}
+            {/* Highlights, colour-coded so the good and the bad are not the
+                same grey box. */}
+            {(block.bestLift || block.stalledLift) && (
+              <div className="border-t border-border divide-y divide-border">
+                {block.bestLift && (
+                  <div className="px-5 py-3 flex items-start gap-3">
+                    <TrendingUp className="w-4 h-4 mt-0.5 shrink-0 text-success" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Biggest gain</p>
+                      <p className="text-sm text-ink font-medium leading-snug">{block.bestLift.name}</p>
+                      <p className="text-[11px] text-ink-subtle mt-0.5">
+                        <span className="text-success font-medium">+{block.bestLift.gain}{unit}</span> estimated 1RM
+                        on {block.bestLift.sets} sets
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+                {block.stalledLift && (
+                  <div className="px-5 py-3 flex items-start gap-3">
+                    <Minus className="w-4 h-4 mt-0.5 shrink-0 text-[var(--warning)]" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Bought the least</p>
+                      <p className="text-sm text-ink font-medium leading-snug">{block.stalledLift.name}</p>
+                      <p className="text-[11px] text-ink-subtle mt-0.5">
+                        <span className="text-[var(--warning)] font-medium">{block.stalledLift.sets} sets</span>, no
+                        movement it could measure
+                        {block.wastedSets > block.stalledLift.sets && (
+                          <> · {block.wastedSets} across every stalled lift</>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
-            <p className="text-[11px] text-ink-subtle border-t border-border pt-2">
+            {block.prs.length > 0 && (
+              <div className="px-5 py-3.5 border-t border-border">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle mb-2">
+                  Personal bests
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {block.prs.map((pr, i) => (
+                    <span key={i} className="chip text-ember border-ember bg-ember-soft !text-[11px] !py-1">
+                      <Trophy className="w-3 h-3" /> {pr.lift} · {pr.value}
+                      {pr.kind === 'weight' ? unit : ' e1RM'}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="px-5 py-2.5 text-[10px] text-ink-subtle border-t border-border">
               {block.complete
-                ? 'Every prescribed day logged. Everything here is read from your own sessions — nothing is estimated on your behalf.'
-                : 'Updates as you log. "Biggest gain" and "bought the least" stay empty until there is enough to say either honestly.'}
+                ? 'Every prescribed day logged. Read from your own sessions — nothing estimated on your behalf.'
+                : 'Updates as you log. Gains stay empty until there is enough to say either way honestly.'}
             </p>
           </div>
         </motion.section>

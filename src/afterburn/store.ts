@@ -359,13 +359,20 @@ export interface Adherence {
   pct: number;
 }
 
-/** How many of the selected week's prescribed days have been logged. */
+/** How many of the selected week's prescribed days have been logged.
+ *
+ *  Every level is guarded. The program is persisted to localStorage and
+ *  restored verbatim, so a partial write, an older schema or a bad sync can
+ *  hand back an object whose `weeks` or `days` is missing — and this is called
+ *  from the Progress screen on every render, so a throw here blanks the page
+ *  rather than degrading one number. Found by fuzzing. */
 export function weekAdherence(program: WorkoutProgram, sessions: WorkoutSession[], weekId: string): Adherence {
-  const week = program.weeks.find((w) => w.id === weekId);
-  if (!week || week.days.length === 0) return { done: 0, total: 0, pct: 0 };
+  const week = program?.weeks?.find?.((w) => w?.id === weekId);
+  const days = week?.days;
+  if (!week || !Array.isArray(days) || days.length === 0) return { done: 0, total: 0, pct: 0 };
   const map = completionMap(sessions);
-  const done = week.days.filter((d) => map.has(dayCompletionKey(week.id, d.id))).length;
-  return { done, total: week.days.length, pct: Math.round((done / week.days.length) * 100) };
+  const done = days.filter((d) => map.has(dayCompletionKey(week.id, d?.id))).length;
+  return { done, total: days.length, pct: Math.round((done / days.length) * 100) };
 }
 
 /** Greedy plates-per-side for a target total weight. */

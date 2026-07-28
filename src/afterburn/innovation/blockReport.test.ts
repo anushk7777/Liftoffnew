@@ -169,6 +169,47 @@ describe('blockReport', () => {
   });
 });
 
+describe('sets taken to failure', () => {
+  const withRpe = (weekId: string, dayId: string, daysAgo: number, rpes: string[]): WorkoutSession =>
+    ({ id: `${weekId}${dayId}${daysAgo}`, dayId, weekId, weekName: weekId,
+       date: ago(daysAgo), completedAt: ago(daysAgo),
+       entries: [{ name: 'Squat', sets: rpes.map((rpe) => ({ weight: '100', reps: '8', rpe, done: true })) }],
+     }) as unknown as WorkoutSession;
+
+  it('counts RPE 10 sets, the lifts they came from, and the share of rated sets', () => {
+    const s = [
+      withRpe('w1', 'd1', 20, ['8', '9', '10']),
+      withRpe('w1', 'd2', 18, ['8', '9', '10']),
+      withRpe('w2', 'd1', 13, ['9', '9', '9']),
+    ];
+    const r = blockReport(s, program(), NOW);
+    expect(r.failureSets).toBe(2);
+    expect(r.failureLifts).toBe(1);
+    expect(r.failureRate).toBe(22); // 2 of 9 rated sets
+  });
+
+  it('measures the share against RATED sets, not every set', () => {
+    // An unrated set says nothing about how hard it was. Counting it as
+    // "not to failure" would punish you for leaving the RPE box empty.
+    const s = [withRpe('w1', 'd1', 20, ['10', '', ' ']), withRpe('w1', 'd2', 18, ['10', '', ''])];
+    const r = blockReport(s, program(), NOW);
+    expect(r.failureSets).toBe(2);
+    expect(r.failureRate).toBe(100); // 2 of 2 RATED sets, not 2 of 6
+  });
+
+  it('treats anything above 10 as failure too, and nothing below', () => {
+    const s = [withRpe('w1', 'd1', 20, ['9.5', '10', '10.5'])];
+    expect(blockReport(s, program(), NOW).failureSets).toBe(2);
+  });
+
+  it('is zero when nothing was pushed that hard', () => {
+    const r = blockReport([withRpe('w1', 'd1', 20, ['7', '8', '8.5'])], program(), NOW);
+    expect(r.failureSets).toBe(0);
+    expect(r.failureLifts).toBe(0);
+    expect(r.failureRate).toBe(0);
+  });
+});
+
 describe('the sheet\'s own deload weeks', () => {
   const p = (): WorkoutProgram =>
     ({

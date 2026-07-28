@@ -61,7 +61,7 @@ Three standing constraints, set by the app's owner and never violated:
 | 6 | **Strength verdict rebuilt** | the ledger was inventing directions for lifts that never moved | false direction on genuinely stalled lifts: **64% → 17%** |
 | 7 | **"Cannot tell" as its own answer** | "flat" was being asserted where nothing could be read either way | 53% of stalled and 78% of very noisy lifts now return *unknown* instead of a bluff |
 | 8 | **Diagnosis before blame** | "swap this exercise" was the first suggestion and the least likely cause | effort → load → volume → exercise, in that order |
-| 9 | **Block report** | ten weeks of work left no mark; every number was in the log but never added up | one screen: weeks, sessions, tonnage, adherence, biggest gain, what bought least, PRs |
+| 9 | **Block report** | ten weeks of work left no mark; every number was in the log but never added up | one screen: weeks, sessions, tonnage, adherence, sets taken to failure, biggest gain, what bought least, PRs |
 
 Also repaired along the way, outside Afterburn: habit streaks that could never
 exceed 2 for a Mon/Wed/Fri habit, a backup restore that reported success
@@ -155,7 +155,7 @@ Full ranked lists live at the end of each document.
 ## Running it
 
 ```bash
-npm test     # 319 tests, 30 files
+npm test     # 324 tests, 31 files
 npm run lint
 npm run build
 ```
