@@ -76,7 +76,7 @@ export default function MemoriesCard() {
             <Sparkles className="w-4 h-4" style={{ color: 'var(--kairos)' }} />
             <span className="font-dream text-dream text-lg leading-none">On this day</span>
             {demo && !real.length && (
-              <span className="text-[10px] uppercase tracking-wide text-ink-subtle border border-border rounded px-1.5 py-0.5">preview</span>
+              <span className="text-[11px] uppercase tracking-wide text-ink-subtle border border-border rounded px-1.5 py-0.5">preview</span>
             )}
           </div>
           <p className="mt-1 text-sm text-ink truncate">

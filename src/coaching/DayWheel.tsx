@@ -142,7 +142,7 @@ export function DayWheel({
                   />
                 )}
                 <span
-                  className="relative text-[10px] font-semibold uppercase tracking-wide"
+                  className="relative text-[11px] font-semibold uppercase tracking-wide"
                   style={{ color: isSel ? 'var(--accent-text)' : 'var(--text-subtle)' }}
                 >
                   {WEEKDAY[d.getDay()]}
@@ -227,7 +227,7 @@ export function DayWheel({
                 {[1, 2, 3, 4, 5, 6, 0].map((d) => (
                   <div
                     key={d}
-                    className="text-center text-[10px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]"
+                    className="text-center text-[11px] font-semibold uppercase tracking-wider text-[var(--text-subtle)]"
                   >
                     {WEEKDAYS[d]}
                   </div>

@@ -62,6 +62,8 @@ Three standing constraints, set by the app's owner and never violated:
 | 7 | **"Cannot tell" as its own answer** | "flat" was being asserted where nothing could be read either way | 53% of stalled and 78% of very noisy lifts now return *unknown* instead of a bluff |
 | 8 | **Diagnosis before blame** | "swap this exercise" was the first suggestion and the least likely cause | effort → load → volume → exercise, in that order |
 | 9 | **Block report** | ten weeks of work left no mark; every number was in the log but never added up | one screen: weeks, sessions, tonnage, adherence, sets taken to failure, biggest gain, what bought least, PRs |
+| 10 | **An unfinished week is not judged** | one session into week 3 the card said "12 under-trained" and told you to add sets everywhere — a shortfall made by the calendar | the last *complete* week is read instead, and the running one is named |
+| 11 | **Placeholder slots kept out of results** | the block's "biggest gain" was "Weak Point Exercise 2 (optional)" — a blank slot in the sheet | excluded from the ledger, PRs and the lift count; their sets still count for volume |
 
 Also repaired along the way, outside Afterburn: habit streaks that could never
 exceed 2 for a Mon/Wed/Fri habit, a backup restore that reported success
@@ -118,6 +120,13 @@ commonest shape of real data. Then every constant was re-derived from its
 textbook definition in a script importing nothing from the app, and every
 citation re-checked at source. → `DECISION_LOG.md` §6.7 and §8
 
+**"Find the UI mistakes — here is what it looks like on my phone."**
+Six screenshots found what an emulated audit had missed: with one of eight
+sessions logged, Volume IQ was holding a part-finished week against a whole
+week's landmarks and telling the lifter to add sets to twelve muscles. Also: the
+sticky header computed to *fully transparent*, so text scrolled through it. →
+`DECISION_LOG.md` §11
+
 **"Make sure the model doesn't overfit."**
 It is **not** overfitted to the seeds it was tuned on — five unseen draws
 reproduce it within 4 points — and it sits on a plateau rather than a knife
@@ -155,7 +164,7 @@ Full ranked lists live at the end of each document.
 ## Running it
 
 ```bash
-npm test     # 324 tests, 31 files
+npm test     # 331 tests, 31 files
 npm run lint
 npm run build
 ```

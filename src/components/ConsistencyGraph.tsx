@@ -119,7 +119,7 @@ export function ConsistencyGraph({
         <div ref={scrollRef} className="overflow-x-auto no-scrollbar">
           <div className="w-max">
             {/* Month labels */}
-            <div className="flex text-[10px] text-ink-subtle mb-1.5 pl-8">
+            <div className="flex text-[11px] text-ink-subtle mb-1.5 pl-8">
               {monthLabels.map((m, i) => (
                 <span key={i} className="shrink-0" style={{ width: STEP }}>
                   {m}
@@ -129,7 +129,7 @@ export function ConsistencyGraph({
 
             <div className="flex">
               {/* Weekday gutter */}
-              <div className="flex flex-col text-[10px] text-ink-subtle pr-2 w-8 shrink-0">
+              <div className="flex flex-col text-[11px] text-ink-subtle pr-2 w-8 shrink-0">
                 {['Mon', '', 'Wed', '', 'Fri', '', ''].map((d, i) => (
                   <span key={i} className="flex items-center" style={{ height: STEP }}>
                     {d}

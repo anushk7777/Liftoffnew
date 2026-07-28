@@ -172,10 +172,10 @@ function NodeLabel({
           align === 'right' ? 'justify-end' : 'justify-start',
         )}
       >
-        <span className={cn('text-[10px] font-semibold uppercase tracking-wider', TYPE_TEXT[task.type])}>
+        <span className={cn('text-[11px] font-semibold uppercase tracking-wider', TYPE_TEXT[task.type])}>
           {task.type}
         </span>
-        {added && <span className="text-[10px] text-ink-subtle">· added</span>}
+        {added && <span className="text-[11px] text-ink-subtle">· added</span>}
         {task.link && <ExternalLink className="w-3 h-3 text-ink-subtle opacity-0 group-hover:opacity-100" />}
       </div>
     </button>

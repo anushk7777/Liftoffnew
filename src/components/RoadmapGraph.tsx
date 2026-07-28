@@ -112,7 +112,7 @@ function RoadmapNode({ data }: NodeProps<RoadmapNodeT>) {
       <Handle type="target" position={Position.Top} className="opacity-0" />
 
       {data.tag && (
-        <div className="absolute -top-2.5 left-2 text-[10px] px-2 py-0.5 rounded-full font-semibold z-10 whitespace-nowrap"
+        <div className="absolute -top-2.5 left-2 text-[11px] px-2 py-0.5 rounded-full font-semibold z-10 whitespace-nowrap"
           style={{ background: 'var(--cozy)', color: '#fff' }}>
           {data.tag}
         </div>
@@ -131,11 +131,11 @@ function RoadmapNode({ data }: NodeProps<RoadmapNodeT>) {
         {data.subLabel && <p className="text-xs leading-tight" style={{ color: 'var(--text-muted)' }}>{data.subLabel}</p>}
 
         <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
-          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: isProject ? 'var(--cozy)' : 'var(--text-subtle)' }}>
+          <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: isProject ? 'var(--cozy)' : 'var(--text-subtle)' }}>
             {data.type}
           </span>
           {data.added && (
-            <span className="text-[10px] font-medium px-1.5 rounded" style={{ background: 'var(--hover)', color: 'var(--text-muted)' }}>In Tasks</span>
+            <span className="text-[11px] font-medium px-1.5 rounded" style={{ background: 'var(--hover)', color: 'var(--text-muted)' }}>In Tasks</span>
           )}
         </div>
       </div>

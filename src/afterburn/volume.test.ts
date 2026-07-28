@@ -231,6 +231,62 @@ describe('analyzeVolume — program-week (microcycle) mode', () => {
   });
 });
 
+// Reported from a real screen: one session into week 3, the card read
+// "Week 3 · Build: 12 under-trained" and told the lifter to add sets to every
+// muscle. One eighth of a week's work had genuinely been done, so the shortfall
+// was arithmetic rather than a finding.
+describe('analyzeVolume — a program week still in progress', () => {
+  const w1 = { id: 'w1', name: 'Week 1 · Build' };
+  const w2 = { id: 'w2', name: 'Week 2 · Build' };
+  // Two weeks of four prescribed days each.
+  const program = {
+    weeks: [
+      { id: 'w1', name: 'Week 1 · Build', days: [{ id: 'd1' }, { id: 'd2' }, { id: 'd3' }, { id: 'd4' }] },
+      { id: 'w2', name: 'Week 2 · Build', days: [{ id: 'd1' }, { id: 'd2' }, { id: 'd3' }, { id: 'd4' }] },
+    ],
+  } as never;
+  const day = (id: string, dayId: string, dayN: number, lifts: [string, number][], week: { id: string; name: string }) =>
+    ({ ...sess(id, new Date(Date.UTC(2026, 2, dayN, 10)).toISOString(), lifts, week), dayId }) as WorkoutSession;
+
+  const fullW1 = [1, 2, 3, 4].map((n) => day(`a${n}`, `d${n}`, 8 + n, [['Cable Fly', 4]], w1));
+
+  it('reads the last COMPLETE week and reports the pending one separately', () => {
+    const started = [day('b1', 'd1', 20, [['Cable Fly', 1]], w2)]; // 1 of 4 days
+    const r = analyzeVolume([...fullW1, ...started], program);
+
+    expect(r.windowLabel).toBe('Week 1 · Build');
+    expect(r.inProgress).toEqual({ label: 'Week 2 · Build', done: 1, total: 4 });
+    expect(r.provisional).toBe(false);
+    // 16 chest sets from the finished week, not the 1 logged so far.
+    expect(r.muscles.find((m) => m.muscle === 'chest')!.rawSets).toBe(16);
+  });
+
+  it('withholds the verdict when there is no complete week to fall back on', () => {
+    const r = analyzeVolume([day('b1', 'd1', 20, [['Cable Fly', 1]], w1)], program);
+    expect(r.provisional).toBe(true);
+    expect(r.inProgress).toEqual({ label: 'Week 1 · Build', done: 1, total: 4 });
+    // The headline states what was logged; it does not name a shortfall.
+    expect(r.headline).toContain('1 of 4 days in');
+    expect(r.headline).not.toContain('under-trained');
+  });
+
+  it('judges the week normally once every prescribed day is logged', () => {
+    const r = analyzeVolume(fullW1, program);
+    expect(r.inProgress).toBeNull();
+    expect(r.provisional).toBe(false);
+    expect(r.windowLabel).toBe('Week 1 · Build');
+    expect(r.headline).toContain('Week 1 · Build:');
+  });
+
+  it('behaves exactly as before when no program is supplied', () => {
+    const started = [day('b1', 'd1', 20, [['Cable Fly', 1]], w2)];
+    const r = analyzeVolume([...fullW1, ...started]);
+    expect(r.inProgress).toBeNull();
+    expect(r.provisional).toBe(false);
+    expect(r.windowLabel).toBe('Week 2 · Build');
+  });
+});
+
 describe('muscles with no minimum effective volume', () => {
   const w1 = { id: 'w1', name: 'Week 1' };
   const legs = (lifts: [string, number][]) =>

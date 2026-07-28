@@ -167,15 +167,13 @@ export default function Chart({
           </linearGradient>
         </defs>
 
-        {/* y gridlines + value labels */}
+        {/* y gridlines. The value labels are drawn LAST, after the series —
+            painted here they sat under the line, and the lowest one is exactly
+            where a series touching its minimum runs, so "45 s" came out with the
+            plot drawn straight through it. */}
         {ticks.map((tv, i) => {
           const gy = y(tv);
-          return (
-            <g key={i}>
-              <line x1={padL} y1={gy} x2={W - padR} y2={gy} stroke="var(--border)" strokeWidth="1" strokeDasharray="2 5" opacity={0.7} />
-              <text x={padL + 2} y={gy - 3} fontSize="9" fill="var(--text-subtle)">{fmt(tv)}</text>
-            </g>
-          );
+          return <line key={i} x1={padL} y1={gy} x2={W - padR} y2={gy} stroke="var(--border)" strokeWidth="1" strokeDasharray="2 5" opacity={0.7} />;
         })}
 
         {/* area */}
@@ -309,6 +307,24 @@ export default function Chart({
             <circle cx={x(active!)} cy={y(ap.value)} r={6} fill={accent} stroke="var(--surface)" strokeWidth="2" />
           </g>
         )}
+
+        {/* Axis values, over everything, each carrying a halo of the page colour
+            so the series reads around the text instead of through it. */}
+        {ticks.map((tv, i) => (
+          <text
+            key={i}
+            x={padL + 2}
+            y={y(tv) - 3}
+            fontSize="11"
+            fill="var(--text-muted)"
+            stroke="var(--bg)"
+            strokeWidth="3"
+            paintOrder="stroke"
+            strokeLinejoin="round"
+          >
+            {fmt(tv)}
+          </text>
+        ))}
       </svg>
 
       {/* tooltip */}
@@ -318,11 +334,11 @@ export default function Chart({
           style={{ left: tipLeft, top: 26, width: tipW }}
         >
           <p className="font-display text-sm font-bold text-ink leading-none">{fmt(ap.value)}</p>
-          <p className="text-[10px] text-ink-subtle mt-0.5">{format(new Date(ap.date), 'EEE, MMM d')}</p>
+          <p className="text-[11px] text-ink-subtle mt-0.5">{format(new Date(ap.date), 'EEE, MMM d')}</p>
         </div>
       )}
 
-      <div className="flex justify-between text-[10px] text-ink-subtle mt-1 px-1">
+      <div className="flex justify-between text-[11px] text-ink-subtle mt-1 px-1">
         <span>{format(new Date(points[0].date), 'MMM d')}</span>
         <span>{format(new Date(points[n - 1].date), 'MMM d')}</span>
       </div>

@@ -1,9 +1,10 @@
 import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus, Sparkles, Gauge, Wind, Play, Square } from 'lucide-react';
+import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus, Sparkles, Gauge, Wind, Play, Square, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAfterburn, volumeByProgramWeek, volumeTrend, weekAdherence, detectPRs, formatVolume } from './store';
+import type { PRHit } from './store';
 import { analyzeVolume, MUSCLE_LABEL } from './volume';
 import type { MuscleAnalysis, VolumeStatus } from './volume';
 import { liftReturns, deadWeight } from './innovation/returns';
@@ -19,6 +20,29 @@ import type { ChartPoint } from './Chart';
 
 const tileVariants = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
 
+/** Long-form "how this works" copy, folded away by default.
+ *
+ *  These explanations earn their place the first two or three times you read
+ *  them and cost a screen of scrolling every time after. Collapsed, the data
+ *  starts at the top of the card; the reasoning is still one tap away. */
+function Explainer({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center gap-1 min-h-[40px] -my-1 text-[11px] font-medium text-ink-muted hover:text-ink transition-colors"
+      >
+        <ChevronRight className={cn('w-3 h-3 transition-transform', open && 'rotate-90')} />
+        {label}
+      </button>
+      {open && <p className="text-xs text-ink-muted leading-relaxed mt-1">{children}</p>}
+    </div>
+  );
+}
+
 function MomentumTile({ icon, label, children, tone }: { icon: ReactNode; label: string; children: ReactNode; tone: 'up' | 'down' | 'flat' }) {
   const rm = useReducedMotion();
   return (
@@ -30,10 +54,30 @@ function MomentumTile({ icon, label, children, tone }: { icon: ReactNode; label:
     >
       <div className="flex items-center gap-1.5 text-ink-subtle">
         <span className={cn(tone === 'up' ? 'text-ember' : tone === 'down' ? 'text-[var(--warning)]' : 'text-ink-muted')}>{icon}</span>
-        <span className="text-[10px] font-semibold uppercase tracking-wide">{label}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide">{label}</span>
       </div>
       <div className="mt-1.5 text-ink font-display text-lg font-bold leading-tight">{children}</div>
     </motion.div>
+  );
+}
+
+/** A personal best, named so it can be read.
+ *
+ *  Was `{lift} {value}{unit}` inside a chip that uppercases its contents, which
+ *  produced "SNATCH-GRIP RDL 98 E1RM": no separator between the name and the
+ *  number, no unit at all on the e1RM case, and a long lift name stripped of the
+ *  word shapes that make it scannable. Sentence case with an explicit separator
+ *  and unit. */
+function PRChip({ pr, unit }: { pr: PRHit; unit: string }) {
+  return (
+    <span className="chip !normal-case !text-[11px] !tracking-normal !py-1 text-ember border-ember bg-ember-soft">
+      <Trophy className="w-3 h-3 shrink-0" />
+      <span className="font-semibold">{pr.lift}</span>
+      <span className="opacity-80">
+        · {pr.value} {unit}
+        {pr.kind === 'e1rm' && ' e1RM'}
+      </span>
+    </span>
   );
 }
 
@@ -64,13 +108,13 @@ function ReturnRow({ r, unit }: { r: LiftReturn; unit: string }) {
           it is happens to be the one thing you cannot infer. */}
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-medium text-ink leading-snug">{r.name}</span>
-        <span className={cn('chip !px-1.5 !py-0.5 text-[10px] font-semibold border-0 shrink-0 mt-0.5', RETURN_STATUS[r.verdict].chip)}>
+        <span className={cn('chip !px-1.5 !py-0.5 !text-[11px] font-semibold border-0 shrink-0 mt-0.5', RETURN_STATUS[r.verdict].chip)}>
           {RETURN_STATUS[r.verdict].label}
         </span>
       </div>
       {judged ? (
         <>
-          <p className="text-[11px] text-ink-subtle">
+          <p className="text-xs text-ink-muted">
             <span className="text-ink font-medium tabular-nums">
               {r.perTenSets > 0 ? '+' : ''}{r.perTenSets}{unit} per 10 sets
             </span>
@@ -81,7 +125,7 @@ function ReturnRow({ r, unit }: { r: LiftReturn; unit: string }) {
               than which movement you picked — and swapping a lift you train
               too easily just gets you a new lift you train too easily. */}
           {stuck && r.diagnosis && (
-            <p className="text-[11px] text-ink-subtle">
+            <p className="text-xs text-ink-muted">
               {r.diagnosis.cause === 'effort' ? (
                 <>
                   Your sets averaged <span className="text-ink">RPE {r.diagnosis.meanRpe}</span> against a
@@ -124,7 +168,7 @@ function ReturnRow({ r, unit }: { r: LiftReturn; unit: string }) {
           )}
         </>
       ) : (
-        <p className="text-[11px] text-ink-subtle">
+        <p className="text-xs text-ink-muted">
           {r.typicalError > 0 ? (
             <>
               Your sessions on this scatter by ±{r.typicalError}{unit}, which is wider than a gain worth
@@ -143,7 +187,7 @@ function ReturnRow({ r, unit }: { r: LiftReturn; unit: string }) {
 }
 
 /** A horizontal bar of weekly sets, with reference ticks at MEV / MAV / MRV. */
-function VolumeBar({ m }: { m: MuscleAnalysis }) {
+function VolumeBar({ m, provisional }: { m: MuscleAnalysis; provisional?: boolean }) {
   const rm = useReducedMotion();
   const scaleMax = m.landmark.mrv * 1.15;
   const pct = (v: number) => `${Math.min(100, (v / scaleMax) * 100)}%`;
@@ -151,7 +195,7 @@ function VolumeBar({ m }: { m: MuscleAnalysis }) {
     <div className="relative h-2.5 rounded-full bg-elevated overflow-hidden">
       <motion.div
         className="absolute inset-y-0 left-0 rounded-full"
-        style={{ backgroundColor: VOL_STATUS[m.status].color }}
+        style={{ backgroundColor: provisional ? 'var(--border-strong)' : VOL_STATUS[m.status].color }}
         initial={rm ? { width: pct(m.sets) } : { width: 0 }}
         animate={{ width: pct(m.sets) }}
         transition={{ duration: 0.7, ease: [0.21, 1, 0.4, 1], delay: 0.1 }}
@@ -167,27 +211,31 @@ function VolumeBar({ m }: { m: MuscleAnalysis }) {
   );
 }
 
-function VolumeRow({ m }: { m: MuscleAnalysis }) {
+function VolumeRow({ m, provisional }: { m: MuscleAnalysis; provisional?: boolean }) {
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <span className="text-sm font-medium text-ink flex items-center gap-1">
           {m.label}
-          {m.dir === 'up' && <TrendingUp className="w-3 h-3 text-ember" />}
-          {m.dir === 'down' && <TrendingDown className="w-3 h-3 text-[var(--warning)]" />}
+          {!provisional && m.dir === 'up' && <TrendingUp className="w-3 h-3 text-ember" />}
+          {!provisional && m.dir === 'down' && <TrendingDown className="w-3 h-3 text-[var(--warning)]" />}
         </span>
         <span className="flex items-center gap-2">
           {/* The rate is what the landmarks are measured in; the raw tally is
               kept beside it so the number is never a black box. */}
-          <span className="text-xs text-ink-subtle tabular-nums">
-            {m.sets} sets/wk
-            {m.rawSets !== m.sets && <span className="opacity-60"> · {m.rawSets} logged</span>}
+          <span className="text-xs text-ink-muted tabular-nums">
+            {provisional ? `${m.rawSets} sets so far` : `${m.sets} sets/wk`}
+            {!provisional && m.rawSets !== m.sets && <span className="text-ink-subtle"> · {m.rawSets} logged</span>}
           </span>
-          <span className={cn('chip !px-1.5 !py-0.5 text-[10px] font-semibold border-0', VOL_STATUS[m.status].chip)}>{VOL_STATUS[m.status].label}</span>
+          {/* A half-finished week cannot be under or over anything — the badge
+              and the "add N sets" line are both withheld until it is done. */}
+          {!provisional && (
+            <span className={cn('chip !px-1.5 !py-0.5 !text-[11px] font-semibold border-0', VOL_STATUS[m.status].chip)}>{VOL_STATUS[m.status].label}</span>
+          )}
         </span>
       </div>
-      <VolumeBar m={m} />
-      {m.status !== 'optimal' && <p className="text-[11px] text-ink-subtle">{m.recommendation}</p>}
+      <VolumeBar m={m} provisional={provisional} />
+      {!provisional && m.status !== 'optimal' && <p className="text-[11px] text-ink-muted">{m.recommendation}</p>}
     </div>
   );
 }
@@ -244,27 +292,31 @@ function CO2Test({ onLog }: { onLog: (score: number) => void }) {
           <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-ember"><Square className="w-3.5 h-3.5" /> Exhale slowly… tap to stop &amp; log</span>
         </motion.button>
       ) : (
-        <button onClick={start} className="btn btn-primary w-full">
+        <button onClick={start} className="btn btn-primary w-full min-h-[44px]">
           <Play className="w-4 h-4" /> Start CO2 test
         </button>
       )}
       <div className="flex gap-2">
+        {/* A placeholder is not a label: it disappears the moment you type and
+            screen readers announce the field as blank. */}
         <input
           type="number"
           inputMode="decimal"
+          aria-label="Exhale time in seconds"
           value={manual}
           onChange={(e) => setManual(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && logManual()}
           placeholder="…or enter seconds manually"
-          className="input flex-1"
+          className="input flex-1 min-h-[44px]"
         />
-        <button onClick={logManual} disabled={!manual.trim()} className="btn btn-secondary disabled:opacity-50">
+        <button onClick={logManual} disabled={!manual.trim()} className="btn btn-secondary disabled:opacity-50 min-h-[44px]">
           <Plus className="w-4 h-4" /> Log
         </button>
       </div>
-      <p className="text-[11px] text-ink-subtle">
-        A few easy breaths, then one full inhale — then exhale as slowly and controlled as you can. The timer measures your exhale; longer = better recovery.
-      </p>
+      <Explainer label="How to do the test">
+        A few easy breaths, then one full inhale — then exhale as slowly and controlled as you can. The
+        timer measures your exhale; longer = better recovery.
+      </Explainer>
     </div>
   );
 }
@@ -317,7 +369,7 @@ export default function Progress() {
   }, [latestInProgress, latestWeek, latestAdherence, unit]);
 
   // ---- "Volume IQ" — hard sets per muscle vs scientific landmarks ----
-  const vol = useMemo(() => analyzeVolume(sessions), [sessions]);
+  const vol = useMemo(() => analyzeVolume(sessions, program), [sessions, program]);
 
   // ---- Block report — the ten weeks added up ----
   const block = useMemo(() => blockReport(sessions, program), [sessions, program]);
@@ -410,16 +462,19 @@ export default function Progress() {
               animate="show"
               variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.1 } } }}
             >
-              <MomentumTile icon={vt.dir === 'up' ? <TrendingUp className="w-3.5 h-3.5" /> : vt.dir === 'down' ? <TrendingDown className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />} label="Volume vs last wk" tone={vt.dir === 'up' ? 'up' : vt.dir === 'down' ? 'down' : 'flat'}>
+              <MomentumTile icon={vt.dir === 'up' ? <TrendingUp className="w-3.5 h-3.5" /> : vt.dir === 'down' ? <TrendingDown className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />} label="Volume vs last" tone={vt.dir === 'up' ? 'up' : vt.dir === 'down' ? 'down' : 'flat'}>
                 {vt.deltaPct == null ? '—' : (<><span>{vt.deltaPct > 0 ? '+' : ''}<AnimatedNumber value={vt.deltaPct} />%</span></>)}
               </MomentumTile>
-              <MomentumTile icon={<Activity className="w-3.5 h-3.5" />} label="Consistency" tone={adh.pct >= 80 ? 'up' : adh.pct < 50 ? 'down' : 'flat'}>
-                {adh.total > 0 ? <><AnimatedNumber value={adh.done} />/{adh.total} <span className="text-xs text-ink-subtle font-normal">days</span></> : '—'}
+              {/* Tone is only meaningful once there is a denominator. Reading it
+                  off pct=0 painted the em-dash in the warning colour, so "no
+                  week selected" looked like "you have missed everything". */}
+              <MomentumTile icon={<Activity className="w-3.5 h-3.5" />} label="Consistency" tone={adh.total === 0 ? 'flat' : adh.pct >= 80 ? 'up' : adh.pct < 50 ? 'down' : 'flat'}>
+                {adh.total > 0 ? <><AnimatedNumber value={adh.done} />/{adh.total} <span className="text-xs text-ink-muted font-normal">days</span></> : '—'}
               </MomentumTile>
-              <MomentumTile icon={<Scale className="w-3.5 h-3.5" />} label="Bodyweight/wk" tone={bwAligned ? 'up' : bwAligned === false ? 'down' : 'flat'}>
+              <MomentumTile icon={<Scale className="w-3.5 h-3.5" />} label="Weight/wk" tone={bwAligned ? 'up' : bwAligned === false ? 'down' : 'flat'}>
                 {bwPerWeek == null ? '—' : <>{bwPerWeek > 0 ? '+' : ''}{Math.round(bwPerWeek * 10) / 10} <span className="text-xs text-ink-subtle font-normal">{unit}</span></>}
               </MomentumTile>
-              <MomentumTile icon={<Trophy className="w-3.5 h-3.5" />} label="PRs last workout" tone={recentPRs.length ? 'up' : 'flat'}>
+              <MomentumTile icon={<Trophy className="w-3.5 h-3.5" />} label="New PRs" tone={recentPRs.length ? 'up' : 'flat'}>
                 <AnimatedNumber value={recentPRs.length} />
               </MomentumTile>
             </motion.div>
@@ -427,9 +482,7 @@ export default function Progress() {
             {recentPRs.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {recentPRs.slice(0, 5).map((pr, i) => (
-                  <span key={i} className="chip text-ember border-ember bg-ember-soft">
-                    <Trophy className="w-3 h-3" /> {pr.lift} {pr.kind === 'weight' ? `${pr.value}${unit}` : `${pr.value} e1RM`}
-                  </span>
+                  <PRChip key={i} pr={pr} unit={unit} />
                 ))}
               </div>
             )}
@@ -454,197 +507,6 @@ export default function Progress() {
           </div>
         </section>
       )}
-
-      {/* Volume IQ — hard sets per muscle vs MEV / MAV / MRV landmarks */}
-      {vol.hasData && vol.trained.length > 0 && (
-        <motion.section
-          initial={rm ? false : { opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
-          className="space-y-3"
-        >
-          <h2 className="section-label flex items-center gap-1.5">
-            <Gauge className="w-3.5 h-3.5" /> Volume IQ
-          </h2>
-          <div className="neo-card p-5 space-y-4">
-            <div>
-              <p className="text-sm text-ink font-medium">{vol.headline}</p>
-              <p className="text-[11px] text-ink-subtle mt-1">
-                Hard sets per muscle for <span className="text-ink">{vol.windowLabel}</span> vs your science-based landmarks — ticks mark MEV (start growing), MAV (sweet spot) and MRV (recovery ceiling). Counted per program week, so a new week starts the tally fresh.
-                {vol.windowDays !== 7 && (
-                  <>
-                    {' '}Your microcycle runs <span className="text-ink">{vol.windowDays} days</span>, so sets are
-                    shown as a weekly rate — the landmarks are per 7 days, and comparing a longer
-                    cycle against them straight would read high.
-                  </>
-                )}
-              </p>
-            </div>
-
-            <div className="space-y-3.5">
-              {vol.trained.map((m) => (
-                <VolumeRow key={m.muscle} m={m} />
-              ))}
-            </div>
-
-            {vol.neglected.length > 0 && (
-              <div className="pt-1">
-                {/* Was hardcoded to "last 7 days" even in microcycle mode,
-                    where the window above is a program week of 10-11 days. */}
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-1.5">Not trained ({vol.windowLabel})</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {vol.neglected.map((mu) => (
-                    <span key={mu} className="chip text-ink-subtle bg-elevated border-0 !text-[11px]">{MUSCLE_LABEL[mu]}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {vol.unclassified.length > 0 && (
-              <p className="text-[11px] text-ink-subtle border-t border-border pt-2">
-                Not counted (unrecognized lift): {vol.unclassified.join(', ')}. Rename it to a standard movement and it'll be tracked.
-              </p>
-            )}
-          </div>
-        </motion.section>
-      )}
-
-      {/* Return on volume — which lifts are earning the sets you spend on them */}
-      {judged.length > 0 && (
-        <motion.section
-          initial={rm ? false : { opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
-          className="space-y-3"
-        >
-          <h2 className="section-label flex items-center gap-1.5">
-            <Trophy className="w-3.5 h-3.5" /> What's paying off
-          </h2>
-          <div className="neo-card p-5 space-y-4">
-            <div>
-              <p className="text-sm text-ink font-medium">
-                {stuck.length === 0
-                  ? `All ${judged.length} of your tracked lifts are moving.`
-                  : `${stuck.length} lift${stuck.length === 1 ? '' : 's'} ${stuck.length === 1 ? 'has' : 'have'} returned nothing for ${stuck.reduce((n, r) => n + r.sets, 0)} sets.`}
-              </p>
-              <p className="text-[11px] text-ink-subtle mt-1">
-                Estimated 1RM gained per set invested, over the last 90 days. Your set budget is
-                finite — this is what each lift bought with its share. A lift needs 4 sessions
-                across 2 weeks before it gets a verdict, and rough days are left out.
-              </p>
-            </div>
-
-            <div className="space-y-3.5">
-              {judged.map((r) => (
-                <ReturnRow key={r.name} r={r} unit={unit} />
-              ))}
-            </div>
-
-            {returns.length > judged.length && (
-              <p className="text-[11px] text-ink-subtle border-t border-border pt-2">
-                {returns.length - judged.length} more lift
-                {returns.length - judged.length === 1 ? '' : 's'} logged too recently to judge.
-              </p>
-            )}
-          </div>
-        </motion.section>
-      )}
-
-      {/* Recovery — CO2 tolerance test */}
-      <motion.section
-        initial={rm ? false : { opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1], delay: 0.08 }}
-        className="space-y-3"
-      >
-        <h2 className="section-label flex items-center gap-1.5">
-          <Wind className="w-3.5 h-3.5" /> Recovery — CO2 tolerance test
-        </h2>
-        <div className="card p-4 space-y-4">
-          {readiness.verdict !== 'na' && (
-            <div className="neo-card p-4 flex items-center justify-between gap-3">
-              <div>
-                <p className={cn('font-display text-xl font-bold', READINESS[readiness.verdict].color)}>{READINESS[readiness.verdict].label}</p>
-                <p className="text-[11px] text-ink-subtle mt-0.5 max-w-[20rem]">{readiness.advice}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="font-display text-2xl font-bold text-ink tabular-nums">{readiness.latest}s</p>
-                <p className="text-[11px] text-ink-subtle">
-                  {readiness.band ? co2Band(readiness.latest!).label : ''}
-                  {readiness.baseline != null && (
-                    <> · {readiness.deltaPct != null && readiness.deltaPct > 0 ? '+' : ''}{readiness.deltaPct}% vs {readiness.baseline}s</>
-                  )}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <CO2Test onLog={(s) => addRecovery(s)} />
-
-          {recoveryPoints.length > 1 && <Chart points={recoveryPoints} unit="s" accent="var(--ember)" />}
-        </div>
-
-        {recovery.length > 0 && (
-          <div className="space-y-1.5">
-            {recovery.slice(0, 8).map((r) => (
-              <div key={r.id} className="flex items-center justify-between text-sm card !py-2 px-3">
-                <span className="text-ink font-medium tabular-nums">
-                  {r.co2Score}s <span className="text-xs text-ink-subtle font-normal">· {co2Band(r.co2Score).label}</span>
-                </span>
-                <span className="text-xs text-ink-subtle">{format(new Date(r.date), 'EEE, MMM d')}</span>
-                <button onClick={() => deleteRecovery(r.id)} className="p-1 text-ink-subtle hover:text-danger" aria-label="Delete entry">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </motion.section>
-
-      {/* Bodyweight */}
-      <section className="space-y-3">
-        <h2 className="section-label flex items-center gap-1.5">
-          <Scale className="w-3.5 h-3.5" /> Bodyweight
-        </h2>
-        <div className="card p-4 space-y-4">
-          <div className="flex gap-2">
-            <input
-              type="number"
-              inputMode="decimal"
-              value={w}
-              onChange={(e) => setW(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && logWeight()}
-              placeholder={`Today's weight (${unit})`}
-              className="input flex-1"
-            />
-            <button onClick={logWeight} disabled={!w.trim()} className="btn btn-primary disabled:opacity-50">
-              <Plus className="w-4 h-4" /> Log
-            </button>
-          </div>
-
-          {bwPoints.length > 0 ? (
-            <Chart points={bwPoints} unit={unit} accent="var(--ember)" />
-          ) : (
-            <p className="text-sm text-ink-subtle text-center py-4">Log your weight to start a trend.</p>
-          )}
-        </div>
-
-        {bodyweight.length > 0 && (
-          <div className="space-y-1.5">
-            {bodyweight.slice(0, 8).map((b) => (
-              <div key={b.id} className="flex items-center justify-between text-sm card !py-2 px-3">
-                <span className="text-ink font-medium">
-                  {b.weight} {unit}
-                </span>
-                <span className="text-xs text-ink-subtle">{format(new Date(b.date), 'EEE, MMM d')}</span>
-                <button onClick={() => deleteBodyweight(b.id)} className="p-1 text-ink-subtle hover:text-danger" aria-label="Delete entry">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
 
       {/* Block report — what the whole program actually bought. A block ends
           and nothing happens: you close the app on the last session of week 10
@@ -671,14 +533,14 @@ export default function Progress() {
               className="px-5 pt-5 pb-4"
               style={{ background: 'linear-gradient(180deg, var(--ember-soft) 0%, transparent 100%)' }}
             >
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle truncate">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted truncate">
                 {block.programName}
                 {block.complete && <span className="text-ember"> · done</span>}
               </p>
               <p className="font-display text-4xl font-bold text-ink leading-none mt-1.5 tabular-nums">
                 {formatVolume(block.tonnage, unit)}
               </p>
-              <p className="text-[11px] text-ink-subtle mt-1.5">
+              <p className="text-xs text-ink-muted mt-1.5">
                 moved across {block.weeks.length} week{block.weeks.length === 1 ? '' : 's'} · {block.spanDays} days
               </p>
             </div>
@@ -692,7 +554,7 @@ export default function Progress() {
               ].map((x) => (
                 <div key={x.l} className="px-2 py-3 text-center">
                   <p className="font-display text-lg font-bold text-ink leading-none tabular-nums">{x.v}</p>
-                  <p className="text-[10px] text-ink-subtle mt-1">{x.l}</p>
+                  <p className="text-[11px] text-ink-muted mt-1">{x.l}</p>
                 </div>
               ))}
             </div>
@@ -708,13 +570,13 @@ export default function Progress() {
                   <p className={cn('font-display text-lg font-bold leading-none tabular-nums', x.accent ? 'text-ember' : 'text-ink')}>
                     {x.v}
                   </p>
-                  <p className="text-[10px] text-ink-subtle mt-1">{x.l}</p>
+                  <p className="text-[11px] text-ink-muted mt-1">{x.l}</p>
                 </div>
               ))}
             </div>
 
             {block.failureSets > 0 && (
-              <p className="px-5 py-2.5 text-[11px] text-ink-subtle border-t border-border">
+              <p className="px-5 py-2.5 text-xs text-ink-muted border-t border-border">
                 <span className="text-ink">{block.failureSets} sets</span> taken to RPE 10 across{' '}
                 <span className="text-ink">{block.failureLifts}</span> lift
                 {block.failureLifts === 1 ? '' : 's'} — {block.failureRate}% of every set you rated.
@@ -729,7 +591,7 @@ export default function Progress() {
                   const short = w.name.replace(/^Week\s*/i, 'W').replace(/\s*·\s*/, ' ');
                   return (
                     <div key={w.id} className="flex items-center gap-2.5">
-                      <span className="text-[10px] text-ink-subtle w-16 shrink-0 truncate">{short}</span>
+                      <span className="text-[11px] text-ink-muted w-16 shrink-0 truncate">{short}</span>
                       <div className="flex-1 h-1.5 rounded-full bg-elevated overflow-hidden">
                         <motion.div
                           className="h-full rounded-full"
@@ -739,11 +601,11 @@ export default function Progress() {
                           transition={{ duration: 0.6, ease: [0.21, 1, 0.4, 1] }}
                         />
                       </div>
-                      <span className="text-[10px] text-ink-subtle tabular-nums w-14 text-right shrink-0">
+                      <span className="text-[11px] text-ink-muted tabular-nums w-14 text-right shrink-0">
                         {formatVolume(w.tonnage, unit)}
                       </span>
                       {w.done < w.planned && (
-                        <span className="text-[10px] text-ink-subtle/60 tabular-nums w-7 text-right shrink-0">
+                        <span className="text-[11px] text-ink-muted/60 tabular-nums w-7 text-right shrink-0">
                           {w.done}/{w.planned}
                         </span>
                       )}
@@ -761,9 +623,9 @@ export default function Progress() {
                   <div className="px-5 py-3 flex items-start gap-3">
                     <TrendingUp className="w-4 h-4 mt-0.5 shrink-0 text-success" />
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Biggest gain</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Biggest gain</p>
                       <p className="text-sm text-ink font-medium leading-snug">{block.bestLift.name}</p>
-                      <p className="text-[11px] text-ink-subtle mt-0.5">
+                      <p className="text-xs text-ink-muted mt-0.5">
                         <span className="text-success font-medium">+{block.bestLift.gain}{unit}</span> estimated 1RM
                         on {block.bestLift.sets} sets
                       </p>
@@ -774,9 +636,9 @@ export default function Progress() {
                   <div className="px-5 py-3 flex items-start gap-3">
                     <Minus className="w-4 h-4 mt-0.5 shrink-0 text-[var(--warning)]" />
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">Bought the least</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Bought the least</p>
                       <p className="text-sm text-ink font-medium leading-snug">{block.stalledLift.name}</p>
-                      <p className="text-[11px] text-ink-subtle mt-0.5">
+                      <p className="text-xs text-ink-muted mt-0.5">
                         <span className="text-[var(--warning)] font-medium">{block.stalledLift.sets} sets</span>, no
                         movement it could measure
                         {block.wastedSets > block.stalledLift.sets && (
@@ -791,25 +653,135 @@ export default function Progress() {
 
             {block.prs.length > 0 && (
               <div className="px-5 py-3.5 border-t border-border">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-subtle mb-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-2">
                   Personal bests
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {block.prs.map((pr, i) => (
-                    <span key={i} className="chip text-ember border-ember bg-ember-soft !text-[11px] !py-1">
-                      <Trophy className="w-3 h-3" /> {pr.lift} · {pr.value}
-                      {pr.kind === 'weight' ? unit : ' e1RM'}
-                    </span>
+                    <PRChip key={i} pr={pr} unit={unit} />
                   ))}
                 </div>
               </div>
             )}
 
-            <p className="px-5 py-2.5 text-[10px] text-ink-subtle border-t border-border">
+            <p className="px-5 py-2.5 text-[11px] text-ink-muted border-t border-border">
               {block.complete
                 ? 'Every prescribed day logged. Read from your own sessions — nothing estimated on your behalf.'
                 : 'Updates as you log. Gains stay empty until there is enough to say either way honestly.'}
             </p>
+          </div>
+        </motion.section>
+      )}
+
+      {/* Volume IQ — hard sets per muscle vs MEV / MAV / MRV landmarks */}
+      {vol.hasData && vol.trained.length > 0 && (
+        <motion.section
+          initial={rm ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
+          className="space-y-3"
+        >
+          <h2 className="section-label flex items-center gap-1.5">
+            <Gauge className="w-3.5 h-3.5" /> Volume IQ
+          </h2>
+          <div className="neo-card p-5 space-y-4">
+            <div>
+              <p className="text-sm text-ink font-medium">{vol.headline}</p>
+              <p className="text-xs text-ink-muted mt-1">
+                Hard sets per muscle for <span className="text-ink">{vol.windowLabel}</span>. Ticks mark MEV,
+                MAV and MRV.
+              </p>
+              {/* The week being trained right now, when the figures above are
+                  the last finished one. Without this the card looks stale. */}
+              {vol.inProgress && !vol.provisional && (
+                <p className="text-xs text-ink-muted mt-1.5">
+                  <span className="text-ink">{vol.inProgress.label}</span> is {vol.inProgress.done} of{' '}
+                  {vol.inProgress.total} days in — it'll be read once you finish it.
+                </p>
+              )}
+              <Explainer label="How this is counted">
+                MEV is the least that still grows a muscle, MAV the productive sweet spot, MRV the most you
+                can recover from. Sets are counted per program week, so a new week starts the tally fresh.
+                {vol.windowDays !== 7 && (
+                  <>
+                    {' '}Your microcycle runs <span className="text-ink">{vol.windowDays} days</span> rather than
+                    seven, so sets are shown as a weekly rate — the landmarks are per 7 days, and holding a
+                    longer cycle against them straight would read high.
+                  </>
+                )}
+              </Explainer>
+            </div>
+
+            <div className="space-y-3.5">
+              {vol.trained.map((m) => (
+                <VolumeRow key={m.muscle} m={m} provisional={vol.provisional} />
+              ))}
+            </div>
+
+            {vol.neglected.length > 0 && (
+              <div className="pt-1">
+                {/* Was hardcoded to "last 7 days" even in microcycle mode,
+                    where the window above is a program week of 10-11 days. */}
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-1.5">Not trained ({vol.windowLabel})</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {vol.neglected.map((mu) => (
+                    <span key={mu} className="chip text-ink-subtle bg-elevated border-0 !text-[11px]">{MUSCLE_LABEL[mu]}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {vol.unclassified.length > 0 && (
+              <p className="text-xs text-ink-muted border-t border-border pt-2">
+                Not counted (unrecognized lift): {vol.unclassified.join(', ')}. Rename it to a standard movement and it'll be tracked.
+              </p>
+            )}
+          </div>
+        </motion.section>
+      )}
+
+      {/* Return on volume — which lifts are earning the sets you spend on them */}
+      {judged.length > 0 && (
+        <motion.section
+          initial={rm ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
+          className="space-y-3"
+        >
+          <h2 className="section-label flex items-center gap-1.5">
+            <Trophy className="w-3.5 h-3.5" /> What's paying off
+          </h2>
+          <div className="neo-card p-5 space-y-4">
+            <div>
+              {/* "All N of your tracked lifts are moving" read as a clean bill of
+                  health on everything, while the footnote below reported 43 more
+                  lifts unjudged — a verdict on 6.5% of them. Say how many of how
+                  many, so the headline cannot outrun its own evidence. */}
+              <p className="text-sm text-ink font-medium">
+                {stuck.length === 0
+                  ? `${judged.length} of your ${returns.length} lift${returns.length === 1 ? '' : 's'} ${judged.length === 1 ? 'has' : 'have'} enough history to read — and ${judged.length === 1 ? 'it is' : "they're all"} moving.`
+                  : `${stuck.length} lift${stuck.length === 1 ? '' : 's'} ${stuck.length === 1 ? 'has' : 'have'} returned nothing for ${stuck.reduce((n, r) => n + r.sets, 0)} sets.`}
+              </p>
+              <p className="text-xs text-ink-muted mt-1">Estimated 1RM gained per set invested, last 90 days.</p>
+              <Explainer label="How a lift earns a verdict">
+                Your set budget is finite — this is what each lift bought with its share. A lift needs 4
+                sessions across 2 weeks before it gets a verdict, and rough days are left out. Anything
+                short of that is reported as "too early" rather than guessed at.
+              </Explainer>
+            </div>
+
+            <div className="space-y-3.5">
+              {judged.map((r) => (
+                <ReturnRow key={r.name} r={r} unit={unit} />
+              ))}
+            </div>
+
+            {returns.length > judged.length && (
+              <p className="text-xs text-ink-muted border-t border-border pt-2">
+                {returns.length - judged.length} more lift
+                {returns.length - judged.length === 1 ? '' : 's'} logged too recently to judge.
+              </p>
+            )}
           </div>
         </motion.section>
       )}
@@ -831,7 +803,7 @@ export default function Progress() {
               provisionalLast={latestInProgress}
               projection={volProjection}
             />
-            <p className="text-[11px] text-ink-subtle">
+            <p className="text-xs text-ink-muted">
               Total load = weight × reps across <span className="text-ink">all</span> lifts, tallied per <span className="text-ink">program week</span> (a week ends when all its sessions are done — even past 7 calendar days; in {unit}).
               {latestWeek && (
                 <>
@@ -844,6 +816,107 @@ export default function Progress() {
                 </>
               )}
             </p>
+          </div>
+        )}
+      </section>
+
+      {/* Recovery — CO2 tolerance test */}
+      <motion.section
+        initial={rm ? false : { opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1], delay: 0.08 }}
+        className="space-y-3"
+      >
+        <h2 className="section-label flex items-center gap-1.5">
+          <Wind className="w-3.5 h-3.5" /> Recovery — CO2 tolerance test
+        </h2>
+        <div className="card p-4 space-y-4">
+          {readiness.verdict !== 'na' && (
+            <div className="neo-card p-4 flex items-center justify-between gap-3">
+              <div>
+                <p className={cn('font-display text-xl font-bold', READINESS[readiness.verdict].color)}>{READINESS[readiness.verdict].label}</p>
+                <p className="text-xs text-ink-muted mt-0.5 max-w-[20rem]">{readiness.advice}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-display text-2xl font-bold text-ink tabular-nums">{readiness.latest}s</p>
+                <p className="text-xs text-ink-muted">
+                  {readiness.band ? co2Band(readiness.latest!).label : ''}
+                  {readiness.baseline != null && (
+                    <> · {readiness.deltaPct != null && readiness.deltaPct > 0 ? '+' : ''}{readiness.deltaPct}% vs {readiness.baseline}s</>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <CO2Test onLog={(s) => addRecovery(s)} />
+
+          {recoveryPoints.length > 1 && <Chart points={recoveryPoints} unit="s" accent="var(--ember)" />}
+        </div>
+
+        {recovery.length > 0 && (
+          <div className="space-y-1.5">
+            {recovery.slice(0, 8).map((r) => (
+              <div key={r.id} className="flex items-center justify-between text-sm card !py-2 px-3">
+                <span className="text-ink font-medium tabular-nums">
+                  {r.co2Score}s <span className="text-xs text-ink-subtle font-normal">· {co2Band(r.co2Score).label}</span>
+                </span>
+                <span className="text-xs text-ink-subtle">{format(new Date(r.date), 'EEE, MMM d')}</span>
+                <button onClick={() => deleteRecovery(r.id)} className="tap-44 p-2.5 -m-1 text-ink-muted hover:text-danger" aria-label="Delete entry">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </motion.section>
+
+      {/* Bodyweight */}
+      <section className="space-y-3">
+        <h2 className="section-label flex items-center gap-1.5">
+          <Scale className="w-3.5 h-3.5" /> Bodyweight
+        </h2>
+        <div className="card p-4 space-y-4">
+          <div className="flex gap-2">
+            <input
+              type="number"
+              inputMode="decimal"
+              aria-label={`Today's weight in ${unit}`}
+              value={w}
+              onChange={(e) => setW(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && logWeight()}
+              placeholder={`Today's weight (${unit})`}
+              className="input flex-1 min-h-[44px]"
+            />
+            <button onClick={logWeight} disabled={!w.trim()} className="btn btn-primary disabled:opacity-50 min-h-[44px]">
+              <Plus className="w-4 h-4" /> Log
+            </button>
+          </div>
+
+          {/* A bordered box a fifth of a screen tall, existing to say "nothing
+              here yet", is worse than one quiet line. */}
+          {bwPoints.length > 1 ? (
+            <Chart points={bwPoints} unit={unit} accent="var(--ember)" />
+          ) : (
+            <p className="text-xs text-ink-muted">
+              {bwPoints.length === 1 ? 'One entry logged — a second starts the trend.' : 'Log your weight to start a trend.'}
+            </p>
+          )}
+        </div>
+
+        {bodyweight.length > 0 && (
+          <div className="space-y-1.5">
+            {bodyweight.slice(0, 8).map((b) => (
+              <div key={b.id} className="flex items-center justify-between text-sm card !py-2 px-3">
+                <span className="text-ink font-medium">
+                  {b.weight} {unit}
+                </span>
+                <span className="text-xs text-ink-subtle">{format(new Date(b.date), 'EEE, MMM d')}</span>
+                <button onClick={() => deleteBodyweight(b.id)} className="tap-44 p-2.5 -m-1 text-ink-muted hover:text-danger" aria-label="Delete entry">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </section>

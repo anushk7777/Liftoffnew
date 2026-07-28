@@ -163,14 +163,14 @@ export default function TopNav({
           className="flex items-center gap-2 rounded-lg border border-border bg-[var(--bg)]/60 text-[var(--text-subtle)] hover:text-[var(--text)] hover:border-border-strong transition-colors px-2.5 py-1.5"
         >
           <Search className="w-[16px] h-[16px]" />
-          <kbd className="hidden lg:inline text-[10px] font-medium border border-border rounded px-1.5 py-0.5">⌘K</kbd>
+          <kbd className="hidden lg:inline text-[11px] font-medium border border-border rounded px-1.5 py-0.5">⌘K</kbd>
         </button>
 
         <button
           onClick={onQuickAdd}
           title="Quick add (⌘N)"
           aria-label="Quick add"
-          className="glow-accent w-9 h-9 flex items-center justify-center rounded-lg bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)] active:scale-90"
+          className="glow-accent tap-44 w-9 h-9 flex items-center justify-center rounded-lg bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)] active:scale-90"
         >
           <Plus className="w-[18px] h-[18px]" />
         </button>
@@ -179,7 +179,7 @@ export default function TopNav({
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
           aria-label="Toggle theme"
-          className="w-9 h-9 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition-colors"
+          className="tap-44 w-9 h-9 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition-colors"
         >
           {theme === 'dark' ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
         </button>
@@ -189,7 +189,7 @@ export default function TopNav({
           title="Settings"
           className={({ isActive }) =>
             cn(
-              'w-9 h-9 flex items-center justify-center rounded-lg transition-colors',
+              'tap-44 w-9 h-9 flex items-center justify-center rounded-lg transition-colors',
               isActive
                 ? 'text-[var(--accent)] bg-[var(--accent-soft)]'
                 : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--hover)]',

@@ -25,6 +25,7 @@
 //     excludes them.
 import type { WorkoutProgram, WorkoutSession } from '../types';
 import { sessionPoints, fitTrend, diagnoseFlat, MIN_SESSIONS_FOR_VERDICT } from './strength';
+import { isPlaceholderExercise } from '../volume';
 import type { Diagnosis } from './strength';
 
 /** Not enough points to fit a line worth trusting. Four, not three: the
@@ -132,7 +133,12 @@ export function liftReturns(
   const subs = substitutionIndex(program);
   const targets = targetRpeIndex(program);
   const names = new Set<string>();
-  for (const s of usable) for (const e of s.entries) names.add(e.name);
+  // A placeholder is a slot in the sheet, not a movement — "Weak Point Exercise
+  // 2 (optional)" was reaching the top of this ledger and being reported as the
+  // block's biggest gain. Whatever was actually done in that slot was logged
+  // under the placeholder's name, so the number is real but it belongs to no
+  // identifiable lift, and naming it tells the lifter nothing they can act on.
+  for (const s of usable) for (const e of s.entries) if (!isPlaceholderExercise(e.name)) names.add(e.name);
 
   const out: LiftReturn[] = [];
   for (const name of names) {

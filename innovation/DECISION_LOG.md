@@ -30,6 +30,7 @@ you need without reading the whole file.
 | **8** Independent verification | "make sure we are not hallucinating" | every constant re-derived from first principles; citations re-checked |
 | **9** Overfitting audit | "make sure the model doesn't overfit" | not overfitted to seeds; IS fitted to an independence assumption, measured and left in place |
 | **10** Block report + app-wide fuzz | "add sets to failure, the card looks bad, find any other bugs" | card rebuilt; three more crashes found, one in the core store |
+| **11** UI/UX audit on a real phone | screenshots from the user's own device | a half-finished week was being judged as a shortfall; the header had no background; two tabs unreachable |
 
 **Sections 8 and 9 are the ones to trust.** Everything before it is reasoning; that one
 is arithmetic that does not depend on the code being right.
@@ -653,6 +654,118 @@ without guarding every level. Passing tests said nothing about it, because tests
 supply well-formed fixtures. Fuzzing is the only thing that found any of them.
 
 ---
+
+## 11. The UI/UX audit — and the bug the screenshots found
+
+Triggered by six screenshots taken on the owner's own phone, after a measured
+audit of the Progress tab on an emulated 390x844 viewport. The emulator found
+layout and contrast problems. The real screenshots found a **correctness** bug
+that the emulator had missed, because the emulated fixture always seeded whole
+weeks and the real device was one session into week 3.
+
+### 11.1 Volume IQ was judging a week that had not happened yet
+
+The screen read:
+
+> **Week 3 · Build: 12 under-trained.**
+> Back — 6.5 sets/wk — BELOW MEV — *Add ~4 sets/wk to actually drive growth.*
+
+One of eight prescribed sessions had been logged. So one eighth of the week's
+work had genuinely been done, and every muscle was "short" of a whole week's
+landmark by construction. Twelve of thirteen muscles were being told to add
+sets, on the second day of a training week, by arithmetic rather than by
+anything about the training.
+
+This is the same class of error as the chart bug in §2 — comparing a partial
+week against finished ones — in the one place it had not been fixed.
+
+**Two fixes were considered and one rejected.**
+
+*Rejected: project the partial week forward.* Multiply what has been logged by
+`daysPlanned / daysDone`. This is what the tonnage chart does, and it works
+there because tonnage is one aggregate number that accumulates evenly. Per
+muscle it fails badly: one push day scaled by eight puts chest at 8x its true
+rate and reports **over MRV — cut back**. Trading a false "under-trained" for a
+false "over-trained" is not an improvement; it is the same mistake with the
+sign flipped.
+
+*Adopted: do not judge an unfinished week at all.* A program week becomes
+readable when it is finished. `analyzeVolume` now takes the program (optionally,
+so every existing caller is unaffected), counts logged days against prescribed
+days for the newest week, and:
+
+- **week unfinished, a complete week behind it** → analyse the last complete
+  week, and say plainly which week is still running:
+  *"Week 3 · Build is 1 of 8 days in — it'll be read once you finish it."*
+- **week unfinished, nothing complete behind it** → show the sets logged so far,
+  flagged `provisional`; the UI withholds every status badge and every
+  "add N sets" line, and the headline states what was logged instead of naming
+  a shortfall.
+- **week finished** → exactly as before.
+
+Verified end to end in the browser against the real Pure Bodybuilding program.
+With week 3 one day in, the card now reads **"Week 2 · Build: 4 under-trained,
+9 dialed in"** — the last week that actually finished — rather than
+**"Week 3 · Build: 12 under-trained"**. Four tests cover the three branches plus
+the no-program path.
+
+### 11.2 The header had no background at all
+
+`bg-background/80` on the sticky header computed to `rgba(0, 0, 0, 0)`.
+Tailwind v3 cannot apply an `/opacity` modifier to a `var()` colour — a fact
+already written down in `tailwind.config.js`, and violated in four places
+including the fixed workout footer. Only `backdrop-blur-xl` separated the header
+from the page, and a blur does not hide white text at full opacity: screenshots
+show a lift name and a status badge colliding with the app title.
+
+Replaced with a `.glass-bar` utility using `color-mix(in srgb, var(--bg) 96%,
+transparent)` and an opaque fallback under `@supports not (backdrop-filter)`.
+Measured after the fix: text scrolled under the bar renders at **1.10:1**
+against the background — the same as empty page.
+
+### 11.3 Placeholder slots were being reported as achievements
+
+`isPlaceholderExercise()` existed and was used by the volume audit, but neither
+`returns.ts` nor `blockReport.ts` called it. So the block's headline read:
+
+> **BIGGEST GAIN — Weak Point Exercise 2 (optional), +13.6 kg estimated 1RM**
+
+The number is real; the name is a blank slot in the sheet. It cannot be
+repeated, swapped, or acted on. Placeholders are now excluded from the ledger,
+from PR chips, and from the lift count — while their sets still count towards
+tonnage and volume, because that work was done.
+
+### 11.4 Everything else, measured
+
+| Finding | Measured before | After |
+| --- | --- | --- |
+| Section headings and secondary copy | 2.6–3.0:1 in all four themes | ≥4.6:1, muted/subtle gap preserved |
+| Tab strip | 544px of tabs in a 390px viewport; "Programs" invisible, selected pill clipped | edge-fade mask + active tab scrolled into view |
+| Text under 11px | 38 elements (incl. 9px chart axis labels) | none |
+| Tap targets under 44px | 14 | all real controls at 44px, via a `.tap-44` overlay that keeps the drawn size |
+| Unlabelled inputs | 2 | none |
+| Truncated titles | "Week 2 · Build · Pull #2 (Mid-Bac…" | week name removed from the title (it was repeated in the picker below); day names wrap |
+| Chart axis labels | drawn under the series; "45 s" struck through by the line | drawn last, with a halo |
+| PR chips | "SNATCH-GRIP RDL 98 E1RM" — no separator, no unit | "Snatch-Grip RDL · 98 kg e1RM", sentence case |
+| Progress section order | block report 2.8 screens down, below a breath-hold timer and a weight logger | analytics first, data entry last |
+| Volume IQ intro | 379 characters before any data | one line, with the rest behind "How this is counted" |
+| "Remove API key" | bare grey text, no confirmation | labelled destructive button with a confirm |
+| A dash tinted as a warning | `tone` read off `pct = 0` before checking `total > 0` | guarded |
+
+### 11.5 What was NOT changed, and why
+
+- **The inline link `aistudio.google.com/apikey` is 178x20.** WCAG 2.5.8
+  explicitly exempts links inline in a sentence; enlarging it would break the
+  paragraph it sits in.
+- **The tab strip still scrolls.** Five tabs cannot fit 390px at a legible size.
+  The fix makes the overflow visible and guarantees the selected tab is on
+  screen, rather than pretending the strip fits.
+- **The volume landmarks, the program, and deload handling are untouched.** The
+  program is read exactly as the sheet authors it, and the app still never
+  infers a deload.
+
+---
+
 
 ## Testing
 

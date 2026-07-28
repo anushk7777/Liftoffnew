@@ -177,7 +177,7 @@ export function PriorityBadge({ priority }: { priority: string }) {
   return (
     <span
       className={cn(
-        'text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border',
+        'text-[11px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border',
         PRIORITY_STYLES[priority] || PRIORITY_STYLES.low,
       )}
     >

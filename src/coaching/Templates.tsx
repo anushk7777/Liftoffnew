@@ -15,11 +15,11 @@ import CoachClients from './CoachClients';
 function Header() {
   const setMode = useAppMode((s) => s.setMode);
   return (
-    <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border pt-[env(safe-area-inset-top)]">
+    <header className="glass-bar sticky top-0 z-30 backdrop-blur-xl border-b border-border pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-3xl px-4 h-14 flex items-center gap-3">
         <button
           onClick={() => setMode('focus')}
-          className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center text-ink-muted hover:text-ink hover:bg-hover transition-colors"
+          className="tap-44 w-9 h-9 -ml-1 rounded-full flex items-center justify-center text-ink-muted hover:text-ink hover:bg-hover transition-colors"
           aria-label="Back to Liftoff Focus"
         >
           <ArrowLeft className="w-5 h-5" />

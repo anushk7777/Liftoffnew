@@ -22,6 +22,7 @@ import { completionMap, dayCompletionKey, detectPRs, volumeByProgramWeek } from 
 import type { PRHit } from '../store';
 import { liftReturns } from './returns';
 import type { LiftReturn } from './returns';
+import { isPlaceholderExercise } from '../volume';
 
 const DAY_MS = 86_400_000;
 
@@ -164,8 +165,12 @@ export function blockReport(
   const lastT = stamped[stamped.length - 1].t;
 
   // PRs across the block: each session judged against everything before it.
+  // Placeholder slots are dropped for the same reason they are dropped from the
+  // ledger — "WEAK POINT EXERCISE 1 · 64 kg" names no movement, so it cannot be
+  // celebrated or repeated. Renaming the slot to the lift actually performed
+  // brings it back.
   const prs: PRHit[] = [];
-  for (const { s } of stamped) prs.push(...detectPRs(mine, s));
+  for (const { s } of stamped) prs.push(...detectPRs(mine, s).filter((p) => !isPlaceholderExercise(p.lift)));
   prs.sort((a, b) => b.value - b.prev - (a.value - a.prev));
 
   // Strength verdicts over a window wide enough to hold the whole block, with
@@ -206,6 +211,7 @@ export function blockReport(
   let ratedSets = 0;
   for (const { s } of stamped)
     for (const e of s.entries) {
+      if (isPlaceholderExercise(e.name)) continue;
       liftNames.add(e.name);
       for (const st of e.sets) {
         const rpe = parseFloat(st.rpe ?? '');

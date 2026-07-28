@@ -207,7 +207,7 @@ export function DateTimePicker({
             <div className="px-3 pb-2">
               <div className="grid grid-cols-7 place-items-center">
                 {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-                  <span key={i} className="text-[10px] font-bold text-[var(--text-subtle)] h-6 flex items-center">{d}</span>
+                  <span key={i} className="text-[11px] font-bold text-[var(--text-subtle)] h-6 flex items-center">{d}</span>
                 ))}
                 {days.map((day) => {
                   const inMonth = isSameMonth(day, viewMonth);

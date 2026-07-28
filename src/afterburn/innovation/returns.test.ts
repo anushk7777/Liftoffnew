@@ -277,3 +277,27 @@ describe('flaws found auditing the rebuilt engine', () => {
     expect(['working', 'strong']).toContain(find(four, 'Machine Row').verdict);
   });
 });
+
+// From a real screen: "Weak Point Exercise 2 (optional)" sat at the top of the
+// ledger and was reported as the block's biggest gain. It is a blank slot in the
+// sheet, not a movement — the number is real but it belongs to no lift the
+// lifter can identify, repeat, or swap.
+describe('placeholder slots', () => {
+  const climb = (name: string) =>
+    [58, 44, 30, 16].map((d, i) => s(`${name}${i}`, d, [[name, 100 + i * 20, 8, 3]]));
+
+  it('never ranks a program placeholder', () => {
+    const rs = liftReturns(
+      [...climb('Weak Point Exercise 1'), ...climb('Weak Point Exercise 2 (optional)'), ...climb('Machine Row')],
+      null,
+      90,
+      NOW,
+    );
+    expect(rs.map((r) => r.name)).toEqual(['Machine Row']);
+  });
+
+  it('still ranks a slot the lifter has renamed to a real movement', () => {
+    const rs = liftReturns(climb('Cable Lateral Raise'), null, 90, NOW);
+    expect(rs.map((r) => r.name)).toEqual(['Cable Lateral Raise']);
+  });
+});
