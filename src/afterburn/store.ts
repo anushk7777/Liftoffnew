@@ -8,6 +8,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { DEFAULT_PROGRAM } from './plan';
 import { withWeakPoints } from './pureBodybuilding';
 import { DEFAULT_NUTRITION } from './nutrition';
+import { DEFAULT_RECALL_DAYS } from './innovation/recall';
 import type { NutritionProfile } from './nutrition';
 import type { BodyEntry, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, RecoveryEntry, WeekPlan, WeightUnit, WorkoutProgram, WorkoutSession } from './types';
 
@@ -428,6 +429,11 @@ interface AfterburnState {
   deleteRecovery: (id: string) => void;
   nutrition: NutritionProfile;
   setNutrition: (patch: Partial<NutritionProfile>) => void;
+  /** How many days an exercise note keeps resurfacing. 0 turns recall off,
+   *  Infinity keeps every note. Defaults to one week — about one microcycle, so
+   *  you meet the lift again while the note still applies. */
+  noteRecallDays: number;
+  setNoteRecallDays: (days: number) => void;
 }
 
 export const useAfterburn = create<AfterburnState>()(
@@ -438,6 +444,8 @@ export const useAfterburn = create<AfterburnState>()(
       bodyweight: [],
       recovery: [],
       nutrition: DEFAULT_NUTRITION,
+      noteRecallDays: DEFAULT_RECALL_DAYS,
+      setNoteRecallDays: (days) => set({ noteRecallDays: Number.isFinite(days) && days >= 0 ? days : DEFAULT_RECALL_DAYS }),
       draft: null,
       currentWeekId: '',
       setCurrentWeek: (id) => set({ currentWeekId: id }),
@@ -678,7 +686,7 @@ export const useAfterburn = create<AfterburnState>()(
         p.program = withWeakPoints(prog);
         return p;
       },
-      partialize: (s) => ({ program: s.program, sessions: s.sessions, bodyweight: s.bodyweight, recovery: s.recovery, nutrition: s.nutrition, draft: s.draft, currentWeekId: s.currentWeekId }),
+      partialize: (s) => ({ program: s.program, sessions: s.sessions, bodyweight: s.bodyweight, recovery: s.recovery, nutrition: s.nutrition, draft: s.draft, currentWeekId: s.currentWeekId, noteRecallDays: s.noteRecallDays }),
     },
   ),
 );

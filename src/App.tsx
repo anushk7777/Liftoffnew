@@ -16,6 +16,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 // so it stays out of the initial bundle until the palette is actually opened.
 import QuickAdd from './components/QuickAdd';
 import AlarmOverlay from './components/AlarmOverlay';
+import Co2Banner from './afterburn/Co2Banner';
+import { useCo2Reminder } from './afterburn/co2Reminder';
 import InstallPrompt from './components/InstallPrompt';
 import OfflineBanner from './components/OfflineBanner';
 
@@ -67,6 +69,8 @@ function Shell() {
   const isMobile = useIsMobile();
   const appMode = useAppMode((s) => s.mode);
   useReminders();
+  // Morning CO2 nudge — windowed 09:30-11:00, silent once the test is logged.
+  useCo2Reminder();
 
   const [authChecking, setAuthChecking] = useState(true);
 
@@ -147,6 +151,7 @@ function Shell() {
         {quickAddOpen && <QuickAdd key="quickadd" onClose={() => setQuickAddOpen(false)} />}
       </AnimatePresence>
       <AlarmOverlay />
+      <Co2Banner />
     </>
   );
 
@@ -188,6 +193,10 @@ function Shell() {
         <OfflineBanner />
         <PWAPrompt />
         <InstallPrompt />
+        {/* The CO2 test LIVES in Afterburn, so the morning nudge has to reach
+            this branch — mounting it only on the Focus side meant the banner
+            was absent from the one workspace where it is actionable. */}
+        <Co2Banner />
         {paletteOpen && (
           <Suspense fallback={null}>
             <CommandPalette onClose={() => setPaletteOpen(false)} />

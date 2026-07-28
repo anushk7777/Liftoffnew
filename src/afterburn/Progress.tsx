@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus, Sparkles, Gauge, Wind, Play, Square, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Scale, TrendingUp, TrendingDown, Trophy, Activity, Minus, Sparkles, Gauge, Wind, Play, Square, ChevronRight, StickyNote } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAfterburn, volumeByProgramWeek, volumeTrend, weekAdherence, detectPRs, formatVolume } from './store';
 import type { PRHit } from './store';
@@ -9,6 +9,7 @@ import { analyzeVolume, microcycleDays, MUSCLE_LABEL, WEEK_GRACE_DAYS } from './
 import type { MuscleAnalysis, VolumeStatus } from './volume';
 import { liftReturns, deadWeight } from './innovation/returns';
 import { blockReport } from './innovation/blockReport';
+import { noteDigest, agoLabel } from './innovation/recall';
 import type { LiftReturn, ReturnVerdict } from './innovation/returns';
 import { recoveryReadiness, co2Band } from './recovery';
 import type { ReadinessVerdict } from './recovery';
@@ -384,6 +385,10 @@ export default function Progress() {
   const returns = useMemo(() => liftReturns(sessions, program), [sessions, program]);
   const judged = returns.filter((r) => r.verdict !== 'unknown');
   const stuck = useMemo(() => deadWeight(judged), [judged]);
+
+  // ---- Notes left on lifts, recalled for a window ----
+  const noteRecallDays = useAfterburn((s) => s.noteRecallDays);
+  const notes = useMemo(() => noteDigest(sessions, noteRecallDays), [sessions, noteRecallDays]);
 
   // ---- Recovery — CO2 tolerance test readiness ----
   const readiness = useMemo(() => recoveryReadiness(recovery), [recovery]);
@@ -831,6 +836,48 @@ export default function Progress() {
           </div>
         )}
       </section>
+
+      {/* Notes you left — surfaced for a week, then gone.
+          Renders NOTHING at all when nothing was noted, so the page is exactly
+          as it was for anyone who does not use notes. */}
+      {!notes.empty && (
+        <motion.section
+          initial={rm ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
+          className="space-y-3"
+        >
+          <h2 className="section-label flex items-center gap-1.5">
+            <StickyNote className="w-3.5 h-3.5" /> What you noted
+          </h2>
+          <div className="neo-card p-5">
+            <p className="text-sm text-ink font-medium">
+              {notes.lifts} {notes.lifts === 1 ? 'lift has' : 'lifts have'} a note from the last{' '}
+              {notes.windowDays} days.
+            </p>
+            <p className="text-xs text-ink-muted mt-1">
+              Each one also shows on the exercise itself next time you train it.
+            </p>
+            <div className="mt-3.5 space-y-3">
+              {notes.notes.map((n) => (
+                <div key={`${n.exercise}-${n.date}`} className="flex items-start gap-2.5">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full mt-[7px] shrink-0"
+                    style={{ background: 'var(--ember)' }}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm text-ink leading-snug">{n.exercise}</p>
+                    <p className="text-xs text-ink-muted italic leading-snug mt-0.5">{n.text}</p>
+                    <p className="text-[11px] text-ink-muted mt-0.5">
+                      {agoLabel(n.daysAgo)}{n.dayName ? ` · ${n.dayName}` : ''}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.section>
+      )}
 
       {/* Recovery — CO2 tolerance test */}
       <motion.section
