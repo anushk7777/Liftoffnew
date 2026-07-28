@@ -231,6 +231,153 @@ describe('analyzeVolume — program-week (microcycle) mode', () => {
   });
 });
 
+// Reported from a real screen: one session into week 3, the card read
+// "Week 3 · Build: 12 under-trained" and told the lifter to add sets to every
+// muscle. One eighth of a week's work had genuinely been done, so the shortfall
+// was arithmetic rather than a finding.
+describe('analyzeVolume — a program week still in progress', () => {
+  const w1 = { id: 'w1', name: 'Week 1 · Build' };
+  const w2 = { id: 'w2', name: 'Week 2 · Build' };
+  // Two weeks of four prescribed days each.
+  const program = {
+    weeks: [
+      { id: 'w1', name: 'Week 1 · Build', days: [{ id: 'd1' }, { id: 'd2' }, { id: 'd3' }, { id: 'd4' }] },
+      { id: 'w2', name: 'Week 2 · Build', days: [{ id: 'd1' }, { id: 'd2' }, { id: 'd3' }, { id: 'd4' }] },
+    ],
+  } as never;
+  const day = (id: string, dayId: string, dayN: number, lifts: [string, number][], week: { id: string; name: string }) =>
+    ({ ...sess(id, new Date(Date.UTC(2026, 2, dayN, 10)).toISOString(), lifts, week), dayId }) as WorkoutSession;
+
+  const fullW1 = [1, 2, 3, 4].map((n) => day(`a${n}`, `d${n}`, 8 + n, [['Cable Fly', 4]], w1));
+  // These fixtures are dated March 2026. "In progress" now expires, so `now` has
+  // to be anchored near the sessions or every week reads as long abandoned.
+  const soon = (sessions: WorkoutSession[]) =>
+    new Date(Math.max(...sessions.map((x) => Date.parse(x.completedAt ?? x.date))) + 86_400_000);
+
+  it('reads the last COMPLETE week and reports the pending one separately', () => {
+    const started = [day('b1', 'd1', 20, [['Cable Fly', 1]], w2)]; // 1 of 4 days
+    const all = [...fullW1, ...started];
+    const r = analyzeVolume(all, program, soon(all));
+
+    expect(r.windowLabel).toBe('Week 1 · Build');
+    expect(r.inProgress).toEqual({ label: 'Week 2 · Build', done: 1, total: 4 });
+    expect(r.provisional).toBe(false);
+    // 16 chest sets from the finished week, not the 1 logged so far.
+    expect(r.muscles.find((m) => m.muscle === 'chest')!.rawSets).toBe(16);
+  });
+
+  it('withholds the verdict when there is no complete week to fall back on', () => {
+    const only = [day('b1', 'd1', 20, [['Cable Fly', 1]], w1)];
+    const r = analyzeVolume(only, program, soon(only));
+    expect(r.provisional).toBe(true);
+    expect(r.inProgress).toEqual({ label: 'Week 1 · Build', done: 1, total: 4 });
+    // The headline states what was logged; it does not name a shortfall.
+    expect(r.headline).toContain('1 of 4 days in');
+    expect(r.headline).not.toContain('under-trained');
+  });
+
+  it('orders a provisional week by what was actually done', () => {
+    // With the status badge withheld, ordering by status left an unexplained
+    // list — a muscle with 10 sets sitting below one with 1.
+    const partial = [
+      day('p1', 'd1', 20, [['Cable Fly', 2], ['Machine Row', 6]], w1),
+      day('p2', 'd2', 21, [['Hammer Curl', 1]], w1),
+    ];
+    const r = analyzeVolume(partial, program, soon(partial));
+    expect(r.provisional).toBe(true);
+    const raw = r.trained.map((m) => m.rawSets);
+    expect(raw).toEqual([...raw].sort((a, b) => b - a)); // descending, no exceptions
+    expect(r.trained[0].muscle).toBe('back'); // 6 sets, the most done
+  });
+
+  it('judges the week normally once every prescribed day is logged', () => {
+    const r = analyzeVolume(fullW1, program, soon(fullW1));
+    expect(r.inProgress).toBeNull();
+    expect(r.provisional).toBe(false);
+    expect(r.windowLabel).toBe('Week 1 · Build');
+    expect(r.headline).toContain('Week 1 · Build:');
+  });
+
+  it('behaves exactly as before when no program is supplied', () => {
+    const started = [day('b1', 'd1', 20, [['Cable Fly', 1]], w2)];
+    const r = analyzeVolume([...fullW1, ...started], null, soon([...fullW1, ...started]));
+    expect(r.inProgress).toBeNull();
+    expect(r.provisional).toBe(false);
+    expect(r.windowLabel).toBe('Week 2 · Build');
+  });
+});
+
+// "What if I end early, leave a workout half done, or skip one completely?"
+// Each of these was measured; two of them used to leave the card stuck on an
+// older week permanently.
+describe('analyzeVolume — real-life interruptions', () => {
+  const DAY = 86_400_000;
+  const t0 = Date.UTC(2026, 5, 1, 10);
+  const program = {
+    weeks: [1, 2, 3].map((w) => ({
+      id: `w${w}`, name: `Week ${w}`, days: [1, 2, 3, 4].map((d) => ({ id: `d${d}` })),
+    })),
+  } as never;
+  const day = (weekId: string, dayId: string, offset: number, sets: number, endedEarly = false) =>
+    ({
+      id: `${weekId}-${dayId}`, dayId, weekId, weekName: `Week ${weekId.slice(1)}`,
+      date: new Date(t0 + offset * DAY).toISOString(),
+      completedAt: new Date(t0 + offset * DAY).toISOString(),
+      endedEarly: endedEarly || undefined,
+      entries: [{ name: 'Cable Fly', sets: Array.from({ length: sets }, () => ({ weight: '50', reps: '10', done: true })) }],
+    }) as unknown as WorkoutSession;
+  const full = (weekId: string, start: number, days = 4, sets = 3) =>
+    Array.from({ length: days }, (_, i) => day(weekId, `d${i + 1}`, start + i * 2, sets));
+  const at = (sessions: WorkoutSession[], daysAfterLast: number) =>
+    new Date(Math.max(...sessions.map((x) => Date.parse(x.completedAt!))) + daysAfterLast * DAY);
+
+  it('ending a workout early still completes the day, and the week', () => {
+    // The day is logged, so it counts — the week is not held open by it.
+    const sessions = [...full('w1', 0), ...full('w2', 10)];
+    sessions[6] = day('w2', 'd3', 14, 1, true); // ended early, one set
+    const r = analyzeVolume(sessions, program, at(sessions, 1));
+    expect(r.inProgress).toBeNull();
+    expect(r.provisional).toBe(false);
+    expect(r.windowLabel).toBe('Week 2');
+  });
+
+  it('skipping a day and starting the next week reads the short week', () => {
+    const sessions = [...full('w1', 0), ...full('w2', 10, 3), day('w3', 'd1', 20, 3)];
+    const r = analyzeVolume(sessions, program, at(sessions, 1));
+    expect(r.windowLabel).toBe('Week 2'); // 3 of 4 days, but it is what happened
+    expect(r.inProgress).toEqual({ label: 'Week 3', done: 1, total: 4 });
+  });
+
+  it('skipping a day and stopping waits a while, then reads it anyway', () => {
+    const sessions = [...full('w1', 0), ...full('w2', 10, 3)];
+    // Right after: you might still finish it, so the last complete week stands.
+    const soon = analyzeVolume(sessions, program, at(sessions, 1));
+    expect(soon.windowLabel).toBe('Week 1');
+    expect(soon.inProgress).toEqual({ label: 'Week 2', done: 3, total: 4 });
+    // A month on you are not going to. Waiting forever would strand the card on
+    // Week 1 and hide three logged sessions — the bug this test exists for.
+    const later = analyzeVolume(sessions, program, at(sessions, 30));
+    expect(later.windowLabel).toBe('Week 2');
+    expect(later.inProgress).toBeNull();
+  });
+
+  it('abandoning a week after one session eventually reads that one session', () => {
+    const sessions = [...full('w1', 0), day('w2', 'd1', 10, 3)];
+    const later = analyzeVolume(sessions, program, at(sessions, 30));
+    expect(later.windowLabel).toBe('Week 2');
+    expect(later.provisional).toBe(false);
+    expect(later.muscles.find((m) => m.muscle === 'chest')!.rawSets).toBe(3);
+  });
+
+  it('a slow but genuine week is not cut off early', () => {
+    // Three of four days done, still inside one cycle plus the grace week.
+    const sessions = [...full('w1', 0), ...full('w2', 10, 3)];
+    const r = analyzeVolume(sessions, program, at(sessions, 5));
+    expect(r.windowLabel).toBe('Week 1');
+    expect(r.inProgress?.done).toBe(3);
+  });
+});
+
 describe('muscles with no minimum effective volume', () => {
   const w1 = { id: 'w1', name: 'Week 1' };
   const legs = (lifts: [string, number][]) =>

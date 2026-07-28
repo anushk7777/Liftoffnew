@@ -174,7 +174,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
             placeholder="Jump to or run a command…"
             className="flex-1 bg-transparent py-3.5 text-sm text-ink placeholder:text-ink-subtle focus:outline-none"
           />
-          <kbd className="text-[10px] text-ink-subtle border border-border rounded px-1.5 py-0.5">esc</kbd>
+          <kbd className="text-[11px] text-ink-subtle border border-border rounded px-1.5 py-0.5">esc</kbd>
         </div>
 
         <div className="max-h-[50vh] overflow-y-auto p-1.5">
@@ -197,7 +197,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
                 >
                   <Icon className={cn('w-4 h-4 shrink-0', i === active ? 'text-accent' : 'text-ink-subtle')} />
                   <span className="flex-1 text-sm truncate">{c.label}</span>
-                  {c.sublabel && <span className="text-[10px] text-ink-subtle uppercase tracking-wide shrink-0">{c.sublabel}</span>}
+                  {c.sublabel && <span className="text-[11px] text-ink-subtle uppercase tracking-wide shrink-0">{c.sublabel}</span>}
                   {i === active && <CornerDownLeft className="w-3.5 h-3.5 text-ink-subtle shrink-0" />}
                 </button>
               </div>

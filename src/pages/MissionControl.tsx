@@ -150,7 +150,7 @@ export default function MissionControl() {
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-[26px] font-bold tracking-tight text-[var(--text)]" style={tnum}>{actual}<span className="text-[15px]">%</span></span>
-                <span className="text-[10px] text-[var(--text-muted)]">complete</span>
+                <span className="text-[11px] text-[var(--text-muted)]">complete</span>
               </div>
             </div>
             <div className="flex-1 flex flex-col gap-3">

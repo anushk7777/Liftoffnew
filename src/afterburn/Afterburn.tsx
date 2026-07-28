@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Flame, Rocket, Plus, Check, CheckCircle2, Star, Trash2, ChevronDown, ChevronRight, ChevronLeft, Pencil, X, LayoutGrid, TrendingUp, Timer, Calculator, ArrowRight, Search, Sparkles, Dumbbell, Wind } from 'lucide-react';
@@ -156,10 +156,10 @@ function ExerciseTable({
                 <td className="py-2 pr-2 font-medium text-ink">
                   {ex.name} <LookupButton name={ex.name} subtle />
                   {ex.lastSetTechnique && (
-                    <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[10px] font-semibold align-middle">{ex.lastSetTechnique}</span>
+                    <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[11px] font-semibold align-middle">{ex.lastSetTechnique}</span>
                   )}
                   {ex.substitutions && ex.substitutions.length > 0 && (
-                    <span className="block text-[10px] text-ink-subtle font-normal mt-0.5">or: {ex.substitutions.join(' · ')}</span>
+                    <span className="block text-[11px] text-ink-subtle font-normal mt-0.5">or: {ex.substitutions.join(' · ')}</span>
                   )}
                 </td>
                 <td className="py-2 px-2 text-center text-ink-muted">{dash(warmOf(ex))}</td>
@@ -190,11 +190,11 @@ function ExerciseTable({
                 <p className="font-medium text-ink text-sm">
                   {ex.name} <LookupButton name={ex.name} subtle />
                   {ex.lastSetTechnique && (
-                    <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[10px] font-semibold align-middle">{ex.lastSetTechnique}</span>
+                    <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[11px] font-semibold align-middle">{ex.lastSetTechnique}</span>
                   )}
                 </p>
                 {ex.substitutions && ex.substitutions.length > 0 && (
-                  <p className="text-[10px] text-ink-subtle mt-0.5">or: {ex.substitutions.join(' · ')}</p>
+                  <p className="text-[11px] text-ink-subtle mt-0.5">or: {ex.substitutions.join(' · ')}</p>
                 )}
               </div>
               {editing && (
@@ -232,12 +232,12 @@ function Header() {
   const setMode = useAppMode((s) => s.setMode);
   const rm = useReducedMotion();
   return (
-    <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border pt-[env(safe-area-inset-top)]">
+    <header className="glass-bar sticky top-0 z-30 backdrop-blur-xl border-b border-border pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-2xl px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setMode('focus')}
-            className="w-9 h-9 rounded-full bg-elevated border border-border flex items-center justify-center text-ink-muted hover:text-ink transition-colors shrink-0"
+            className="tap-44 w-9 h-9 rounded-full bg-elevated border border-border flex items-center justify-center text-ink-muted hover:text-ink transition-colors shrink-0"
             aria-label="Back to Liftoff"
             title="Back to Liftoff"
           >
@@ -265,12 +265,12 @@ function Header() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => window.dispatchEvent(new Event('liftoff:search'))}
-            className="w-9 h-9 rounded-full bg-elevated border border-border flex items-center justify-center text-ink-muted hover:text-ink transition-colors"
+            className="tap-44 w-9 h-9 rounded-full bg-elevated border border-border flex items-center justify-center text-ink-muted hover:text-ink transition-colors"
             aria-label="Search everything"
           >
             <Search className="w-4 h-4" />
           </button>
-          <button onClick={() => setMode('focus')} className="mode-switch mode-switch-ink !py-2 !px-3.5 text-xs">
+          <button onClick={() => setMode('focus')} className="mode-switch mode-switch-ink !py-2 !px-3.5 min-h-[40px] text-xs">
             <Rocket className="w-4 h-4" /> Liftoff
           </button>
         </div>
@@ -340,7 +340,7 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
             <button
               disabled={weekIdx <= 0}
               onClick={() => setCurrentWeek(program.weeks[weekIdx - 1].id)}
-              className="btn btn-secondary !px-2 !py-1.5 disabled:opacity-40"
+              className="btn btn-secondary !px-2 min-h-[44px] min-w-[44px] disabled:opacity-40"
               aria-label="Previous week"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -348,7 +348,8 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
             <select
               value={week?.id}
               onChange={(e) => setCurrentWeek(e.target.value)}
-              className="input !py-1.5 flex-1 text-center font-medium"
+              aria-label="Program week"
+              className="input !py-1.5 min-h-[44px] flex-1 text-center font-medium"
             >
               {program.weeks.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -359,7 +360,7 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
             <button
               disabled={weekIdx >= program.weeks.length - 1}
               onClick={() => setCurrentWeek(program.weeks[weekIdx + 1].id)}
-              className="btn btn-secondary !px-2 !py-1.5 disabled:opacity-40"
+              className="btn btn-secondary !px-2 min-h-[44px] min-w-[44px] disabled:opacity-40"
               aria-label="Next week"
             >
               <ChevronRight className="w-4 h-4" />
@@ -369,7 +370,7 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
           {week && (
             <p className="text-xs text-ink-subtle px-1 flex items-center gap-2">
               {phase && (
-                <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide', phase === 'Deload' ? 'bg-warning/15 text-warning' : 'bg-accent/15 text-accent')}>{phase}</span>
+                <span className={cn('px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide', phase === 'Deload' ? 'bg-warning/15 text-warning' : 'bg-accent/15 text-accent')}>{phase}</span>
               )}
               {weekDone === week.days.length ? (
                 <span className="text-success font-medium">✓ All {week.days.length} days done this week</span>
@@ -394,7 +395,7 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
           {week && nextDay && weekDone < week.days.length && (
             <button
               onClick={() => begin(nextDay.id)}
-              className="w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-elevated px-3 py-2 text-sm hover:border-accent/40 transition-colors"
+              className="w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-elevated px-3 min-h-[44px] text-sm hover:border-accent/40 transition-colors"
             >
               <span className="text-ink-subtle">Next in your cycle</span>
               <span className="font-medium text-ink flex items-center gap-1.5">{nextDay.name} <ArrowRight className="w-4 h-4 text-accent" /></span>
@@ -450,7 +451,7 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
           </div>
         </div>
       ) : (
-        <button onClick={() => setAdding(true)} className="btn btn-secondary w-full">
+        <button onClick={() => setAdding(true)} className="btn btn-secondary w-full min-h-[44px]">
           <Plus className="w-4 h-4" /> Add your own workout
         </button>
       )}
@@ -465,7 +466,7 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
             )
               resetProgram();
           }}
-          className="btn btn-danger w-full !py-1.5 text-sm mt-2"
+          className="btn btn-danger w-full min-h-[44px] text-sm mt-2"
         >
           <Trash2 className="w-4 h-4" /> Reset / clear program
         </button>
@@ -501,12 +502,21 @@ function DayCard({
       whileHover={rm ? undefined : { y: -2 }}
       transition={springSoft}
     >
-      <div className="flex items-center gap-2">
-        <button onClick={() => setOpen((o) => !o)} className="flex-1 flex items-center gap-2 text-left min-w-0">
+      {/* gap-3, not gap-2: the star and the pencil are 32px wide, so at an 8px
+          gap their 44px touch overlays overlapped by 4px and a tap in that
+          sliver hit whichever painted last — pinning a workout when you meant
+          to edit it. 12px puts the centres exactly 44px apart, so the two
+          targets meet without ever crossing. */}
+      <div className="flex items-center gap-3">
+        <button onClick={() => setOpen((o) => !o)} className="flex-1 flex items-center gap-2 text-left min-w-0 min-h-[44px]">
           {open ? <ChevronDown className="w-4 h-4 text-ink-subtle shrink-0" /> : <ChevronRight className="w-4 h-4 text-ink-subtle shrink-0" />}
           <div className="min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <p className="font-semibold text-ink truncate">{day.name}</p>
+            {/* Wraps rather than truncating. "Pull #1 (Lat Focused)" and
+                "Pull #2 (Mid-Back Focused)" both cut to "Pull #… (…" beside the
+                badges, and the parenthetical is the only thing telling the two
+                pull days apart. */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+              <p className="font-semibold text-ink leading-snug">{day.name}</p>
               {day.isPrimary && (
                 <span className="chip text-ember border-ember bg-ember-soft shrink-0 !py-0.5">
                   <Star className="w-3 h-3 fill-[var(--ember)]" /> Primary
@@ -525,16 +535,16 @@ function DayCard({
         </button>
         <button
           onClick={() => setPrimaryDay(day.id)}
-          className={cn('p-2 hover:text-ember', day.isPrimary ? 'text-ember' : 'text-ink-subtle')}
+          className={cn('tap-44 p-2 hover:text-ember', day.isPrimary ? 'text-ember' : 'text-ink-muted')}
           aria-label={day.isPrimary ? 'Unpin primary workout' : 'Make primary workout'}
           title={day.isPrimary ? 'Unpin primary workout' : 'Make this my primary workout'}
         >
           <Star className={cn('w-4 h-4', day.isPrimary && 'fill-[var(--ember)]')} />
         </button>
-        <button onClick={onToggleEdit} className="p-2 text-ink-subtle hover:text-ink" aria-label="Edit workout">
+        <button onClick={onToggleEdit} className="tap-44 p-2 text-ink-muted hover:text-ink" aria-label="Edit workout">
           <Pencil className="w-4 h-4" />
         </button>
-        <button onClick={onStart} className="btn btn-primary !py-1.5 !px-3 text-sm">Start</button>
+        <button onClick={onStart} className="btn btn-primary !px-3.5 min-h-[40px] text-sm">Start</button>
       </div>
 
       <AnimatePresence initial={false}>
@@ -871,7 +881,7 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
                   placeholder="Type your weak-point exercise"
                   className="input !py-1.5 text-sm font-semibold w-full"
                 />
-                <p className="text-[10px] text-ink-subtle mt-1">Choose from your Weak Point Table — paste the table in to get a dropdown here.</p>
+                <p className="text-[11px] text-ink-subtle mt-1">Choose from your Weak Point Table — paste the table in to get a dropdown here.</p>
               </div>
             )
           ) : ex.target.substitutions && ex.target.substitutions.length > 0 ? (
@@ -957,7 +967,7 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
 
           {/* ACHIEVED (what you logged) */}
           <div className="mt-3">
-            <div className="flex items-center gap-1.5 px-0.5 mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-subtle">
+            <div className="flex items-center gap-1.5 px-0.5 mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-subtle">
               <span className="w-9 shrink-0">Set</span>
               <span className="flex-1 text-center">{unit}</span>
               <span className="flex-1 text-center">reps</span>
@@ -1089,7 +1099,7 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
       })}
 
       <div
-        className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur border-t border-border px-3 pt-3"
+        className="fixed bottom-0 left-0 right-0 z-30 glass-bar backdrop-blur border-t border-border px-3 pt-3"
         style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
       >
         {restEndsAt !== null && (
@@ -1159,29 +1169,33 @@ function SessionCard({ session, onEdit }: { session: WorkoutSession; onEdit: (id
   return (
     <div className="card p-4">
       <div className="flex items-center gap-2">
-        <button onClick={() => setOpen((o) => !o)} className="flex-1 text-left min-w-0">
-          <p className="font-semibold text-ink truncate flex items-center gap-1.5">
-            <span className="truncate">{session.weekName ? `${session.weekName} · ${session.dayName}` : session.dayName}</span>
+        <button onClick={() => setOpen((o) => !o)} className="flex-1 text-left min-w-0 min-h-[44px]">
+          {/* The day is what distinguishes one card from the next, so it leads
+              and is allowed to wrap. Prefixing every title with the week name
+              truncated the useful half — "Week 2 · Build · Pull #2 (Mid-Bac…" —
+              and then repeated that same week name in the picker below. */}
+          <p className="font-semibold text-ink leading-snug flex items-start gap-1.5">
+            <span className="min-w-0">{session.dayName}</span>
             {session.endedEarly && (
-              <span className="chip !px-1.5 !py-0.5 text-[10px] font-semibold border-0 text-[var(--warning)] bg-[var(--accent-soft)] shrink-0" title={session.endNote || 'Ended early'}>
+              <span className="chip !px-1.5 !py-0.5 text-[11px] font-semibold border-0 text-[var(--warning)] bg-[var(--accent-soft)] shrink-0 mt-0.5" title={session.endNote || 'Ended early'}>
                 Ended early
               </span>
             )}
           </p>
-          <p className="text-xs text-ink-subtle">
+          <p className="text-xs text-ink-muted">
             {format(new Date(session.completedAt ?? session.date), 'MMM d, yyyy · h:mm a')} · {doneSets} sets logged
             {session.endedEarly && session.endNote ? ` · ${session.endNote}` : ''}
           </p>
         </button>
         <button
           onClick={() => { if (window.confirm('Reopen this workout to edit? It moves back to in-progress.')) onEdit(session.id); }}
-          className="p-2 text-ink-subtle hover:text-ink"
+          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-muted hover:text-ink"
           aria-label="Edit session"
           title="Reopen to edit"
         >
           <Pencil className="w-4 h-4" />
         </button>
-        <button onClick={() => deleteSession(session.id)} className="p-2 text-ink-subtle hover:text-danger" aria-label="Delete session">
+        <button onClick={() => deleteSession(session.id)} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-muted hover:text-danger" aria-label="Delete session">
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
@@ -1189,11 +1203,11 @@ function SessionCard({ session, onEdit }: { session: WorkoutSession; onEdit: (id
       {/* Which week was this? Setting it labels the log AND marks that week's day done. */}
       {weeks.length > 0 && (
         <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <span className="text-xs text-ink-subtle shrink-0">Week:</span>
           <select
+            aria-label="Program week for this workout"
             value={session.weekId ?? ''}
             onChange={(e) => setSessionWeek(session.id, e.target.value)}
-            className={cn('input !py-1 !px-2 text-xs !w-auto', !session.weekId && 'text-ink-subtle')}
+            className={cn('input !py-1 !px-2 text-xs !w-auto min-h-[40px]', !session.weekId && 'text-[var(--accent)]')}
           >
             <option value="">— set week —</option>
             {weeks.map((w) => (
@@ -1297,6 +1311,41 @@ export default function Afterburn() {
 
   const showLogger = !!draft && !minimized;
   const showTabs = !draft || minimized;
+
+  // The five tabs are wider than a phone. Two problems follow: the selected tab
+  // can sit off-screen after a jump from a link or a restored session, and the
+  // fade that signals "scroll for more" must not appear on an edge that has
+  // nothing beyond it.
+  const tabScrollRef = useRef<HTMLDivElement | null>(null);
+  const activeTabRef = useRef<HTMLButtonElement | null>(null);
+  const syncTabEdges = useCallback(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    el.classList.toggle('is-start', el.scrollLeft <= 1);
+    el.classList.toggle('is-end', el.scrollLeft >= max - 1);
+  }, []);
+  useEffect(() => {
+    if (!showTabs) return;
+    const strip = tabScrollRef.current;
+    const el = activeTabRef.current;
+    if (strip && el) {
+      // Scrolls the STRIP sideways, and nothing else. scrollIntoView was doing
+      // this correctly but also dragging the PAGE up to bring the strip into
+      // view — measured jumping scrollY 400 -> 0 on every tab change, so
+      // switching tabs while reading threw away your place. Only the horizontal
+      // overflow is ours to move.
+      const pad = 16;
+      const er = el.getBoundingClientRect();
+      const sr = strip.getBoundingClientRect();
+      const delta =
+        er.left < sr.left + pad ? er.left - sr.left - pad
+        : er.right > sr.right - pad ? er.right - sr.right + pad
+        : 0;
+      if (delta) strip.scrollBy({ left: delta, behavior: rm ? 'auto' : 'smooth' });
+    }
+    syncTabEdges();
+  }, [tab, showTabs, rm, syncTabEdges]);
   const loggedSets = draft ? draft.entries.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0) : 0;
 
   const finishWorkout = (opts?: { endedEarly?: boolean; note?: string }) => {
@@ -1329,13 +1378,15 @@ export default function Afterburn() {
       <div className="relative z-10">
         <Header />
         {showTabs && (
-          <div className="mx-auto max-w-2xl px-4 pt-4 overflow-x-auto custom-scrollbar">
+          <div ref={tabScrollRef} onScroll={syncTabEdges} className="mx-auto max-w-2xl px-4 pt-4 pb-1 overflow-x-auto no-scrollbar edge-fade-x">
             <div className="flex bg-elevated p-0.5 rounded-lg border border-border w-max">
               {TABS.map((t) => (
                 <button
                   key={t.id}
+                  ref={tab === t.id ? activeTabRef : undefined}
                   onClick={() => setTab(t.id)}
-                  className={cn('relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors', tab === t.id ? 'text-ink' : 'text-ink-muted')}
+                  aria-current={tab === t.id ? 'page' : undefined}
+                  className={cn('relative flex items-center gap-1.5 px-3.5 min-h-[40px] rounded-md text-sm font-medium transition-colors', tab === t.id ? 'text-ink' : 'text-ink-muted')}
                 >
                   {tab === t.id && (
                     <motion.span

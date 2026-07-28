@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Send, Loader2, Calculator, MessageSquare, KeyRound } from 'lucide-react';
+import { Sparkles, Send, Loader2, Calculator, MessageSquare, KeyRound, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAfterburn } from './store';
 import { generateWorkoutCoaching } from './coach';
@@ -51,7 +51,7 @@ export default function Coach() {
           <button
             key={t.id}
             onClick={() => setView(t.id)}
-            className={cn('flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors', view === t.id ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted')}
+            className={cn('flex items-center gap-1.5 px-3.5 min-h-[40px] rounded-md text-sm font-medium transition-colors', view === t.id ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted')}
           >
             <t.icon className="w-3.5 h-3.5" /> {t.label}
           </button>
@@ -84,7 +84,8 @@ export default function Coach() {
                   onChange={(e) => setKeyInput(e.target.value)}
                   placeholder="AIza…"
                   autoComplete="off"
-                  className="input flex-1"
+                  aria-label="Google Gemini API key"
+                  className="input flex-1 min-h-[44px]"
                 />
                 <button
                   onClick={() => {
@@ -92,7 +93,7 @@ export default function Coach() {
                     setKeySaved(hasApiKey());
                   }}
                   disabled={!keyInput.trim()}
-                  className="btn btn-primary disabled:opacity-50"
+                  className="btn btn-primary disabled:opacity-50 min-h-[44px]"
                 >
                   Save
                 </button>
@@ -117,21 +118,26 @@ export default function Coach() {
                   onChange={(e) => setQuestion(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && question.trim() && !loading && run(question.trim())}
                   placeholder="Ask anything — e.g. 'is my bench progressing?'"
-                  className="input flex-1"
+                  aria-label="Ask the coach a question"
+                  className="input flex-1 min-h-[44px]"
                 />
-                <button onClick={() => question.trim() && run(question.trim())} disabled={loading || !question.trim()} className="btn btn-secondary disabled:opacity-50" aria-label="Ask">
+                <button onClick={() => question.trim() && run(question.trim())} disabled={loading || !question.trim()} className="btn btn-secondary disabled:opacity-50 min-h-[44px] min-w-[44px]" aria-label="Ask">
                   <Send className="w-4 h-4" />
                 </button>
               </div>
+              {/* Destructive, and it was a bare line of grey text under the
+                  composer with no confirmation — one mistaken tap and the key is
+                  gone with nothing to undo it. */}
               <button
                 onClick={() => {
+                  if (!window.confirm('Remove your saved API key? The coach stops working until you paste it in again.')) return;
                   setApiKey('');
                   setKeySaved(false);
                   setKeyInput('');
                 }}
-                className="text-xs text-ink-subtle hover:text-danger"
+                className="self-start inline-flex items-center gap-1.5 min-h-[36px] px-2 -ml-2 rounded-lg text-xs text-ink-muted hover:text-danger transition-colors"
               >
-                Remove API key
+                <Trash2 className="w-3.5 h-3.5" /> Remove API key
               </button>
             </>
           )}

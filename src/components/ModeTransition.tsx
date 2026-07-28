@@ -147,7 +147,7 @@ export default function ModeTransition() {
                 {look.title}
               </span>
               <span
-                className="text-[10px] font-bold uppercase"
+                className="text-[11px] font-bold uppercase"
                 style={{ letterSpacing: '0.32em', color: look.hint }}
               >
                 {look.tagline}

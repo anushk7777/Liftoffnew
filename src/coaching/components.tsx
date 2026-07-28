@@ -322,7 +322,7 @@ export function MetricsForm({
             )}
             <span className="relative">
               {t.label}
-              <span className="block text-[10px] font-medium opacity-70">{t.hint}</span>
+              <span className="block text-[11px] font-medium opacity-70">{t.hint}</span>
             </span>
           </button>
         ))}
@@ -584,7 +584,7 @@ export function BmiCard({ metrics, heightCm }: { metrics: Metric[]; heightCm: nu
               }}
             />
           </div>
-          <div className="flex justify-between mt-1.5 text-[10px] text-[var(--text-subtle)]">
+          <div className="flex justify-between mt-1.5 text-[11px] text-[var(--text-subtle)]">
             <span>15</span>
             <span style={{ color: 'var(--success)' }}>healthy 18.5–25</span>
             <span>35</span>

@@ -273,3 +273,26 @@ describe('the sheet\'s own deload weeks', () => {
     expect(r.sessions).toBe(4);
   });
 });
+
+describe('blockReport — placeholder slots', () => {
+  it('counts neither the lift nor its PRs, and never names it as the biggest gain', () => {
+    const p = program(2, 3);
+    // Six sessions, each logging a real lift and an unfilled slot, both climbing.
+    const sessions = [
+      sess('w1', 'd1', 40, [['Squat', 100, 8, 3], ['Weak Point Exercise 1', 40, 8, 3]]),
+      sess('w1', 'd2', 37, [['Squat', 105, 8, 3], ['Weak Point Exercise 1', 45, 8, 3]]),
+      sess('w1', 'd3', 34, [['Squat', 110, 8, 3], ['Weak Point Exercise 1', 50, 8, 3]]),
+      sess('w2', 'd1', 20, [['Squat', 115, 8, 3], ['Weak Point Exercise 1', 60, 8, 3]]),
+      sess('w2', 'd2', 17, [['Squat', 120, 8, 3], ['Weak Point Exercise 1', 70, 8, 3]]),
+      sess('w2', 'd3', 14, [['Squat', 125, 8, 3], ['Weak Point Exercise 1', 80, 8, 3]]),
+    ];
+    const r = blockReport(sessions, p, NOW);
+
+    // The slot climbs faster than the squat, so before the filter it won both.
+    expect(r.bestLift?.name).toBe('Squat');
+    expect(r.prs.every((x) => !/weak point/i.test(x.lift))).toBe(true);
+    expect(r.lifts).toBe(1);
+    // The sets themselves still happened and are still counted.
+    expect(r.sets).toBe(36);
+  });
+});

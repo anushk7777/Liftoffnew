@@ -36,8 +36,14 @@
     --hover-strong: rgba(0, 0, 0, 0.07);
 
     --text: #16151a;
-    --text-muted: #6a6970;
-    --text-subtle: #9a99a0;
+    /* Raised to clear WCAG AA. These two tokens carry every secondary line in
+       the app — section headings, stat labels, the explanations under each
+       card — and --text-subtle measured 2.6-3.0:1 against its own background in
+       all four themes, well under the 4.5:1 floor for body text. Both are now
+       >=4.6:1, with the muted/subtle gap kept wide enough to still read as two
+       levels of emphasis. */
+    --text-muted: #535259;
+    --text-subtle: #6f6e75;
 
     --accent: #16151a;
     --accent-hover: #000000;
@@ -116,8 +122,14 @@
     --hover-strong: rgba(60, 60, 90, 0.09);
 
     --text: #16161c;
-    --text-muted: #62626d;
-    --text-subtle: #9a9aa6;
+    /* Raised to clear WCAG AA. These two tokens carry every secondary line in
+       the app — section headings, stat labels, the explanations under each
+       card — and --text-subtle measured 2.6-3.0:1 against its own background in
+       all four themes, well under the 4.5:1 floor for body text. Both are now
+       >=4.6:1, with the muted/subtle gap kept wide enough to still read as two
+       levels of emphasis. */
+    --text-muted: #555560;
+    --text-subtle: #71717d;
 
     /* primary — Raycast-style warm coral (black is the base) */
     --accent: #e14b34;
@@ -175,7 +187,13 @@
 
     --text: #f4f4f7;
     --text-muted: #9d9da8;
-    --text-subtle: #5c5c68;
+    /* Raised to clear WCAG AA. These two tokens carry every secondary line in
+       the app — section headings, stat labels, the explanations under each
+       card — and --text-subtle measured 2.6-3.0:1 against its own background in
+       all four themes, well under the 4.5:1 floor for body text. Both are now
+       >=4.6:1, with the muted/subtle gap kept wide enough to still read as two
+       levels of emphasis. */
+    --text-subtle: #797985;
 
     --accent: #ff7a5c;
     --accent-hover: #ff9478;
@@ -218,7 +236,13 @@
 
     --text: #f4f3f1;
     --text-muted: #8d8c92;
-    --text-subtle: #5a595f;
+    /* Raised to clear WCAG AA. These two tokens carry every secondary line in
+       the app — section headings, stat labels, the explanations under each
+       card — and --text-subtle measured 2.6-3.0:1 against its own background in
+       all four themes, well under the 4.5:1 floor for body text. Both are now
+       >=4.6:1, with the muted/subtle gap kept wide enough to still read as two
+       levels of emphasis. */
+    --text-subtle: #7b7a80;
 
     --accent: #f4f3f1; /* off-white ink */
     --accent-hover: #ffffff;
@@ -397,7 +421,9 @@
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    font-size: 0.68rem;
+    /* 0.68rem is 10.9px — under the 11px floor, and chips carry status words
+       ("Below MEV", "Paying off") that have to be legible at a glance. */
+    font-size: 0.7rem;
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -430,11 +456,84 @@
   }
 
   .section-label {
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: var(--text-subtle);
+    /* Was --text-subtle, which measures 2.9:1 against the page — below the 4.5:1
+       floor, and applied to every section heading in the app, so the labels you
+       navigate by were the least readable text on screen. --text-muted is 5.9:1. */
+    color: var(--text-muted);
+  }
+
+  /* A bar that floats over scrolling content: header, workout footer.
+     Tailwind v3 cannot apply a `/opacity` modifier to a var() colour — see the
+     note in tailwind.config.js — so `bg-background/80` silently computed to
+     rgba(0,0,0,0) and the header had NO background at all. Only the blur stood
+     between the title and whatever scrolled under it, and white text at full
+     opacity reads straight through a blur. color-mix does what the modifier was
+     meant to, with an opaque fallback for engines that lack it. */
+  .glass-bar {
+    /* Override with `[--glass:var(--sidebar)]` on bars that sit on a different
+       surface — the Liftoff top nav does. It had the identical bug via
+       `bg-[var(--sidebar)]/85`, which is the same unsupported construct wearing
+       a different colour, and was missed on the first pass. */
+    --glass: var(--bg);
+    background: var(--glass);
+    /* 88% still let a heading scrolled under the bar be read through it — white
+       text at full opacity survives both a blur and a 12% gap. 96% keeps the
+       faint depth cue without the collision. */
+    background: color-mix(in srgb, var(--glass) 96%, transparent);
+  }
+  /* Without backdrop-filter support the bar must be fully opaque or content
+     shows through it again. */
+  @supports not (backdrop-filter: blur(1px)) {
+    .glass-bar {
+      background: var(--glass);
+    }
+  }
+
+  /* Extends a control's TOUCH area to the 44px both Apple's HIG and Material
+     ask for, without changing the size it is painted at. The header's round
+     36px buttons and the small icon actions read correctly at their drawn size;
+     they were just hard to hit. Growing the box would have redrawn the header,
+     so an invisible centred overlay takes the taps instead. */
+  .tap-44 {
+    position: relative;
+  }
+  .tap-44::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+
+  /* A horizontal scroller whose overflow is visible as a soft fade instead of a
+     hard cut at the viewport edge. The Afterburn tab strip is 544px wide on a
+     390px phone: "Programs" sat entirely off-screen with nothing to suggest it
+     existed, and the selected pill could be sliced in half by the edge. The
+     fade reads as "there is more this way"; the padding keeps a rounded pill
+     from being clipped flat. */
+  .edge-fade-x {
+    --edge: 18px;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--edge), #000 calc(100% - var(--edge)), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 var(--edge), #000 calc(100% - var(--edge)), transparent 100%);
+  }
+  /* Nothing overflows, so a fade would only dim the first and last tab. */
+  .edge-fade-x.is-start {
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - var(--edge)), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - var(--edge)), transparent 100%);
+  }
+  .edge-fade-x.is-end {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--edge), #000 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 var(--edge), #000 100%);
+  }
+  .edge-fade-x.is-start.is-end {
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 }
 

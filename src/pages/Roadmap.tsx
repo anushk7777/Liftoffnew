@@ -381,7 +381,7 @@ function PhaseCard({
                     </div>
                     <span
                       className={cn(
-                        'text-[10px] font-semibold uppercase tracking-wider shrink-0',
+                        'text-[11px] font-semibold uppercase tracking-wider shrink-0',
                         TYPE_COLOR[task.type] || 'text-ink-subtle',
                       )}
                     >

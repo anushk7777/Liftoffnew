@@ -30,6 +30,9 @@ you need without reading the whole file.
 | **8** Independent verification | "make sure we are not hallucinating" | every constant re-derived from first principles; citations re-checked |
 | **9** Overfitting audit | "make sure the model doesn't overfit" | not overfitted to seeds; IS fitted to an independence assumption, measured and left in place |
 | **10** Block report + app-wide fuzz | "add sets to failure, the card looks bad, find any other bugs" | card rebuilt; three more crashes found, one in the core store |
+| **11** UI/UX audit on a real phone | screenshots from the user's own device | a half-finished week was being judged as a shortfall; the header had no background; two tabs unreachable |
+| &nbsp;&nbsp;11.6 Interruptions | "what if I end early or skip a workout?" | a week you never finish used to freeze the card on the week before it, forever |
+| &nbsp;&nbsp;11.7 Second look | "I am sure there are still bugs — step back" | five defects inside the fixes themselves, incl. the transparent-bar bug in four more places; two earlier claims corrected |
 
 **Sections 8 and 9 are the ones to trust.** Everything before it is reasoning; that one
 is arithmetic that does not depend on the code being right.
@@ -653,6 +656,246 @@ without guarding every level. Passing tests said nothing about it, because tests
 supply well-formed fixtures. Fuzzing is the only thing that found any of them.
 
 ---
+
+## 11. The UI/UX audit — and the bug the screenshots found
+
+Triggered by six screenshots taken on the owner's own phone, after a measured
+audit of the Progress tab on an emulated 390x844 viewport. The emulator found
+layout and contrast problems. The real screenshots found a **correctness** bug
+that the emulator had missed, because the emulated fixture always seeded whole
+weeks and the real device was one session into week 3.
+
+### 11.1 Volume IQ was judging a week that had not happened yet
+
+The screen read:
+
+> **Week 3 · Build: 12 under-trained.**
+> Back — 6.5 sets/wk — BELOW MEV — *Add ~4 sets/wk to actually drive growth.*
+
+One of eight prescribed sessions had been logged. So one eighth of the week's
+work had genuinely been done, and every muscle was "short" of a whole week's
+landmark by construction. Twelve of thirteen muscles were being told to add
+sets, on the second day of a training week, by arithmetic rather than by
+anything about the training.
+
+This is the same class of error as the chart bug in §2 — comparing a partial
+week against finished ones — in the one place it had not been fixed.
+
+**Two fixes were considered and one rejected.**
+
+*Rejected: project the partial week forward.* Multiply what has been logged by
+`daysPlanned / daysDone`. This is what the tonnage chart does, and it works
+there because tonnage is one aggregate number that accumulates evenly. Per
+muscle it fails badly: one push day scaled by eight puts chest at 8x its true
+rate and reports **over MRV — cut back**. Trading a false "under-trained" for a
+false "over-trained" is not an improvement; it is the same mistake with the
+sign flipped.
+
+*Adopted: do not judge an unfinished week at all.* A program week becomes
+readable when it is finished. `analyzeVolume` now takes the program (optionally,
+so every existing caller is unaffected), counts logged days against prescribed
+days for the newest week, and:
+
+- **week unfinished, a complete week behind it** → analyse the last complete
+  week, and say plainly which week is still running:
+  *"Week 3 · Build is 1 of 8 days in — it'll be read once you finish it."*
+- **week unfinished, nothing complete behind it** → show the sets logged so far,
+  flagged `provisional`; the UI withholds every status badge and every
+  "add N sets" line, and the headline states what was logged instead of naming
+  a shortfall.
+- **week finished** → exactly as before.
+
+Verified end to end in the browser against the real Pure Bodybuilding program.
+With week 3 one day in, the card now reads **"Week 2 · Build: 4 under-trained,
+9 dialed in"** — the last week that actually finished — rather than
+**"Week 3 · Build: 12 under-trained"**. Four tests cover the three branches plus
+the no-program path.
+
+### 11.2 The header had no background at all
+
+`bg-background/80` on the sticky header computed to `rgba(0, 0, 0, 0)`.
+Tailwind v3 cannot apply an `/opacity` modifier to a `var()` colour — a fact
+already written down in `tailwind.config.js`, and violated in four places
+including the fixed workout footer. Only `backdrop-blur-xl` separated the header
+from the page, and a blur does not hide white text at full opacity: screenshots
+show a lift name and a status badge colliding with the app title.
+
+Replaced with a `.glass-bar` utility using `color-mix(in srgb, var(--bg) 96%,
+transparent)` and an opaque fallback under `@supports not (backdrop-filter)`.
+Measured after the fix: text scrolled under the bar renders at **1.10:1**
+against the background — the same as empty page.
+
+**This fix was incomplete** — see §11.7. The same construct existed under three
+other colour names (`--sidebar`, `--surface`) in the Liftoff top nav, the mobile
+header and the mobile bottom tab bar. Grepping for the one string that had
+already been found, rather than for the pattern, missed all three.
+
+### 11.3 Placeholder slots were being reported as achievements
+
+`isPlaceholderExercise()` existed and was used by the volume audit, but neither
+`returns.ts` nor `blockReport.ts` called it. So the block's headline read:
+
+> **BIGGEST GAIN — Weak Point Exercise 2 (optional), +13.6 kg estimated 1RM**
+
+The number is real; the name is a blank slot in the sheet. It cannot be
+repeated, swapped, or acted on. Placeholders are now excluded from the ledger,
+from PR chips, and from the lift count — while their sets still count towards
+tonnage and volume, because that work was done.
+
+### 11.4 Everything else, measured
+
+| Finding | Measured before | After |
+| --- | --- | --- |
+| Section headings and secondary copy | 2.6–3.0:1 in all four themes | ≥4.6:1, muted/subtle gap preserved |
+| Tab strip | 544px of tabs in a 390px viewport; "Programs" invisible, selected pill clipped | edge-fade mask + active tab scrolled into view |
+| Text under 11px | 38 elements (incl. 9px chart axis labels) | none |
+| Tap targets under 44px | 14 | all real controls at 44px, via a `.tap-44` overlay that keeps the drawn size |
+| Unlabelled inputs | 2 | none |
+| Truncated titles | "Week 2 · Build · Pull #2 (Mid-Bac…" | week name removed from the title (it was repeated in the picker below); day names wrap |
+| Chart axis labels | drawn under the series; "45 s" struck through by the line | drawn last, with a halo |
+| PR chips | "SNATCH-GRIP RDL 98 E1RM" — no separator, no unit | "Snatch-Grip RDL · 98 kg e1RM", sentence case |
+| Progress section order | block report 2.8 screens down, below a breath-hold timer and a weight logger | analytics first, data entry last |
+| Volume IQ intro | 379 characters before any data | one line, with the rest behind "How this is counted" |
+| "Remove API key" | bare grey text, no confirmation | labelled destructive button with a confirm |
+| A dash tinted as a warning | `tone` read off `pct = 0` before checking `total > 0` | guarded |
+
+### 11.5 What was NOT changed, and why
+
+- **The inline link `aistudio.google.com/apikey` is 178x20.** WCAG 2.5.8
+  explicitly exempts links inline in a sentence; enlarging it would break the
+  paragraph it sits in.
+- **The tab strip still scrolls.** Five tabs cannot fit 390px at a legible size.
+  The fix makes the overflow visible and guarantees the selected tab is on
+  screen, rather than pretending the strip fits.
+- **The volume landmarks, the program, and deload handling are untouched.** The
+  program is read exactly as the sheet authors it, and the app still never
+  infers a deload.
+
+---
+
+
+### 11.6 "What if I end early, or skip a workout?" — the follow-up that found a second bug
+
+Asked immediately after 11.1 shipped, and it was the right question: the rule in
+11.1 keys off *"has this week finished?"*, so anything that stops a week from
+ever finishing was a live risk. Five interruption patterns were simulated
+against the real engine rather than reasoned about.
+
+| What the lifter does | What the app did | Verdict |
+| --- | --- | --- |
+| Ends a workout early (2 sets instead of 12) | day still counts as done, week completes normally | fine — `completionMap` keys on `completedAt`, not on how much was logged |
+| Pauses mid-workout and comes back | draft is not a session; nothing counts until finished | fine |
+| Skips a day, then starts the next week | the short week is read as soon as a newer week exists | fine |
+| **Skips a day and stops there** | **stuck on the PREVIOUS week, permanently** | **bug** |
+| **Abandons a week after one session** | **stuck on the PREVIOUS week, permanently** | **bug** |
+
+The last two are the same failure: a week that will never be finished waits
+forever to be finished, and while it waits the card reports the week *before*
+it. Three logged sessions of real training become permanently invisible. Worse
+than the bug in 11.1, because 11.1 at least corrected itself once the week
+completed — this one had no exit.
+
+**Fix: "in progress" expires.** A week stops being treated as live once it has
+had one full microcycle plus `WEEK_GRACE_DAYS = 7` of grace. After that,
+whatever is in it is what happened, and it is read as the current window.
+
+Why that shape, and what was rejected:
+
+- **Rejected: a percentage threshold** ("judge it once 75% of the days are
+  done"). Invents a constant with nothing behind it, and still strands the
+  abandoned-after-one-session case forever.
+- **Rejected: time since the last session in the week.** Cannot work — the
+  analyser anchors to the newest session in the log, so an abandoned week's
+  "time since" never grows. This needed real wall-clock time, so `analyzeVolume`
+  now takes an optional `now`, matching `liftReturns` and `blockReport`.
+- **Adopted: one microcycle plus a calendar week.** The cycle length is already
+  measured from the lifter's own finished weeks (`microcycleDays`), so the rule
+  self-calibrates to whoever is using it — nothing is hardcoded to Pure
+  Bodybuilding. The 7-day grace is generous enough that illness or travel does
+  not change the reading underneath a real, slow week, and short enough that an
+  abandoned one resolves on its own.
+
+Measured after the fix, on a week left at 3 of 4 days: **one day later** it
+still shows the last complete week (you might yet finish it); **thirty days
+later** it reads the short week itself, with the pending note gone. A genuinely
+slow week five days past its last session is untouched.
+
+**The tonnage chart had the identical bug.** `latestInProgress` in
+`Progress.tsx` tested only `done < total`, so an abandoned week kept its final
+point dashed and captioned *"day 3 of 4 · on pace for 92 t"* — a forecast for a
+week that ended months ago. Same expiry now applies to both, so the chart and
+the volume card can never disagree about whether a week is still running.
+
+Five permanent tests cover the five patterns above.
+
+**Performance, since it was asked in the same breath.** Measured on two years of
+training (160 sessions, 3,840 logged sets, 20 program weeks):
+
+| | |
+| --- | --- |
+| `analyzeVolume` without the program (old path) | 3.73 ms |
+| `analyzeVolume` with the program (new path) | 3.27 ms |
+| `liftReturns` | 0.10 ms |
+| `blockReport` | 35 ms |
+
+The new work is a day count per week and one date comparison — below the noise
+floor. `blockReport` is the expensive one and always was; it is memoised on
+`[sessions, program]`, so it runs when the data changes, not on every render.
+
+### 11.7 Second look — what the first pass got wrong
+
+Asked to step back and re-examine everything as new, on the grounds that more
+bugs existed. They did, and most of them were in code written in 11.1-11.6. Two
+claims from the earlier pass also turned out to be wrong and are corrected here
+rather than quietly dropped.
+
+**Bugs found in the fixes themselves**
+
+| Found | Cause | Fix |
+| --- | --- | --- |
+| The star and the pencil on every workout row stole each other's taps | `.tap-44` centres an invisible 44px overlay on a 32px button; at an 8px gap the two overlays crossed by 4px, and the later-painted one won | row gap 8px -> 12px, putting the centres exactly 44px apart so the targets meet without overlapping |
+| A provisional week listed muscles in an order nothing explained — Back with 10 sets below Glutes with 1 | rows are sorted by status severity, and 11.1 hid the status badge without changing the sort | provisional weeks sort by sets done, descending |
+| "1 sets so far" | no pluralisation on the provisional label | pluralised |
+| "Not trained (Week 1 · Build) — QUADS, CALVES" two days into an eight-day week | the same error 11.1 exists to prevent, one section lower: leg day had not come round yet | reads "Not trained yet" while the week is provisional |
+| The Liftoff top nav, the mobile header and **the mobile bottom tab bar** had no background | `bg-[var(--sidebar)]/85`, `bg-[var(--surface)]/85`, `bg-[var(--surface)]/90` — the identical Tailwind-v3 construct from 11.2, in colours 11.2 did not grep for | `.glass-bar` now takes a `--glass` override; all four sites converted. A repo-wide grep for `bg-[var(--*)]/` returns nothing |
+
+The last one is the lesson: 11.2 fixed `bg-background/80` and stopped there,
+having "found the bug". The same defect existed four more times under three
+other colour names, including on the bottom navigation of the mobile shell.
+
+**Two corrections to the previous pass**
+
+1. *"Switching tabs jumps the page to the top — caused by my `scrollIntoView`."*
+   **Wrong.** Removing `scrollIntoView` did not change it: scroll is already 0
+   within 60 ms of the click, before any smooth scroll could animate. The real
+   cause is the content swap briefly shortening the page so the browser clamps
+   the scroll offset. Pre-existing, and arguably wanted — you land at the top of
+   the tab you opened. The replacement (scroll the strip sideways, never the
+   page) is still the better code and was kept, but it fixed a latent problem,
+   not the observed one.
+2. *Contrast failures reported against `document.body`.* Measuring against the
+   body's colour rather than the nearest painted background inflated the count.
+   Re-measured properly, "Preview client page" at a reported 1.00:1 is an accent
+   on its own 10%-alpha tint over white — really about 3.9:1. Reporting it as
+   1.00:1 would have been a fabricated defect.
+
+**Checked and found clean** (worth recording so it is not re-checked blindly):
+a brand-new account with no data on all five tabs — no crashes, no `NaN`,
+`undefined` or `[object Object]` leaking into the UI; the diary's gradient
+headings, which register as 1.1:1 because `color` is transparent under
+`background-clip: text` — a false positive, not a defect; and placeholder text,
+which the token change lifted from 1.55:1 to 1.98:1, still nowhere near the
+17.85:1 of real entered text, so the "a placeholder must not read as a value"
+rule in `index.css` still holds.
+
+**Known and deliberately not changed**
+
+- The Focus active nav label sits at **3.64:1** — it is `--cozy`, a brand
+  coral, at 11px. Fixing it means changing the workspace's identity colour,
+  which is the owner's call, not a silent edit.
+- The "Supabase isn't configured" warning is **2.80:1** in light mode. Real, but
+  it only appears when the environment is misconfigured.
+
 
 ## Testing
 

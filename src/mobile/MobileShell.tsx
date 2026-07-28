@@ -80,7 +80,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
   return (
     <div className="focus-daylight flex flex-col h-[100dvh]">
       {/* Top bar */}
-      <header className="shrink-0 flex items-center justify-between px-4 h-14 border-b border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur-md pt-[env(safe-area-inset-top)] box-content">
+      <header className="shrink-0 flex items-center justify-between px-4 h-14 border-b border-[var(--border)] glass-bar [--glass:var(--surface)] backdrop-blur-md pt-[env(safe-area-inset-top)] box-content">
         <AnimatePresence mode="wait">
           <motion.h1
             key={title}
@@ -148,7 +148,7 @@ export default function MobileShell({ onOpenSearch }: { onOpenSearch: () => void
       </motion.button>
 
       {/* Bottom tab bar — the soft pill glides between tabs via layoutId. */}
-      <nav className="shrink-0 grid grid-cols-5 border-t border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur-md pb-[env(safe-area-inset-bottom)] z-30">
+      <nav className="shrink-0 grid grid-cols-5 border-t border-[var(--border)] glass-bar [--glass:var(--surface)] backdrop-blur-md pb-[env(safe-area-inset-bottom)] z-30">
         {TABS.map(({ to, label, icon: Icon, end }) => {
           const isActive = end ? location.pathname === to : location.pathname.startsWith(to);
           return (

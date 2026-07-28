@@ -50,11 +50,30 @@ weekly rate. The UI shows both: `15 sets/wk · 24 logged`.
   direction — it never tells someone to cut work they should be doing.
 - *Divided by the cycle's **length**, not by days elapsed.* A week two days in
   has genuinely done two days of work; dividing by two would report a wild rate
-  off a single session. The cost is that a partially complete week reads low —
-  which is honest, but can look alarming mid-cycle.
+  off a single session.
 - *The window still resets each program week.* A rolling window was tried and
   reverted: two existing tests encoded the reset deliberately, it matches the UI
   copy, and it matches how a lifter thinks about a block.
+- *An unfinished week is not judged at all.* The note above used to end "the
+  cost is that a partially complete week reads low — honest, but it can look
+  alarming mid-cycle". It was worse than alarming. One session into week 3 the
+  card read **"Week 3 · Build: 12 under-trained"** and told the lifter to add
+  sets to twelve of thirteen muscles — a shortfall produced by the calendar, not
+  by training. `analyzeVolume` now takes the program, counts logged days against
+  prescribed days, and analyses the last **complete** week while naming the one
+  still running. With no complete week behind it the report is marked
+  `provisional` and the UI withholds every badge and recommendation. Projecting
+  the partial week forward was tried on paper and rejected: one push day
+  multiplied by eight reports chest **over MRV**, which is the same error with
+  the sign flipped. Detail in `DECISION_LOG.md` §11.1.
+- *"In progress" expires after one microcycle plus seven days.* Without an
+  expiry, skipping a single day and stopping there left the card reporting the
+  week BEFORE it, permanently — real logged sessions invisible with no way back.
+  A week that has had its whole cycle plus a week of grace is not being trained
+  any more, so whatever is in it is read as-is. The cycle length comes from the
+  lifter's own finished weeks, so the rule calibrates itself rather than being
+  tuned to one program. Ending a workout early does NOT hold a week open — the
+  day still counts as done. `DECISION_LOG.md` §11.6.
 
 ### 1a. The volume-by-program-week chart
 

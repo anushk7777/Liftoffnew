@@ -403,7 +403,7 @@ function LooseItem({
               key={q.hour}
               onClick={() => onSchedule(q.hour)}
               title={`Schedule at ${hourLabel(q.hour)}`}
-              className="font-mono-data text-[10px] px-1.5 py-0.5 rounded bg-hover text-on-surface-variant hover:bg-accent-soft hover:text-primary transition-colors"
+              className="font-mono-data text-[11px] px-1.5 py-0.5 rounded bg-hover text-on-surface-variant hover:bg-accent-soft hover:text-primary transition-colors"
             >
               {q.label}
             </button>
@@ -437,7 +437,7 @@ function BacklogItem({
       <button
         onClick={onMove}
         title={`Move to ${dayLabel}`}
-        className="shrink-0 inline-flex items-center gap-1 font-mono-data text-[10px] px-2 py-1 rounded-lg bg-hover text-on-surface-variant hover:bg-accent-soft hover:text-primary transition-colors"
+        className="shrink-0 inline-flex items-center gap-1 font-mono-data text-[11px] px-2 py-1 rounded-lg bg-hover text-on-surface-variant hover:bg-accent-soft hover:text-primary transition-colors"
       >
         <CornerDownRight className="w-3 h-3" /> {dayLabel}
       </button>
