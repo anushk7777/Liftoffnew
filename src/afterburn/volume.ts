@@ -511,7 +511,16 @@ export function analyzeVolume(
     return { muscle: m, label: MUSCLE_LABEL[m], sets, rawSets, prevSets, dir, landmark: lm, status, suggestedSets, recommendation };
   });
 
-  const sorted = [...muscles].sort((a, b) => SEVERITY[a.status] - SEVERITY[b.status] || b.sets - a.sets || a.label.localeCompare(b.label));
+  // Normally ordered most-actionable first, so what needs attention floats up.
+  // In a provisional week the status is withheld — no badge, no recommendation —
+  // and ordering by a hidden field left an apparently random list: Back with 10
+  // sets sat below Glutes with 1. With nothing to justify it, the order has to
+  // be self-evident, so the most-trained muscle leads.
+  const sorted = [...muscles].sort((a, b) =>
+    provisional
+      ? b.rawSets - a.rawSets || a.label.localeCompare(b.label)
+      : SEVERITY[a.status] - SEVERITY[b.status] || b.sets - a.sets || a.label.localeCompare(b.label),
+  );
   const trained = sorted.filter((m) => m.sets > 0);
   // A muscle with no MEV isn't "neglected" when it's untouched — nothing was
   // owed. Listing it would put Adductors in the missed-muscle chips every week.

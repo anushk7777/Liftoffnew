@@ -474,17 +474,22 @@
      opacity reads straight through a blur. color-mix does what the modifier was
      meant to, with an opaque fallback for engines that lack it. */
   .glass-bar {
-    background: var(--bg);
+    /* Override with `[--glass:var(--sidebar)]` on bars that sit on a different
+       surface — the Liftoff top nav does. It had the identical bug via
+       `bg-[var(--sidebar)]/85`, which is the same unsupported construct wearing
+       a different colour, and was missed on the first pass. */
+    --glass: var(--bg);
+    background: var(--glass);
     /* 88% still let a heading scrolled under the bar be read through it — white
        text at full opacity survives both a blur and a 12% gap. 96% keeps the
        faint depth cue without the collision. */
-    background: color-mix(in srgb, var(--bg) 96%, transparent);
+    background: color-mix(in srgb, var(--glass) 96%, transparent);
   }
   /* Without backdrop-filter support the bar must be fully opaque or content
      shows through it again. */
   @supports not (backdrop-filter: blur(1px)) {
     .glass-bar {
-      background: var(--bg);
+      background: var(--glass);
     }
   }
 

@@ -276,6 +276,20 @@ describe('analyzeVolume — a program week still in progress', () => {
     expect(r.headline).not.toContain('under-trained');
   });
 
+  it('orders a provisional week by what was actually done', () => {
+    // With the status badge withheld, ordering by status left an unexplained
+    // list — a muscle with 10 sets sitting below one with 1.
+    const partial = [
+      day('p1', 'd1', 20, [['Cable Fly', 2], ['Machine Row', 6]], w1),
+      day('p2', 'd2', 21, [['Hammer Curl', 1]], w1),
+    ];
+    const r = analyzeVolume(partial, program, soon(partial));
+    expect(r.provisional).toBe(true);
+    const raw = r.trained.map((m) => m.rawSets);
+    expect(raw).toEqual([...raw].sort((a, b) => b - a)); // descending, no exceptions
+    expect(r.trained[0].muscle).toBe('back'); // 6 sets, the most done
+  });
+
   it('judges the week normally once every prescribed day is logged', () => {
     const r = analyzeVolume(fullW1, program, soon(fullW1));
     expect(r.inProgress).toBeNull();

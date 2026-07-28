@@ -224,7 +224,7 @@ function VolumeRow({ m, provisional }: { m: MuscleAnalysis; provisional?: boolea
           {/* The rate is what the landmarks are measured in; the raw tally is
               kept beside it so the number is never a black box. */}
           <span className="text-xs text-ink-muted tabular-nums">
-            {provisional ? `${m.rawSets} sets so far` : `${m.sets} sets/wk`}
+            {provisional ? `${m.rawSets} set${m.rawSets === 1 ? '' : 's'} so far` : `${m.sets} sets/wk`}
             {!provisional && m.rawSets !== m.sets && <span className="text-ink-subtle"> · {m.rawSets} logged</span>}
           </span>
           {/* A half-finished week cannot be under or over anything — the badge
@@ -728,7 +728,13 @@ export default function Progress() {
               <div className="pt-1">
                 {/* Was hardcoded to "last 7 days" even in microcycle mode,
                     where the window above is a program week of 10-11 days. */}
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-subtle mb-1.5">Not trained ({vol.windowLabel})</p>
+                {/* "Not trained" is a finding about a week that is over. Two
+                    days into one it is just the calendar — leg day has not come
+                    round yet. The same mistake as calling a half-finished week
+                    "under-trained", which is what this card was built to stop. */}
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1.5">
+                  {vol.provisional ? 'Not trained yet' : `Not trained (${vol.windowLabel})`}
+                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {vol.neglected.map((mu) => (
                     <span key={mu} className="chip text-ink-subtle bg-elevated border-0 !text-[11px]">{MUSCLE_LABEL[mu]}</span>

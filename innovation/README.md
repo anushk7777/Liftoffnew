@@ -65,6 +65,7 @@ Three standing constraints, set by the app's owner and never violated:
 | 10 | **An unfinished week is not judged** | one session into week 3 the card said "12 under-trained" and told you to add sets everywhere — a shortfall made by the calendar | the last *complete* week is read instead, and the running one is named |
 | 11 | **Placeholder slots kept out of results** | the block's "biggest gain" was "Weak Point Exercise 2 (optional)" — a blank slot in the sheet | excluded from the ledger, PRs and the lift count; their sets still count for volume |
 | 12 | **Interruptions handled** | skipping one day and stopping froze the volume card on the previous week forever | "in progress" expires after a cycle plus a week; ending early was already safe |
+| 13 | **Second look at the fixes** | the repairs above shipped five defects of their own, and the transparent-bar bug existed in four more places | all fixed; two earlier claims corrected rather than dropped |
 
 Also repaired along the way, outside Afterburn: habit streaks that could never
 exceed 2 for a Mon/Wed/Fri habit, a backup restore that reported success
@@ -135,6 +136,14 @@ previous week permanently, hiding real sessions. "In progress" now expires after
 one microcycle plus a week. All five interruption patterns are tested. →
 `DECISION_LOG.md` §11.6
 
+**"I am still sure there are bugs — step back and look at it new."**
+Correct. Five were inside the fixes themselves — including tap targets that
+stole each other's taps, and a "not trained yet" list that repeated the exact
+mistake the volume fix was built to stop. The transparent-bar bug turned out to
+exist in four more places, including the mobile bottom tab bar. Two claims from
+the previous pass were also wrong and are corrected in place. →
+`DECISION_LOG.md` §11.7
+
 **"Make sure the model doesn't overfit."**
 It is **not** overfitted to the seeds it was tuned on — five unseen draws
 reproduce it within 4 points — and it sits on a plateau rather than a knife
@@ -172,7 +181,7 @@ Full ranked lists live at the end of each document.
 ## Running it
 
 ```bash
-npm test     # 336 tests, 31 files
+npm test     # 337 tests, 31 files
 npm run lint
 npm run build
 ```

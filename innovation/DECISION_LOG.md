@@ -32,6 +32,7 @@ you need without reading the whole file.
 | **10** Block report + app-wide fuzz | "add sets to failure, the card looks bad, find any other bugs" | card rebuilt; three more crashes found, one in the core store |
 | **11** UI/UX audit on a real phone | screenshots from the user's own device | a half-finished week was being judged as a shortfall; the header had no background; two tabs unreachable |
 | &nbsp;&nbsp;11.6 Interruptions | "what if I end early or skip a workout?" | a week you never finish used to freeze the card on the week before it, forever |
+| &nbsp;&nbsp;11.7 Second look | "I am sure there are still bugs — step back" | five defects inside the fixes themselves, incl. the transparent-bar bug in four more places; two earlier claims corrected |
 
 **Sections 8 and 9 are the ones to trust.** Everything before it is reasoning; that one
 is arithmetic that does not depend on the code being right.
@@ -724,6 +725,11 @@ transparent)` and an opaque fallback under `@supports not (backdrop-filter)`.
 Measured after the fix: text scrolled under the bar renders at **1.10:1**
 against the background — the same as empty page.
 
+**This fix was incomplete** — see §11.7. The same construct existed under three
+other colour names (`--sidebar`, `--surface`) in the Liftoff top nav, the mobile
+header and the mobile bottom tab bar. Grepping for the one string that had
+already been found, rather than for the pattern, missed all three.
+
 ### 11.3 Placeholder slots were being reported as achievements
 
 `isPlaceholderExercise()` existed and was used by the volume audit, but neither
@@ -835,6 +841,61 @@ training (160 sessions, 3,840 logged sets, 20 program weeks):
 The new work is a day count per week and one date comparison — below the noise
 floor. `blockReport` is the expensive one and always was; it is memoised on
 `[sessions, program]`, so it runs when the data changes, not on every render.
+
+### 11.7 Second look — what the first pass got wrong
+
+Asked to step back and re-examine everything as new, on the grounds that more
+bugs existed. They did, and most of them were in code written in 11.1-11.6. Two
+claims from the earlier pass also turned out to be wrong and are corrected here
+rather than quietly dropped.
+
+**Bugs found in the fixes themselves**
+
+| Found | Cause | Fix |
+| --- | --- | --- |
+| The star and the pencil on every workout row stole each other's taps | `.tap-44` centres an invisible 44px overlay on a 32px button; at an 8px gap the two overlays crossed by 4px, and the later-painted one won | row gap 8px -> 12px, putting the centres exactly 44px apart so the targets meet without overlapping |
+| A provisional week listed muscles in an order nothing explained — Back with 10 sets below Glutes with 1 | rows are sorted by status severity, and 11.1 hid the status badge without changing the sort | provisional weeks sort by sets done, descending |
+| "1 sets so far" | no pluralisation on the provisional label | pluralised |
+| "Not trained (Week 1 · Build) — QUADS, CALVES" two days into an eight-day week | the same error 11.1 exists to prevent, one section lower: leg day had not come round yet | reads "Not trained yet" while the week is provisional |
+| The Liftoff top nav, the mobile header and **the mobile bottom tab bar** had no background | `bg-[var(--sidebar)]/85`, `bg-[var(--surface)]/85`, `bg-[var(--surface)]/90` — the identical Tailwind-v3 construct from 11.2, in colours 11.2 did not grep for | `.glass-bar` now takes a `--glass` override; all four sites converted. A repo-wide grep for `bg-[var(--*)]/` returns nothing |
+
+The last one is the lesson: 11.2 fixed `bg-background/80` and stopped there,
+having "found the bug". The same defect existed four more times under three
+other colour names, including on the bottom navigation of the mobile shell.
+
+**Two corrections to the previous pass**
+
+1. *"Switching tabs jumps the page to the top — caused by my `scrollIntoView`."*
+   **Wrong.** Removing `scrollIntoView` did not change it: scroll is already 0
+   within 60 ms of the click, before any smooth scroll could animate. The real
+   cause is the content swap briefly shortening the page so the browser clamps
+   the scroll offset. Pre-existing, and arguably wanted — you land at the top of
+   the tab you opened. The replacement (scroll the strip sideways, never the
+   page) is still the better code and was kept, but it fixed a latent problem,
+   not the observed one.
+2. *Contrast failures reported against `document.body`.* Measuring against the
+   body's colour rather than the nearest painted background inflated the count.
+   Re-measured properly, "Preview client page" at a reported 1.00:1 is an accent
+   on its own 10%-alpha tint over white — really about 3.9:1. Reporting it as
+   1.00:1 would have been a fabricated defect.
+
+**Checked and found clean** (worth recording so it is not re-checked blindly):
+a brand-new account with no data on all five tabs — no crashes, no `NaN`,
+`undefined` or `[object Object]` leaking into the UI; the diary's gradient
+headings, which register as 1.1:1 because `color` is transparent under
+`background-clip: text` — a false positive, not a defect; and placeholder text,
+which the token change lifted from 1.55:1 to 1.98:1, still nowhere near the
+17.85:1 of real entered text, so the "a placeholder must not read as a value"
+rule in `index.css` still holds.
+
+**Known and deliberately not changed**
+
+- The Focus active nav label sits at **3.64:1** — it is `--cozy`, a brand
+  coral, at 11px. Fixing it means changing the workspace's identity colour,
+  which is the owner's call, not a silent edit.
+- The "Supabase isn't configured" warning is **2.80:1** in light mode. Real, but
+  it only appears when the environment is misconfigured.
+
 
 ## Testing
 

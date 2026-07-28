@@ -58,7 +58,7 @@ export default function TopNav({
       initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.21, 1, 0.4, 1] }}
-      className="topnav-underglow shrink-0 relative z-40 flex items-center gap-3 h-16 px-4 xl:px-6 border-b border-border bg-[var(--sidebar)]/85 backdrop-blur-xl"
+      className="topnav-underglow shrink-0 relative z-40 flex items-center gap-3 h-16 px-4 xl:px-6 border-b border-border glass-bar [--glass:var(--sidebar)] backdrop-blur-xl"
     >
       {/* Brand */}
       <NavLink to="/" className="flex items-center gap-2.5 shrink-0 text-[var(--text)] group">
@@ -160,7 +160,7 @@ export default function TopNav({
         <button
           onClick={onOpenSearch}
           title="Search (⌘K)"
-          className="flex items-center gap-2 rounded-lg border border-border bg-[var(--bg)]/60 text-[var(--text-subtle)] hover:text-[var(--text)] hover:border-border-strong transition-colors px-2.5 py-1.5"
+          className="flex items-center gap-2 rounded-lg border border-border glass-bar text-[var(--text-subtle)] hover:text-[var(--text)] hover:border-border-strong transition-colors px-2.5 py-1.5"
         >
           <Search className="w-[16px] h-[16px]" />
           <kbd className="hidden lg:inline text-[11px] font-medium border border-border rounded px-1.5 py-0.5">⌘K</kbd>

@@ -502,7 +502,12 @@ function DayCard({
       whileHover={rm ? undefined : { y: -2 }}
       transition={springSoft}
     >
-      <div className="flex items-center gap-2">
+      {/* gap-3, not gap-2: the star and the pencil are 32px wide, so at an 8px
+          gap their 44px touch overlays overlapped by 4px and a tap in that
+          sliver hit whichever painted last — pinning a workout when you meant
+          to edit it. 12px puts the centres exactly 44px apart, so the two
+          targets meet without ever crossing. */}
+      <div className="flex items-center gap-3">
         <button onClick={() => setOpen((o) => !o)} className="flex-1 flex items-center gap-2 text-left min-w-0 min-h-[44px]">
           {open ? <ChevronDown className="w-4 h-4 text-ink-subtle shrink-0" /> : <ChevronRight className="w-4 h-4 text-ink-subtle shrink-0" />}
           <div className="min-w-0">
@@ -1322,7 +1327,23 @@ export default function Afterburn() {
   }, []);
   useEffect(() => {
     if (!showTabs) return;
-    activeTabRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: rm ? 'auto' : 'smooth' });
+    const strip = tabScrollRef.current;
+    const el = activeTabRef.current;
+    if (strip && el) {
+      // Scrolls the STRIP sideways, and nothing else. scrollIntoView was doing
+      // this correctly but also dragging the PAGE up to bring the strip into
+      // view — measured jumping scrollY 400 -> 0 on every tab change, so
+      // switching tabs while reading threw away your place. Only the horizontal
+      // overflow is ours to move.
+      const pad = 16;
+      const er = el.getBoundingClientRect();
+      const sr = strip.getBoundingClientRect();
+      const delta =
+        er.left < sr.left + pad ? er.left - sr.left - pad
+        : er.right > sr.right - pad ? er.right - sr.right + pad
+        : 0;
+      if (delta) strip.scrollBy({ left: delta, behavior: rm ? 'auto' : 'smooth' });
+    }
     syncTabEdges();
   }, [tab, showTabs, rm, syncTabEdges]);
   const loggedSets = draft ? draft.entries.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0) : 0;
