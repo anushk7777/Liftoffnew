@@ -25,7 +25,12 @@ export default function PanicButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 left-4 md:bottom-5 md:left-5 z-40 w-11 h-11 rounded-full bg-surface border border-border shadow-md text-ink-muted hover:text-accent hover:border-accent/40 transition-colors flex items-center justify-center"
+        /* Right column, stacked above the quick-add FAB — not bottom-LEFT.
+           Headings and labels are left-aligned, so a floating control on that
+           side lands squarely on top of them: measured covering the word
+           "CONSISTENCY" on the dashboard. On the right it sits over the empty
+           end of a card row instead. */
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+9.5rem)] right-4 md:bottom-5 md:left-5 md:right-auto z-40 w-11 h-11 rounded-full bg-surface border border-border shadow-md text-ink-muted hover:text-accent hover:border-accent/40 transition-colors flex items-center justify-center"
         aria-label="Feeling like quitting?"
         title="Feeling stuck?"
       >

@@ -97,7 +97,7 @@ export default function Schedule() {
                       isToday && !isSelected && "border border-primary text-primary"
                     )}
                   >
-                    <span className={cn("text-xs font-label-caps", isSelected ? "text-on-primary/80" : "text-text-subtle")}>
+                    <span className={cn("text-xs font-label-caps", isSelected ? "text-on-primary opacity-90" : "text-ink-muted")}>
                       {format(date, 'EEE')}
                     </span>
                     <span className="text-lg font-bold mt-1">{format(date, 'd')}</span>

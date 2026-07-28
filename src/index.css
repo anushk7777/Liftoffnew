@@ -43,19 +43,27 @@
        >=4.6:1, with the muted/subtle gap kept wide enough to still read as two
        levels of emphasis. */
     --text-muted: #535259;
-    --text-subtle: #6f6e75;
+    /* Checked against --elevated, the darkest/lightest surface these tokens sit
+       on — not just --bg. The first pass only compared with the page colour, so
+       every one of these passed there and still failed on a card. */
+    --text-subtle: #69686f;
 
     --accent: #16151a;
     --accent-hover: #000000;
     --accent-soft: rgba(0, 0, 0, 0.07);
     --accent-text: #ffffff;
 
-    --danger: #c25563;
-    --success: #4f9472;
-    --warning: #b1823f;
+    /* Darkened for LIGHT mode only. These are tuned to glow against black and
+       measured 2.9-4.4:1 on white, where they carry small text: "2 days late",
+       "Overdue", the week-over-week deltas, "Today". Same hue, lower lightness,
+       all now >=4.5:1 on the white card surface. The dark-mode values are
+       untouched — they were already fine there. */
+    --danger: #be5361;
+    --success: #458163;
+    --warning: #966e36;
 
     /* Cozy caramel — Focus's single warm highlight (redefined in its scope). */
-    --cozy: #b0703c;
+    --cozy: #a26737;
     --cozy-soft: rgba(176, 112, 60, 0.13);
 
     /* Afterburn signature ember — used ONLY to highlight key progress metrics
@@ -129,7 +137,10 @@
        >=4.6:1, with the muted/subtle gap kept wide enough to still read as two
        levels of emphasis. */
     --text-muted: #555560;
-    --text-subtle: #71717d;
+    /* Checked against --elevated, the darkest/lightest surface these tokens sit
+       on — not just --bg. The first pass only compared with the page colour, so
+       every one of these passed there and still failed on a card. */
+    --text-subtle: #6d6d79;
 
     /* primary — Raycast-style warm coral (black is the base) */
     --accent: #e14b34;
@@ -139,13 +150,18 @@
     --primary: #e14b34;
     --on-primary: #ffffff;
 
+    /* Darkened for LIGHT mode only. These are tuned to glow against black and
+       measured 2.9-4.4:1 on white, where they carry small text: "2 days late",
+       "Overdue", the week-over-week deltas, "Today". Same hue, lower lightness,
+       all now >=4.5:1 on the white card surface. The dark-mode values are
+       untouched — they were already fine there. */
     /* secondary highlight — muted coral, same warm family */
-    --cozy: #d1614e;
+    --cozy: #bc5746;
     --cozy-soft: rgba(209, 97, 78, 0.12);
 
-    --success: #17a673;
-    --warning: #c98a3a;
-    --danger: #e0556a;
+    --success: #13865d;
+    --warning: #9b6a2d;
+    --danger: #c54b5d;
 
     --glow: rgba(225, 75, 52, 0.08);
     --card-grad: #ffffff;
@@ -193,7 +209,10 @@
        all four themes, well under the 4.5:1 floor for body text. Both are now
        >=4.6:1, with the muted/subtle gap kept wide enough to still read as two
        levels of emphasis. */
-    --text-subtle: #797985;
+    /* Checked against --elevated, the darkest/lightest surface these tokens sit
+       on — not just --bg. The first pass only compared with the page colour, so
+       every one of these passed there and still failed on a card. */
+    --text-subtle: #80808c;
 
     --accent: #ff7a5c;
     --accent-hover: #ff9478;
@@ -242,7 +261,10 @@
        all four themes, well under the 4.5:1 floor for body text. Both are now
        >=4.6:1, with the muted/subtle gap kept wide enough to still read as two
        levels of emphasis. */
-    --text-subtle: #7b7a80;
+    /* Checked against --elevated, the darkest/lightest surface these tokens sit
+       on — not just --bg. The first pass only compared with the page colour, so
+       every one of these passed there and still failed on a card. */
+    --text-subtle: #848389;
 
     --accent: #f4f3f1; /* off-white ink */
     --accent-hover: #ffffff;

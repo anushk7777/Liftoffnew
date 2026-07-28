@@ -611,7 +611,7 @@ export default function Progress() {
                         {formatVolume(w.tonnage, unit)}
                       </span>
                       {w.done < w.planned && (
-                        <span className="text-[11px] text-ink-muted/60 tabular-nums w-7 text-right shrink-0">
+                        <span className="text-[11px] text-ink-muted opacity-70 tabular-nums w-7 text-right shrink-0">
                           {w.done}/{w.planned}
                         </span>
                       )}

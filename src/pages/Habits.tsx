@@ -154,6 +154,11 @@ function HabitRow({
           <p className={cn('text-sm font-medium truncate', done ? 'text-ink' : 'text-ink')}>
             {habit.name}
           </p>
+          {habit.scheduledTime && (
+            <span className="text-[11px] font-medium text-ink-muted tabular-nums shrink-0">
+              {habit.scheduledTime}
+            </span>
+          )}
           {streak > 0 && (
             <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-warning">
               <Flame className="w-3 h-3" /> {streak}
@@ -168,12 +173,12 @@ function HabitRow({
                 key={d.key}
                 title={`${d.key}${d.hit ? ' — done' : d.due ? ' — missed' : ' — not scheduled'}`}
                 className={cn(
-                  'w-3.5 h-3.5 rounded-[4px] flex items-center justify-center text-[7px] font-bold',
+                  'w-5 h-5 rounded-[5px] flex items-center justify-center text-[11px] font-bold leading-none',
                   d.hit
                     ? 'bg-accent text-[var(--accent-text)]'
                     : d.due
                       ? 'bg-elevated text-ink-subtle'
-                      : 'bg-transparent border border-dashed border-border text-ink-subtle/40',
+                      : 'bg-transparent border border-dashed border-border text-ink-subtle opacity-45',
                 )}
               >
                 {WEEKDAYS[d.weekday]}
@@ -190,7 +195,8 @@ function HabitRow({
 
       <button
         onClick={onDelete}
-        className="p-1.5 rounded-md text-ink-subtle hover:text-danger hover:bg-hover opacity-0 group-hover:opacity-100 transition-opacity"
+        className="tap-44 p-1.5 rounded-md text-ink-muted hover:text-danger hover:bg-hover opacity-0 group-hover:opacity-100 transition-opacity"
+        aria-label="Delete habit"
         title="Delete habit"
       >
         <Trash2 className="w-4 h-4" />
@@ -204,6 +210,7 @@ function AddHabit({ onAdd }: { onAdd: (h: Partial<Habit> & { name: string }) => 
   const [emoji, setEmoji] = useState('');
   const [cadence, setCadence] = useState<'daily' | 'weekly'>('daily');
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
+  const [at, setAt] = useState('');
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,11 +220,13 @@ function AddHabit({ onAdd }: { onAdd: (h: Partial<Habit> & { name: string }) => 
       emoji: emoji.trim() || undefined,
       cadence,
       daysOfWeek: cadence === 'weekly' && daysOfWeek.length ? daysOfWeek : undefined,
+      scheduledTime: at || undefined,
     });
     setName('');
     setEmoji('');
     setCadence('daily');
     setDaysOfWeek([]);
+    setAt('');
   };
 
   const toggleDay = (d: number) =>
@@ -230,13 +239,15 @@ function AddHabit({ onAdd }: { onAdd: (h: Partial<Habit> & { name: string }) => 
           value={emoji}
           onChange={(e) => setEmoji(e.target.value.slice(0, 2))}
           placeholder="🎯"
-          className="input w-12 text-center text-base px-0"
+          aria-label="Habit emoji (optional)"
+          className="input w-12 min-h-[44px] text-center text-base px-0"
         />
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Add a habit — e.g. Solve 1 DSA problem"
-          className="input flex-1"
+          aria-label="Habit name"
+          className="input flex-1 min-h-[44px]"
         />
         <button type="submit" className="btn btn-primary shrink-0">
           <Plus className="w-4 h-4" /> Add
@@ -277,7 +288,28 @@ function AddHabit({ onAdd }: { onAdd: (h: Partial<Habit> & { name: string }) => 
             ))}
           </div>
         )}
+        {/* An implementation intention: "when it is 07:00, I will read".
+            Gollwitzer & Sheeran's meta-analysis — 94 tests, ~8,000 people —
+            puts specifying WHEN at d = 0.65 on goal attainment, one of the
+            larger effects in the behaviour-change literature. The field has
+            existed on the Habit type since the beginning; nothing set it. */}
+        <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+          at
+          <input
+            type="time"
+            value={at}
+            onChange={(e) => setAt(e.target.value)}
+            aria-label="Time of day for this habit (optional)"
+            className="input !w-auto !py-1 !px-2 text-xs min-h-[44px]"
+          />
+        </label>
       </div>
+      {!at && name.trim() && (
+        <p className="text-xs text-ink-muted">
+          Setting a time roughly doubles the odds you'll actually do it — it gives the habit a cue
+          instead of relying on remembering.
+        </p>
+      )}
     </form>
   );
 }

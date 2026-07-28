@@ -84,7 +84,7 @@ export function MiniBars({
       </div>
       <div className="flex gap-1.5 mt-1.5">
         {data.map((d, i) => (
-          <span key={i} className="flex-1 text-center text-[11px] text-ink-subtle truncate">
+          <span key={i} className="flex-1 text-center text-[11px] text-ink-muted overflow-visible whitespace-nowrap">
             {i % labelEvery === 0 ? d.label : ''}
           </span>
         ))}

@@ -411,7 +411,8 @@ export default function Focus() {
                 setTaskId(null); // free-form text unlinks any picked task
               }}
               placeholder="What are you working on?"
-              className="input w-full text-center"
+              aria-label="What are you working on?"
+              className="input w-full min-h-[44px] text-center"
             />
             {openTasks.length > 0 && (
               <select
