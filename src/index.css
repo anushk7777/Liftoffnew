@@ -56,11 +56,13 @@
     /* Darkened for LIGHT mode only. These are tuned to glow against black and
        measured 2.9-4.4:1 on white, where they carry small text: "2 days late",
        "Overdue", the week-over-week deltas, "Today". Same hue, lower lightness,
-       all now >=4.5:1 on the white card surface. The dark-mode values are
-       untouched — they were already fine there. */
-    --danger: #be5361;
-    --success: #458163;
-    --warning: #966e36;
+       all now >=4.5:1 on --elevated, the DARKEST surface they sit on in light
+       mode. Tuning against white alone left the stat tiles at 3.8-4.2:1, since
+       those tiles are --elevated, not white. The dark-mode values are untouched
+       — they were already fine there. */
+    --danger: #a94a56;
+    --success: #3d7358;
+    --warning: #866230;
 
     /* Cozy caramel — Focus's single warm highlight (redefined in its scope). */
     --cozy: #a26737;
@@ -142,26 +144,37 @@
        every one of these passed there and still failed on a card. */
     --text-subtle: #6d6d79;
 
-    /* primary — Raycast-style warm coral (black is the base) */
-    --accent: #e14b34;
-    --accent-hover: #c93f2a;
+    /* primary — Raycast-style warm coral (black is the base).
+       Deepened from #e14b34 for LIGHT mode. The original measured 3.99:1 as
+       text on white and carries the active nav label, "Today", and the selected
+       calendar day. Same hue, ~9% darker: 4.62:1 as text, and white-on-accent
+       buttons improve by the same amount. Dark mode defines its own, lighter
+       accent and is untouched. */
+    --accent: #cb442f;
+    --accent-hover: #bb3f2b;
     --accent-soft: rgba(225, 75, 52, 0.1);
     --accent-text: #ffffff;
-    --primary: #e14b34;
+    --primary: #cb442f;
     --on-primary: #ffffff;
 
     /* Darkened for LIGHT mode only. These are tuned to glow against black and
        measured 2.9-4.4:1 on white, where they carry small text: "2 days late",
        "Overdue", the week-over-week deltas, "Today". Same hue, lower lightness,
-       all now >=4.5:1 on the white card surface. The dark-mode values are
-       untouched — they were already fine there. */
-    /* secondary highlight — muted coral, same warm family */
-    --cozy: #bc5746;
+       all now >=4.5:1 on --elevated, the DARKEST surface they sit on in light
+       mode. Tuning against white alone left the stat tiles at 3.8-4.2:1, since
+       those tiles are --elevated, not white. The dark-mode values are untouched
+       — they were already fine there. */
+    /* secondary highlight — muted coral, same warm family.
+       Deepened again for light mode: this carries the ACTIVE bottom-tab label,
+       which sits on its own --cozy-soft pill. That tint composites to
+       rgb(245,232,230), where #bc5746 measured 3.82:1 — the label you look at
+       most often was the least legible thing in the workspace. */
+    --cozy: #a74e3e;
     --cozy-soft: rgba(209, 97, 78, 0.12);
 
-    --success: #13865d;
-    --warning: #9b6a2d;
-    --danger: #c54b5d;
+    --success: #127d56;
+    --warning: #92642a;
+    --danger: #b94657;
 
     --glow: rgba(225, 75, 52, 0.08);
     --card-grad: #ffffff;
@@ -192,17 +205,26 @@
   /* Dark mode for Focus — true obsidian black with a mint-emerald accent
      and a teal secondary that glow gently against the black. */
   .dark .focus-daylight {
+    /* Elevation in dark mode has to come from SURFACE LIGHTNESS, because a black
+       shadow on a near-black page renders nothing. Measured before: a card sat
+       at 1.05:1 against the page and its border at 1.18:1, so the whole screen
+       read as one flat black sheet with text floating on it. Raised to 1.16:1
+       (card) and 1.42:1 (border) — the page keeps its obsidian colour, which is
+       the identity; only the things ON it lift. Method follows Material's dark
+       theme: composite white over the base rather than picking greys by eye.
+       --text-muted and --text-subtle are re-tuned against the NEW, lighter
+       --elevated, or making cards visible would have broken the text on them. */
     --bg: #08080a;
-    --surface: #101014;
-    --elevated: #17171d;
+    --surface: #1a1a21;
+    --elevated: #24242a;
     --sidebar: #0b0b0f;
-    --border: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.14);
+    --border: rgba(255, 255, 255, 0.14);
+    --border-strong: rgba(255, 255, 255, 0.22);
     --hover: rgba(255, 255, 255, 0.04);
     --hover-strong: rgba(255, 255, 255, 0.08);
 
     --text: #f4f4f7;
-    --text-muted: #9d9da8;
+    --text-muted: #9d9ca2;
     /* Raised to clear WCAG AA. These two tokens carry every secondary line in
        the app — section headings, stat labels, the explanations under each
        card — and --text-subtle measured 2.6-3.0:1 against its own background in
@@ -212,7 +234,7 @@
     /* Checked against --elevated, the darkest/lightest surface these tokens sit
        on — not just --bg. The first pass only compared with the page colour, so
        every one of these passed there and still failed on a card. */
-    --text-subtle: #80808c;
+    --text-subtle: #8c8b91;
 
     --accent: #ff7a5c;
     --accent-hover: #ff9478;
@@ -244,17 +266,23 @@
 
   /* Dark theme — Monochrome Editorial (layered blacks + ink-on-white accents) */
   .dark {
+    /* Same reasoning as the Focus dark scope above: a card measured 1.07:1
+       against the page, so nothing had an edge. Raised to 1.16:1 with the page
+       colour untouched, and the text tokens re-tuned against the new lighter
+       --elevated. */
     --bg: #0a0a0b;
-    --surface: #131314;
-    --elevated: #1b1b1d;
+    --surface: #1c1c1d;
+    --elevated: #262627;
     --sidebar: #0d0d0e;
-    --border: #232325;
-    --border-strong: #343437;
+    /* Lifted with the surfaces: against the new lighter --surface the old
+       #232325 fell to 1.09:1, so cards lost the edge they were meant to have. */
+    --border: #313134;
+    --border-strong: #45454a;
     --hover: rgba(255, 255, 255, 0.05);
     --hover-strong: rgba(255, 255, 255, 0.09);
 
     --text: #f4f3f1;
-    --text-muted: #8d8c92;
+    --text-muted: #9e9da3;
     /* Raised to clear WCAG AA. These two tokens carry every secondary line in
        the app — section headings, stat labels, the explanations under each
        card — and --text-subtle measured 2.6-3.0:1 against its own background in
@@ -264,7 +292,7 @@
     /* Checked against --elevated, the darkest/lightest surface these tokens sit
        on — not just --bg. The first pass only compared with the page colour, so
        every one of these passed there and still failed on a card. */
-    --text-subtle: #848389;
+    --text-subtle: #8e8d93;
 
     --accent: #f4f3f1; /* off-white ink */
     --accent-hover: #ffffff;

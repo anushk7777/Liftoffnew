@@ -243,11 +243,8 @@ Every Focus screen measured in both themes.
 
 ### 6.8 Known weaknesses of the rebuild
 
-1. **The accent coral reads at 4.0-4.4:1 as small text on white.** Nav labels,
-   "Today", the selected calendar day. Fixing it means darkening `--accent`,
-   which is the workspace's identity colour and also fills every primary
-   button — a brand decision, deliberately left for the owner rather than
-   changed silently.
+1. ~~The accent coral reads at 4.0-4.4:1 as small text on white.~~ **Fixed** —
+   approved by the owner and deepened in light mode only; see §6a.
 2. **Schedule day cells are 39x64.** Seven columns cannot be 44px wide on a
    390px screen without a 2px gutter. Passes WCAG 2.5.8 (24x24 minimum); fails
    the 44px AAA guidance. Left as is.
@@ -258,6 +255,89 @@ Every Focus screen measured in both themes.
    ticked one trivial task counts the same as a full one.
 5. **The roadmap is still a separate, unintegrated feature.** The dashboard no
    longer nags about it, but it also no longer surfaces it at all.
+
+---
+
+
+## 6a. Dark mode, and the colour system underneath it
+
+Asked for directly: *"I want the dark mode to be nicely implemented."* It was
+not a matter of taste — the problem measured.
+
+### The finding
+
+**A card was invisible against the page.**
+
+| | before | after |
+| --- | --- | --- |
+| Focus: page -> card | **1.05:1** | 1.16:1 |
+| Focus: card border | **1.18:1** | 1.41:1 |
+| Afterburn: page -> card | **1.07:1** | 1.16:1 |
+| Afterburn: card border vs card | **1.09:1** | 1.31:1 |
+
+At 1.05:1 there is no visible boundary at all. Every screen read as one flat
+black sheet with text floating on it, which is most of what "looks bad" meant.
+
+**Why it happened.** The theme leans on shadows for elevation —
+`--shadow-md: 0 8px 28px rgba(0,0,0,0.55)`. A black shadow on a near-black page
+renders nothing. In dark mode elevation has to come from **surface lightness**,
+which is what Material's dark theme does: composite white over the base rather
+than picking greys by eye (1dp = 5%, 8dp = 12%). Their #121212 base at 8dp gives
+1.38:1; ours now gives 1.30:1 from a considerably darker base.
+
+**The page colour is unchanged.** `#08080a` and `#0a0a0b` are the obsidian
+identity. Only the things sitting *on* the page were lifted.
+
+### The trap this walked into twice
+
+Raising the surfaces **breaks the text on them**. `--text-subtle` had been tuned
+against `--elevated` and measured 4.58:1; against the new lighter `--elevated` it
+fell to 3.66:1. Fixing contrast in one direction broke it in the other. Both had
+to be solved together, and every text token was re-derived against the final
+surface, not the old one.
+
+The same trap, one level down, caught the light theme: `--success`, `--danger`
+and `--warning` were tuned against **white** and passed at 4.57:1, but the stat
+tiles are `--elevated`, not white, where they measured 3.8-4.2:1.
+
+**The rule that came out of it:** tune a text token against the *darkest surface
+in dark mode and the darkest surface in light mode* that it will ever sit on —
+never against the page.
+
+### The accent
+
+`--accent` in light Focus was `#e14b34`, measuring **3.99:1** as text on white.
+It carries the active nav label and "Today". `--cozy` was worse: the active
+bottom-tab label sits on a `--cozy-soft` pill that composites to
+rgb(245,232,230), where it measured **3.82:1** — the label you look at most
+often was the least legible element in the workspace.
+
+Both deepened, same hue: accent 4.57:1 against the page and 4.76:1 on a card;
+cozy 4.61:1 on its own pill. White-on-accent buttons improve by the same amount,
+so nothing was traded away. **Dark mode defines its own lighter accent and was
+not touched.**
+
+### The Focus timer's Start button
+
+White bold text on `linear-gradient(#ffb07a, #ff7a5c, #ff5c8a)` measured
+**1.79:1** on the peach end and 2.94:1 on the rose — the primary button of the
+timer was the least readable thing on its screen, in both themes.
+
+Two ways out: dull the gradient enough to carry white, or change the text. The
+gradient is the workspace's signature, so the text changed — deep brown
+`#2b1206` clears **6.00:1 at its worst stop** with the sunset left exactly as
+designed.
+
+*(Note for future audits: this button now reports ~1.1:1 to any tool that reads
+`backgroundColor`, because the fill is a `background-image`. That reading is
+wrong — there is no opaque colour in the DOM chain to find. Verified by hand.)*
+
+### Method note
+
+Light mode was initially tested by removing the `dark` class from `<html>`. That
+leaves `<body>` on the dark background, so several "light mode" contrast numbers
+were taken on a half-switched page. The theme is driven by `theme` in the store;
+switching it there and reloading is the only reading worth trusting.
 
 ---
 
