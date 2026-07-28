@@ -62,6 +62,15 @@ export interface BlockReport {
   sets: number;
   /** Distinct exercises trained. */
   lifts: number;
+  /** Sets logged at RPE 10 — taken to failure. */
+  failureSets: number;
+  /** Distinct exercises taken to failure at least once. */
+  failureLifts: number;
+  /** Failure sets as a share of every set that had an RPE logged at all.
+   *  Measured against RATED sets, not all sets: an unrated set says nothing
+   *  about how hard it was, and counting it as "not to failure" would punish
+   *  you for not filling in a box. */
+  failureRate: number;
   /** Best PRs of the block, biggest jump first. */
   prs: PRHit[];
   /** The lift that gained most, when one can be named with confidence. */
@@ -87,6 +96,9 @@ const empty = (programName: string): BlockReport => ({
   tonnage: 0,
   sets: 0,
   lifts: 0,
+  failureSets: 0,
+  failureLifts: 0,
+  failureRate: 0,
   prs: [],
   bestLift: null,
   stalledLift: null,
@@ -189,7 +201,25 @@ export function blockReport(
   const stalledLift = [...stalled].sort((a, b) => b.sets - a.sets).find((r) => r.sets >= 6) ?? null;
 
   const liftNames = new Set<string>();
-  for (const { s } of stamped) for (const e of s.entries) liftNames.add(e.name);
+  const failureNames = new Set<string>();
+  let failureSets = 0;
+  let ratedSets = 0;
+  for (const { s } of stamped)
+    for (const e of s.entries) {
+      liftNames.add(e.name);
+      for (const st of e.sets) {
+        const rpe = parseFloat(st.rpe ?? '');
+        if (!Number.isFinite(rpe) || rpe <= 0) continue;
+        ratedSets++;
+        // RPE 10 is failure by definition — nothing left in the tank. This
+        // program asks for it on the last set of 75 of its exercises, so it is
+        // the sheet's own measure of whether you actually did the work.
+        if (rpe >= 10) {
+          failureSets++;
+          failureNames.add(e.name);
+        }
+      }
+    }
 
   return {
     hasData: true,
@@ -206,6 +236,9 @@ export function blockReport(
     tonnage: weeks.reduce((n, w) => n + w.tonnage, 0),
     sets: weeks.reduce((n, w) => n + w.sets, 0),
     lifts: liftNames.size,
+    failureSets,
+    failureLifts: failureNames.size,
+    failureRate: ratedSets > 0 ? Math.round((failureSets / ratedSets) * 100) : 0,
     prs: prs.slice(0, 5),
     bestLift,
     stalledLift,

@@ -542,6 +542,13 @@ revision of the sheet — and the filter would then silently do nothing. Deload
 week *ids* are resolved from the program and matched on `weekId`. A test covers
 exactly this: sessions carrying a non-matching `weekName` must still be excluded.
 
+**Sets taken to failure** are counted as sets logged at RPE 10 — failure by
+definition, nothing left in the tank. This is the sheet's own measure: Pure
+Bodybuilding asks for RPE 10 on the last set of **75** of its exercises. The
+share is measured against **rated** sets rather than all sets, because an
+unrated set says nothing about how hard it was, and counting it as "not to
+failure" would punish you for leaving the box empty.
+
 **Decisions worth challenging**
 
 - *It stays quiet rather than guessing.* One logged session gets a headline and
@@ -614,5 +621,5 @@ session barely moving the prescription, a sustained real drop still being
 followed, every refusal case, and every exercise name the program can show.
 
 ```bash
-npm test        # 319 tests, 30 files
+npm test        # 324 tests, 31 files
 ```

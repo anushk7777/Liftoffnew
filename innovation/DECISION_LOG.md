@@ -29,6 +29,7 @@ you need without reading the whole file.
 | **7** Machine learning | "can ML fine-tune our inventions?" | yes — partial pooling; and where it would not help |
 | **8** Independent verification | "make sure we are not hallucinating" | every constant re-derived from first principles; citations re-checked |
 | **9** Overfitting audit | "make sure the model doesn't overfit" | not overfitted to seeds; IS fitted to an independence assumption, measured and left in place |
+| **10** Block report + app-wide fuzz | "add sets to failure, the card looks bad, find any other bugs" | card rebuilt; three more crashes found, one in the core store |
 
 **Sections 8 and 9 are the ones to trust.** Everything before it is reasoning; that one
 is arithmetic that does not depend on the code being right.
@@ -624,10 +625,39 @@ now with a number attached instead of a hedge.
 
 ---
 
+## 10. Fuzzing the whole app — three crashes nobody had hit yet
+
+After the block report went in, the same fuzz approach that had found two
+crashes in the innovation modules was pointed at the rest of the app: every
+combination of malformed weight / reps / RPE, plus structural nasties (no
+sessions, no entries, unparseable dates, sessions sharing one instant, missing
+fields, 1e308 loads) and broken program shapes, across volume, the store,
+recovery, nutrition, streaks, habits and Kairos.
+
+It found **`weekAdherence` throwing on a program whose `weeks` or `days` was
+missing** — the same class of bug as before, but this time in the **core store
+rather than the new code**, and worse: `weekAdherence` is called from the
+Progress screen on every render, so a throw there **blanks the whole page**
+instead of losing one number.
+
+Reachable for the same reason as the others: the program is persisted to
+localStorage and restored verbatim, so a partial write, an older schema or a bad
+sync produces exactly that shape.
+
+The sweep is now permanent (`src/app-robustness.test.ts`) and asserts two
+things: nothing throws, and no NaN or Infinity reaches a field the UI renders.
+
+**The lesson worth keeping.** Three of the five crashes found in this whole
+project came from the same root — traversing the persisted program object
+without guarding every level. Passing tests said nothing about it, because tests
+supply well-formed fixtures. Fuzzing is the only thing that found any of them.
+
+---
+
 ## Testing
 
 ```bash
-npm test        # 304 tests, 28 files
+npm test        # 324 tests, 31 files
 ```
 
 Beyond unit tests, each behavioural claim in this log was checked against
