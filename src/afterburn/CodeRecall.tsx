@@ -92,17 +92,73 @@ function Cue({ cue, index, dayId }: { cue: RecallCue; index: number; dayId: stri
 }
 
 /**
- * `compact` is for inside the logger.
+ * One cue, on the exercise card it is about.
  *
- * The brief used to be replaced by the logger the moment you tapped Start —
- * you read "open Incline DB Press lighter", started the workout, and the
- * instruction was gone from the screen at exactly the point you were choosing
- * the weight. Minimising the draft brought it back, which nobody was ever going
- * to discover.
+ * This is where an instruction actually lands: you are standing at the machine,
+ * the sets are in front of you, and "open this lighter than last time" is about
+ * to matter. Styled as a sibling of the note-recall line so the card keeps one
+ * visual language rather than gaining a second.
  *
- * So the logger carries a one-line version: the top cue, tappable to open the
- * whole brief. Collapsed by default, because the logger's job is the set in
- * front of you and a three-cue card at the top would push it down the screen.
+ * The verdict chips live here too, and that fixes something the pre-session card
+ * could not: "did this" is only answerable once you have done it. In the doorway
+ * it is a guess; here it is a fact.
+ */
+export function ExerciseCue({
+  cue,
+  dayId,
+  acted,
+}: {
+  cue: RecallCue | null | undefined;
+  dayId: string | null;
+  /** True once a set on this lift has been logged — the cue has had its moment,
+   *  so it steps back rather than shouting for the rest of the session. */
+  acted?: boolean;
+}) {
+  const [why, setWhy] = useState(false);
+  if (!cue) return null;
+  return (
+    <div
+      className={cn(
+        'mt-2 rounded-lg px-3 py-2 text-xs border transition-opacity',
+        acted ? 'opacity-55 border-border' : 'border-ember/30',
+      )}
+      style={acted ? undefined : { background: 'var(--ember-soft)' }}
+    >
+      <div className="flex items-start gap-2">
+        <Zap className="w-3.5 h-3.5 mt-0.5 shrink-0 text-ember" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-ink leading-snug">{cue.headline}</p>
+          <p className="text-ink-muted leading-relaxed mt-0.5">{cue.evidence}</p>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setWhy((v) => !v)}
+              aria-expanded={why}
+              className="flex items-center gap-1 min-h-[40px] -my-1.5 text-[11px] font-medium text-ink-muted hover:text-ink transition-colors"
+            >
+              <ChevronRight className={cn('w-3 h-3 transition-transform', why && 'rotate-90')} />
+              Why
+            </button>
+            <Verdict cue={cue} dayId={dayId} />
+          </div>
+          {why && <p className="text-ink-muted leading-relaxed mt-1">{cue.basis}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The brief itself. `compact` is the in-logger form.
+ *
+ * The brief used to be replaced by the logger the moment you tapped Start — you
+ * read "open Incline DB Press lighter", started the workout, and the instruction
+ * left the screen at exactly the point you were choosing the weight.
+ *
+ * In compact form it carries only the cues about the whole SESSION, collapsed to
+ * one line. The per-lift cues are handed to `ExerciseCue` and appear on the lifts
+ * themselves, which is both better placed and stops the two interfaces competing
+ * for the top of the screen.
  */
 export default function CodeRecall({
   day,
@@ -137,11 +193,29 @@ export default function CodeRecall({
   // outcome than a padded one, and the card simply is not there.
   if (!brief.cues.length && !brief.spark) return null;
 
-  // In the logger, start collapsed to a single line. The spark is deliberately
-  // left out of the collapsed state: mid-workout the instructions are what
-  // matter, and there is nothing to be motivated into — you are already here.
+  // Inside the logger the brief is SPLIT by scope, which is the whole answer to
+  // making these two interfaces live together.
+  //
+  // A cue about the fifth exercise is out of context in a banner at the top of a
+  // long screen — by the time you reach that lift you have scrolled past it, and
+  // it is competing with the sets for attention it does not need. So the cues
+  // that name a lift move onto that lift's own card (see `ExerciseCue`), and only
+  // the ones about the WHOLE session stay up here: recovery, a flat RPE habit, a
+  // volume ceiling, a day you cut short.
+  //
+  // The usual result is a one-line bar or nothing at all, and the logger keeps
+  // its own hierarchy.
+  //
+  // `readiness` is dropped in compact form as well: the logger already carries
+  // its own recovery banner, gated on the same 36-hour freshness, and saying
+  // "autoregulate today" twice on one screen reads as a bug rather than as
+  // emphasis. Found by looking at a screenshot of the real thing.
+  const sessionCues = compact
+    ? brief.cues.filter((c) => !c.exercise && c.kind !== 'readiness')
+    : brief.cues;
+
   if (compact && !expanded) {
-    if (!brief.cues.length) return null;
+    if (!sessionCues.length) return null;
     return (
       <button
         type="button"
@@ -150,9 +224,9 @@ export default function CodeRecall({
         className="w-full flex items-center gap-2.5 rounded-xl border border-border bg-elevated px-3 py-2.5 min-h-[44px] text-left hover:border-ember/40 transition-colors"
       >
         <Zap className="w-4 h-4 text-ember shrink-0" aria-hidden />
-        <span className="flex-1 min-w-0 text-xs font-medium text-ink truncate">{brief.cues[0].headline}</span>
-        {brief.cues.length > 1 && (
-          <span className="text-[11px] font-semibold text-ink-subtle shrink-0">+{brief.cues.length - 1}</span>
+        <span className="flex-1 min-w-0 text-xs font-medium text-ink truncate">{sessionCues[0].headline}</span>
+        {sessionCues.length > 1 && (
+          <span className="text-[11px] font-semibold text-ink-subtle shrink-0">+{sessionCues.length - 1}</span>
         )}
         <ChevronRight className="w-4 h-4 text-ink-muted shrink-0" aria-hidden />
       </button>
@@ -187,16 +261,16 @@ export default function CodeRecall({
         )}
       </div>
 
-      {brief.cues.length > 0 && (
+      {sessionCues.length > 0 && (
         <ol className="space-y-3.5">
-          {brief.cues.map((c, i) => (
+          {sessionCues.map((c, i) => (
             <Cue key={c.id} cue={c} index={i} dayId={day?.id ?? null} />
           ))}
         </ol>
       )}
 
-      {brief.spark && (
-        <div className={cn('flex gap-2.5 items-start', brief.cues.length > 0 && 'mt-4 pt-3.5 border-t border-border')}>
+      {brief.spark && !compact && (
+        <div className={cn('flex gap-2.5 items-start', sessionCues.length > 0 && 'mt-4 pt-3.5 border-t border-border')}>
           <Sparkles className="w-4 h-4 text-ember shrink-0 mt-0.5" aria-hidden />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-ink leading-snug">{brief.spark.headline}</p>
@@ -216,7 +290,7 @@ export default function CodeRecall({
           sharper with every session you record.
         </p>
       )}
-      {brief.depth === 'thin' && brief.cues.length > 0 && (
+      {brief.depth === 'thin' && !compact && brief.cues.length > 0 && (
         <p className="text-[11px] text-ink-subtle leading-relaxed mt-3">
           Built on only a few logged sessions — treat these as a starting point rather than a
           verdict.

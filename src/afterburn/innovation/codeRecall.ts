@@ -102,7 +102,19 @@ export interface Spark {
 
 export interface RecallBrief {
   dayName: string | null;
+  /** The best few, for the card read in the doorway. */
   cues: RecallCue[];
+  /**
+   * Every cue that fired, sorted, uncapped and un-deduplicated.
+   *
+   * The three-cue card is the right shape for the ten seconds before a session.
+   * It is the wrong shape once the session is under way: a cue about the fifth
+   * exercise is out of context in a banner at the top, and belongs on that
+   * exercise's own card at the moment you reach it. The logger reads this list to
+   * find the cue for whatever it is rendering, so a lift crowded out of the
+   * headline three still speaks when you are standing in front of it.
+   */
+  all: RecallCue[];
   spark: Spark | null;
   /** How much history stands behind this brief. `none` means the cues are the
    *  sheet's own targets rather than anything measured, and the UI should say so
@@ -1078,7 +1090,7 @@ export function codeRecall(input: RecallInput): RecallBrief {
   const depth: RecallBrief['depth'] = logged === 0 ? 'none' : logged < 4 ? 'thin' : 'solid';
 
   if (!day) {
-    return { dayName: null, cues: [], spark: null, depth };
+    return { dayName: null, cues: [], all: [], spark: null, depth };
   }
 
   const subs = new Map<string, string[]>();
@@ -1135,6 +1147,7 @@ export function codeRecall(input: RecallInput): RecallBrief {
   return {
     dayName: day.name ?? null,
     cues,
+    all: sorted,
     spark: buildSpark(day, sessions, program, unit, now),
     depth,
   };

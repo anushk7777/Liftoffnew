@@ -8,6 +8,8 @@ import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerforma
 import { setVerdict, ghostLabel, exerciseProgress, learnedLoadHint } from './progression';
 import { equipmentOf, loadStep, EQUIPMENT_LABEL } from './innovation/equipment';
 import { noteForExercise, agoLabel } from './innovation/recall';
+import { codeRecall } from './innovation/codeRecall';
+import type { RecallCue } from './innovation/codeRecall';
 import { readCo2DeepLink, consumeCo2DeepLink } from './deepLink';
 import { buildLoadModel } from './innovation/loadModel';
 import { recoveryReadiness } from './recovery';
@@ -17,7 +19,7 @@ import WorkoutIgnition from './WorkoutIgnition';
 import { randomIgnitionPhrase } from './ignition';
 import type { PRHit } from './store';
 import ProgramLibrary from './ProgramLibrary';
-import CodeRecall from './CodeRecall';
+import CodeRecall, { ExerciseCue } from './CodeRecall';
 import Progress from './Progress';
 import Coach from './Coach';
 import PlateCalc from './PlateCalc';
@@ -778,6 +780,29 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
   const [plateOpen, setPlateOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   const [rough, setRough] = useState(false);
+  const program = useAfterburn((s) => s.program);
+  const noteRecallDaysForCues = noteRecallDays;
+
+  // One brief for the whole session, indexed by lift, so each exercise card can
+  // show the cue that is about IT. Computed once here rather than per card: the
+  // engine runs several trend fits and there are eight cards on a Push day.
+  const cueByLift = useMemo(() => {
+    const day = [...program.weeks.flatMap((w) => w.days ?? []), ...(program.custom ?? [])]
+      .find((d) => d.id === draft.dayId) ?? null;
+    const brief = codeRecall({
+      day,
+      sessions,
+      program,
+      recovery,
+      unit,
+      noteRecallDays: noteRecallDaysForCues,
+    });
+    const byLift = new Map<string, RecallCue>();
+    // `all` rather than `cues`: a lift crowded out of the headline three still
+    // deserves its cue when you are standing in front of it.
+    for (const c of brief.all) if (c.exercise && !byLift.has(c.exercise)) byLift.set(c.exercise, c);
+    return byLift;
+  }, [program, draft.dayId, sessions, recovery, unit, noteRecallDaysForCues]);
 
   // Auto-suggest weak points: muscles reading below MEV / untrained in the last
   // 7 days float to the top of the picker, tagged so the pick is obvious.
@@ -991,6 +1016,18 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
             </div>
           )}
 
+          {/* Code Recall's cue for THIS lift, ABOVE the inputs.
+              A cue at the top of the logger is already out of context by the
+              fifth exercise, and one below the set table arrives after the weight
+              has been typed. Here it sits between what you did last time and the
+              boxes you are about to fill in, which is the one position where it
+              can still change the answer. */}
+          <ExerciseCue
+            cue={cueByLift.get(ex.name)}
+            dayId={draft.dayId}
+            acted={ex.sets.some((s) => s.weight && s.reps)}
+          />
+
           {/* ACHIEVED (what you logged) */}
           <div className="mt-3">
             <div className="flex items-center gap-1.5 px-0.5 mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-subtle">
@@ -1117,8 +1154,11 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
           {/* The note you left on THIS lift last time, shown at the moment it
               is worth something — standing in front of the machine — instead of
               buried eight screens deep in History. Expires after
-              `noteRecallDays` so it cannot pile up into a wall of stale text. */}
+              `noteRecallDays` so it cannot pile up into a wall of stale text.
+              Suppressed when the cue above already quotes it, or the same note
+              appears twice on one card. */}
           {(() => {
+            if (cueByLift.get(ex.name)?.kind === 'note') return null;
             const past = noteForExercise(sessions, ex.name, noteRecallDays);
             if (!past) return null;
             return (
