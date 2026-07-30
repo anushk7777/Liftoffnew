@@ -734,6 +734,41 @@ So the "spark" is ranked, and each rung quotes something real:
 
 There is no fifth rung. "Let's go, champ" is not motivation, it is furniture.
 
+### Living alongside the logger
+
+Two interfaces want the same screen: the brief, and the logger you spend an hour
+in. A banner at the top loses that fight — by the fifth exercise you have scrolled
+past it, and it is competing with the set inputs for attention it does not need.
+
+So inside the logger the brief is **split by scope**:
+
+| Scope | Cues | Where it goes |
+| --- | --- | --- |
+| The whole session | volume ceiling, flat-RPE habit, a day cut short | One collapsed line at the top, tappable |
+| One lift | load, rating, note, order | On **that lift's own card**, between the "last time" line and the set inputs |
+
+Three things fall out of it:
+
+- **The instruction arrives where it can still change the answer.** Above the
+  inputs, not below them — a cue under the set table is read after the weight has
+  been typed. `all` on the brief exists for this: a lift crowded out of the
+  headline three still speaks when you are standing in front of it.
+- **"Did this" becomes answerable.** On the pre-session card it is a guess; at the
+  machine it is a fact. This is the fix for the bias that shortcoming was going to
+  put in the outcome ledger.
+- **The cue steps back once you have logged a set on that lift.** It has had its
+  moment; it should not shout for the rest of the session.
+
+Two duplications had to go with it, both found by looking at a screenshot rather
+than at code:
+
+- The readiness cue is **suppressed in the logger**, because the logger already
+  carries its own recovery banner on the same 36-hour freshness rule. "Autoregulate
+  today" twice on one screen reads as a bug, not as emphasis.
+- A note cue **replaces** the raw note-recall line on the same card rather than
+  sitting beside it, so the note is quoted once — as an instruction rather than as
+  a quote.
+
 ### The one tap that makes a backtest possible
 
 Every other engine in here was calibrated against ground truth: the strength
