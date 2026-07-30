@@ -69,6 +69,8 @@ Three standing constraints, set by the app's owner and never violated:
 | 14 | **Focus dashboard rebuilt** | completing a task put it back on your home screen; the biggest card said "Not started" to an active user; a 120-day countdown printed twice | Today / momentum / consistency / this week, each tied to a named study |
 | 15 | **Morning CO2 nudge** | the test is only useful as a trend, and a trend needs a fixed time of day — one taken "whenever" is worth much less | a window 09:30-11:00, a different line each slot, silent the moment it's logged |
 | 16 | **Note recall** | a note written on a lift was filed where you'd never see it again — least of all standing in front of that machine next week | shown on the exercise itself, plus a weekly digest; expires after a week |
+| 17 | **The nudge reaches a closed phone** | the reminder could only fire while a tab was alive — which is precisely not the situation at 09:30, when the app is shut and the phone is in a pocket | a server push on a 5-minute cron, using the timezone stored on each device; four slots a morning, keyed per zone so two countries cannot silence each other |
+| 18 | **Code Recall** | every engine in here reported on training that was already over; none of it was in front of you at the one moment it could change what you do | at most three grounded instructions before the session, plus a motivational line that is measured or absent — and it finally reads the set ratings, which nothing had ever looked at |
 
 Also repaired along the way, outside Afterburn: habit streaks that could never
 exceed 2 for a Mon/Wed/Fri habit, a backup restore that reported success
@@ -164,6 +166,39 @@ part was that both passed their unit tests while the reminder was invisible in a
 real browser — the check ran before the banner had mounted. →
 `TRAINING_LOGIC.md` §7
 
+**"Set up the server push so it works when the app is closed."**
+Done. The zone lives on each push subscription rather than on the account, so
+09:30 means 09:30 where the *phone* is, and travelling corrects itself on the
+next open; a subscription with no zone is skipped rather than assumed to be UTC,
+because guessing buzzes someone at 3am. The de-dup key carries the zone, or two
+devices in two countries silence each other. The scheduling rule now exists in
+two runtimes and is held byte-identical by a test. Driving a real browser found a
+third instance of this feature's recurring bug: tapping the banner from Focus
+landed on the Programs tab, because the Afterburn tree is lazy and nothing was
+listening yet. → `TRAINING_LOGIC.md` §7c, `DECISION_LOG.md` §12
+
+**"Build an engine that reads my lifts, my RPEs and my set ratings and tells
+me how to approach the session — and something motivational. Call it Code
+Recall."**
+Built. Three instructions at most, each with the numbers that produced it and the
+reason one tap away. The find along the way: every set already carried a 1-5 star
+rating and **nothing in the app had ever read it** — it was written to storage and
+never looked at again. It is the only subjective channel separate from RPE, and
+the separation is the point: RPE says how hard a set was, the rating says how
+well it went. A lift that is hard enough and still rates one star is an execution
+problem, and adding weight — the one thing a load-only engine would suggest — is
+the one thing that cannot help. The motivational half is measured or absent;
+there is no rung for "let's go, champ".
+
+A step-back review an hour later found three defects in it, all mine: the card
+could contradict itself ("hold your top sets below target" beside "go up"), the
+motivational line read two endpoints of a noisy series and announced 10.1 kg of
+progress where the app's own fitted trend says 0.00, and the brief was replaced
+by the logger at the exact moment you would act on it. All three fixed, each
+pinned by a regression built from the series that exposed it. Each cue now also
+carries a one-tap verdict — the seed of the ground truth this engine, alone among
+them, had no way to collect. → `TRAINING_LOGIC.md` §6, `DECISION_LOG.md` §13
+
 **"Make sure the model doesn't overfit."**
 It is **not** overfitted to the seeds it was tuned on — five unseen draws
 reproduce it within 4 points — and it sits on a plateau rather than a knife
@@ -201,7 +236,7 @@ Full ranked lists live at the end of each document.
 ## Running it
 
 ```bash
-npm test     # 404 tests, 35 files
+npm test     # 565 tests, 39 files
 npm run lint
 npm run build
 ```

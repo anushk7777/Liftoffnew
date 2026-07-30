@@ -149,3 +149,55 @@ describe('note recall setting', () => {
     setNoteRecallDays(7);
   });
 });
+
+describe('cue outcomes — the seed of the ground truth this engine has none of', () => {
+  const reset = () => useAfterburn.setState({ cueOutcomes: [] });
+
+  it('starts empty and records what a backtest would need to join on', () => {
+    reset();
+    expect(useAfterburn.getState().cueOutcomes).toEqual([]);
+    useAfterburn.getState().recordCueOutcome({
+      cueId: 'load-light-Incline DB Press',
+      kind: 'load',
+      dayId: 'push-a',
+      verdict: 'did',
+    });
+    const [o] = useAfterburn.getState().cueOutcomes;
+    expect(o.cueId).toBe('load-light-Incline DB Press');
+    expect(o.kind).toBe('load');
+    expect(o.dayId).toBe('push-a');
+    expect(o.verdict).toBe('did');
+    // Without a timestamp there is nothing to join a session to.
+    expect(Number.isNaN(Date.parse(o.answeredAt))).toBe(false);
+  });
+
+  it('replaces an answer rather than double-counting a change of mind', () => {
+    reset();
+    const record = useAfterburn.getState().recordCueOutcome;
+    record({ cueId: 'c1', kind: 'load', dayId: 'push-a', verdict: 'did' });
+    record({ cueId: 'c1', kind: 'load', dayId: 'push-a', verdict: 'skipped' });
+    expect(useAfterburn.getState().cueOutcomes).toHaveLength(1);
+    expect(useAfterburn.getState().cueOutcomes[0].verdict).toBe('skipped');
+  });
+
+  it('keeps the same cue on a different day as its own data point', () => {
+    // The same rule fires on Push A and on Pull A; those are two observations,
+    // not one being overwritten.
+    reset();
+    const record = useAfterburn.getState().recordCueOutcome;
+    record({ cueId: 'calibration-flat-rpe', kind: 'calibration', dayId: 'push-a', verdict: 'did' });
+    record({ cueId: 'calibration-flat-rpe', kind: 'calibration', dayId: 'pull-a', verdict: 'skipped' });
+    expect(useAfterburn.getState().cueOutcomes).toHaveLength(2);
+  });
+
+  it('cannot grow the persisted store without bound', () => {
+    reset();
+    const record = useAfterburn.getState().recordCueOutcome;
+    for (let i = 0; i < 600; i++) record({ cueId: `c${i}`, kind: 'load', dayId: 'push-a', verdict: 'did' });
+    const kept = useAfterburn.getState().cueOutcomes;
+    expect(kept).toHaveLength(500);
+    // Trimmed from the correct end: the newest answers are the ones worth having.
+    expect(kept.at(-1)!.cueId).toBe('c599');
+    expect(kept[0].cueId).toBe('c100');
+  });
+});

@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import type { CueOutcome } from './innovation/codeRecall';
 import { DEFAULT_PROGRAM } from './plan';
 import { withWeakPoints } from './pureBodybuilding';
 import { DEFAULT_NUTRITION } from './nutrition';
@@ -425,6 +426,10 @@ interface AfterburnState {
   addBodyweight: (weight: number, note?: string) => void;
   deleteBodyweight: (id: string) => void;
   recovery: RecoveryEntry[];
+  /** What the lifter said about each Code Recall cue. The seed of the ground
+   *  truth this engine has none of — see innovation/codeRecall.ts. */
+  cueOutcomes: CueOutcome[];
+  recordCueOutcome: (o: Omit<CueOutcome, 'answeredAt'>) => void;
   addRecovery: (co2Score: number, note?: string) => void;
   deleteRecovery: (id: string) => void;
   nutrition: NutritionProfile;
@@ -443,6 +448,7 @@ export const useAfterburn = create<AfterburnState>()(
       sessions: [],
       bodyweight: [],
       recovery: [],
+      cueOutcomes: [],
       nutrition: DEFAULT_NUTRITION,
       noteRecallDays: DEFAULT_RECALL_DAYS,
       setNoteRecallDays: (days) => set({ noteRecallDays: Number.isFinite(days) && days >= 0 ? days : DEFAULT_RECALL_DAYS }),
@@ -461,6 +467,7 @@ export const useAfterburn = create<AfterburnState>()(
           sessions: fresh.sessions,
           bodyweight: fresh.bodyweight,
           recovery: fresh.recovery,
+          cueOutcomes: fresh.cueOutcomes,
           nutrition: fresh.nutrition,
           ownerId: null,
         });
@@ -502,6 +509,7 @@ export const useAfterburn = create<AfterburnState>()(
               sessions?: WorkoutSession[];
               bodyweight?: BodyEntry[];
               recovery?: RecoveryEntry[];
+              cueOutcomes?: CueOutcome[];
               nutrition?: NutritionProfile;
             };
             // Ignore an old-shape cloud program (pre-weeks) so it can't break the UI.
@@ -511,6 +519,7 @@ export const useAfterburn = create<AfterburnState>()(
               sessions: d.sessions ?? get().sessions,
               bodyweight: Array.isArray(d.bodyweight) ? d.bodyweight : get().bodyweight,
               recovery: Array.isArray(d.recovery) ? d.recovery : get().recovery,
+              cueOutcomes: Array.isArray(d.cueOutcomes) ? d.cueOutcomes : get().cueOutcomes,
               nutrition: d.nutrition ? { ...get().nutrition, ...d.nutrition } : get().nutrition,
             });
             setMarker(cloudTs || new Date().toISOString());
@@ -667,18 +676,29 @@ export const useAfterburn = create<AfterburnState>()(
           recovery: [{ id: uid(), date: new Date().toISOString(), co2Score, note: note?.trim() || undefined }, ...s.recovery],
         })),
       deleteRecovery: (id) => set((s) => ({ recovery: s.recovery.filter((r) => r.id !== id) })),
+
+      // One row per (cue, day): answering again replaces the answer rather than
+      // appending, so a change of mind does not read as two data points. Trimmed
+      // so a year of briefs cannot grow the persisted store without bound.
+      recordCueOutcome: (o) =>
+        set((s) => {
+          const without = s.cueOutcomes.filter((x) => !(x.cueId === o.cueId && x.dayId === o.dayId));
+          return { cueOutcomes: [...without, { ...o, answeredAt: new Date().toISOString() }].slice(-500) };
+        }),
       setNutrition: (patch) => set((s) => ({ nutrition: { ...s.nutrition, ...patch } })),
     }),
     {
       name: 'liftoff-afterburn',
-      version: 4,
+      version: 5,
       // v1 stored a single-week `program.days`. Reset the program to the new
       // multi-week default if the persisted shape predates `weeks` (keep sessions).
       // v3 added the `recovery` collection — backfill it so old persists load.
       // v4 backfills the Weak Point Table onto persisted Pure Bodybuilding copies.
+      // v5 added `cueOutcomes` — backfill it so old persists load.
       migrate: (persisted: unknown) => {
         const p = (persisted ?? {}) as Record<string, unknown>;
         if (!Array.isArray(p.recovery)) p.recovery = [];
+        if (!Array.isArray(p.cueOutcomes)) p.cueOutcomes = [];
         const prog = p.program as WorkoutProgram | undefined;
         if (!prog || !Array.isArray(prog.weeks)) {
           return { ...p, program: DEFAULT_PROGRAM, currentWeekId: '' };
@@ -686,7 +706,7 @@ export const useAfterburn = create<AfterburnState>()(
         p.program = withWeakPoints(prog);
         return p;
       },
-      partialize: (s) => ({ program: s.program, sessions: s.sessions, bodyweight: s.bodyweight, recovery: s.recovery, nutrition: s.nutrition, draft: s.draft, currentWeekId: s.currentWeekId, noteRecallDays: s.noteRecallDays }),
+      partialize: (s) => ({ program: s.program, sessions: s.sessions, bodyweight: s.bodyweight, recovery: s.recovery, cueOutcomes: s.cueOutcomes, nutrition: s.nutrition, draft: s.draft, currentWeekId: s.currentWeekId, noteRecallDays: s.noteRecallDays }),
     },
   ),
 );
@@ -697,6 +717,7 @@ let lastProgram = useAfterburn.getState().program;
 let lastSessions = useAfterburn.getState().sessions;
 let lastBodyweight = useAfterburn.getState().bodyweight;
 let lastRecovery = useAfterburn.getState().recovery;
+let lastCueOutcomes = useAfterburn.getState().cueOutcomes;
 let lastNutrition = useAfterburn.getState().nutrition;
 let syncTimer: ReturnType<typeof setTimeout>;
 useAfterburn.subscribe((state) => {
@@ -706,6 +727,7 @@ useAfterburn.subscribe((state) => {
     state.sessions === lastSessions &&
     state.bodyweight === lastBodyweight &&
     state.recovery === lastRecovery &&
+    state.cueOutcomes === lastCueOutcomes &&
     state.nutrition === lastNutrition
   )
     return;
@@ -713,6 +735,7 @@ useAfterburn.subscribe((state) => {
   lastSessions = state.sessions;
   lastBodyweight = state.bodyweight;
   lastRecovery = state.recovery;
+  lastCueOutcomes = state.cueOutcomes;
   lastNutrition = state.nutrition;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
@@ -723,7 +746,7 @@ useAfterburn.subscribe((state) => {
       if (!session) return;
       const ts = new Date().toISOString();
       const { error } = await supabase.from('workout_data').upsert(
-        { id: session.user.id, data: { program: state.program, sessions: state.sessions, bodyweight: state.bodyweight, recovery: state.recovery, nutrition: state.nutrition }, updated_at: ts },
+        { id: session.user.id, data: { program: state.program, sessions: state.sessions, bodyweight: state.bodyweight, recovery: state.recovery, cueOutcomes: state.cueOutcomes, nutrition: state.nutrition }, updated_at: ts },
         { onConflict: 'id' },
       );
       if (error) {

@@ -33,6 +33,13 @@
 //
 // Everything here is pure and takes `now`, so tests never depend on the clock.
 import type { RecoveryEntry, WorkoutSession } from '../types';
+import {
+  CO2_WINDOW_START,
+  CO2_WINDOW_END,
+  CO2_SLOT_MINUTES,
+  CO2_TAGLINES,
+  CO2_TITLE,
+} from './co2Server';
 
 const DAY_MS = 86_400_000;
 
@@ -46,21 +53,17 @@ export const localDay = (d: Date): string =>
 // CO2 morning nudge
 // ---------------------------------------------------------------------------
 
-/** Window, in minutes past local midnight. 09:30 to 11:00. */
-export const CO2_WINDOW_START = 9 * 60 + 30;
-export const CO2_WINDOW_END = 11 * 60;
-/** How often it asks again inside the window. */
-export const CO2_SLOT_MINUTES = 30;
-
-/** One line per slot, so four nudges in a morning are not the same sentence
- *  four times. Ordered from invitation to last call — the tone tightens as the
- *  window closes, because by 11:00 it genuinely is the last useful moment. */
-export const CO2_TAGLINES = [
-  'One slow breath out. Your recovery score is waiting.',
-  'Before the day gets loud — one exhale, one number.',
-  "Still time. One breath tells you what today's training should cost.",
-  'Last call — the window closes at 11, and a late reading tells you nothing.',
-] as const;
+// The window, the slot length and the wording live in `co2Server.ts` because the
+// server that pushes to a closed phone has to agree with the browser to the
+// minute. Re-exported here so every existing caller (and test) still finds them
+// where it always has.
+export {
+  CO2_WINDOW_START,
+  CO2_WINDOW_END,
+  CO2_SLOT_MINUTES,
+  CO2_TAGLINES,
+  CO2_TITLE,
+} from './co2Server';
 
 export interface Co2Nudge {
   /** Which half-hour slot inside the window this is, 0-based. */
@@ -104,7 +107,7 @@ export function co2Nudge(
   return {
     slot,
     key,
-    title: 'CO2 tolerance test',
+    title: CO2_TITLE,
     body: CO2_TAGLINES[Math.min(slot, CO2_TAGLINES.length - 1)],
   };
 }

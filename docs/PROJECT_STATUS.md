@@ -54,6 +54,12 @@ Liftoff can now be installed like a native app:
   and the installed app knows how to display them.
 - There's a **"Push reminders"** switch in Settings. It stays disabled with a
   note until the server side is set up (see "What still needs you").
+- Two senders exist: due tasks, and the **morning CO2 nudge** (09:30–11:00,
+  four slots, silent once the test is logged). Both are delivered with the app
+  closed, and both need the same one-time server setup.
+- The CO2 nudge sends by **this device's timezone**, stored with its
+  subscription — so 09:30 means 09:30 where the phone is, and travelling sorts
+  itself out the next time you open the app.
 - Your existing reminders (in-app alarms + "Add to Calendar") keep working
   regardless.
 
@@ -113,10 +119,13 @@ fixed:
 1. **Push reminders backend (optional).** To turn the push switch on, you need
    to generate VAPID keys, add one key to the app's environment, create a small
    database table, and deploy a Supabase function that sends the reminders.
-   Step-by-step instructions are in **`docs/PUSH_SETUP.md`**. Until then,
-   in-app alarms and calendar export cover reminders.
+   Step-by-step instructions are in **`docs/PUSH_SETUP.md`** — steps 0–6 for
+   task reminders, step 7 for the morning CO2 nudge (same keys, ~5 more
+   minutes). Until then, in-app alarms and calendar export cover reminders.
    - Note: on iPhone, push only works after installing Liftoff to the Home
      Screen (Apple's rule).
+   - After deploying, **open Liftoff once on each device**. That is what
+     records the device's timezone, and the CO2 nudge will not send without it.
 2. **Try it on your phone.** Deploy this branch (or run it), open it on a real
    device, install it, and confirm the signed-in screens feel right.
 
@@ -126,7 +135,10 @@ fixed:
 - Install prompt: `src/components/InstallPrompt.tsx`. Offline banner:
   `src/components/OfflineBanner.tsx`.
 - Push: client in `src/lib/push.ts`, service-worker handlers in
-  `public/push-sw.js`, setup guide in `docs/PUSH_SETUP.md`.
+  `public/push-sw.js`, setup guide in `docs/PUSH_SETUP.md`. Senders in
+  `supabase/functions/{send-reminders,send-co2-nudge}/`; the CO2 sender's
+  scheduling rule is a verbatim copy of `src/afterburn/innovation/co2Server.ts`
+  kept in sync by `scripts/sync-co2-shared.mjs` and enforced by a test.
 - PWA/manifest/offline config: `vite.config.ts`. App icons: `public/pwa-*.png`
   (regenerate with `npm run gen:icons`).
 - All mobile screens reuse the existing data layer (`src/store/useStore.ts`) —

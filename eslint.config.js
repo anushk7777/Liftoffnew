@@ -21,4 +21,12 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Test fakes mirror a third-party API's signature, so they necessarily carry
+    // parameters they have no use for. Underscore marks those deliberate.
+    files: ['src/test/stubs/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
 ])

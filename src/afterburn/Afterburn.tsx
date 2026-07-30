@@ -8,6 +8,7 @@ import { useAfterburn, useAppMode, completionMap, dayCompletionKey, lastPerforma
 import { setVerdict, ghostLabel, exerciseProgress, learnedLoadHint } from './progression';
 import { equipmentOf, loadStep, EQUIPMENT_LABEL } from './innovation/equipment';
 import { noteForExercise, agoLabel } from './innovation/recall';
+import { readCo2DeepLink, consumeCo2DeepLink } from './deepLink';
 import { buildLoadModel } from './innovation/loadModel';
 import { recoveryReadiness } from './recovery';
 import { analyzeVolume } from './volume';
@@ -16,6 +17,7 @@ import WorkoutIgnition from './WorkoutIgnition';
 import { randomIgnitionPhrase } from './ignition';
 import type { PRHit } from './store';
 import ProgramLibrary from './ProgramLibrary';
+import CodeRecall from './CodeRecall';
 import Progress from './Progress';
 import Coach from './Coach';
 import PlateCalc from './PlateCalc';
@@ -302,6 +304,24 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
   const phase = week?.name.includes('·') ? week.name.split('·').pop()!.trim() : null;
   // Next workout in the async cycle = first day this week not yet logged.
   const nextDay = week?.days.find((d) => !done.has(dayCompletionKey(week.id, d.id)));
+  // The session Code Recall briefs: the one you are mid-way through if there is
+  // one, otherwise the next in the cycle. A finished week has no next session,
+  // and briefing an arbitrary day would be worse than briefing none.
+  const briefDay = useMemo(() => {
+    const all = [...program.weeks.flatMap((w) => w.days ?? []), ...(program.custom ?? [])];
+    if (draft) return all.find((d) => d.id === draft.dayId) ?? null;
+    if (nextDay) return nextDay;
+    // Two cases used to fall through here and get no card at all: a week you have
+    // finished, and a program of nothing but custom days — both because there was
+    // no "next in the cycle" to point at. Falling back to the day you most
+    // recently trained is the honest answer, since it is also the one you are
+    // most likely to repeat.
+    const lastTrained = [...sessions]
+      .sort((a, b) => (b.completedAt ?? b.date).localeCompare(a.completedAt ?? a.date))
+      .map((s) => all.find((d) => d.id === s.dayId))
+      .find((d): d is ProgramDay => !!d);
+    return lastTrained ?? all[0] ?? null;
+  }, [draft, program, nextDay, sessions]);
   // Pinned "primary" workout floats to the top of its list.
   const sortPrimary = (days: ProgramDay[]) => [...days].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
 
@@ -332,6 +352,10 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
         <h1 className="font-display text-2xl font-bold">{program.name}</h1>
         <p className="text-xs text-ink-subtle mt-0.5">Logging in {program.unit} · RPE 1–10</p>
       </div>
+
+      {/* The brief goes above everything the lifter has to scroll past. It is
+          read once, standing up, in the ten seconds before starting. */}
+      <CodeRecall day={briefDay} />
 
       {/* Week selector — only when the program ships scheduled weeks. A fresh
           install has none, so users go straight to "My workouts" below. */}
@@ -1336,11 +1360,26 @@ export default function Afterburn() {
   const showLogger = !!draft && !minimized;
   const showTabs = !draft || minimized;
 
+  // The day the in-progress workout belongs to, so the logger can carry the same
+  // brief the Workout tab showed before Start was tapped.
+  const draftDay = useMemo(() => {
+    if (!draft) return null;
+    const p = useAfterburn.getState().program;
+    const all = [...p.weeks.flatMap((w) => w.days ?? []), ...(p.custom ?? [])];
+    return all.find((d) => d.id === draft.dayId) ?? null;
+  }, [draft]);
+
   // The morning CO2 banner asks to be taken straight to the test. Without this
   // the button switched workspace and dropped you on whatever tab you left
   // open, which is exactly the friction the reminder exists to remove.
   useEffect(() => {
     const open = () => setTab('progress');
+    // Same intent arriving from outside the app: a push notification tapped on
+    // the lock screen, which reaches us as `/?co2=1`. Reading first makes this
+    // ordering-proof — whichever of the shell and this tree runs earlier claims
+    // the URL, and the other finds the latch already set.
+    readCo2DeepLink();
+    if (consumeCo2DeepLink()) open();
     window.addEventListener('afterburn:open-co2', open);
     return () => window.removeEventListener('afterburn:open-co2', open);
   }, []);
@@ -1470,7 +1509,12 @@ export default function Afterburn() {
 
         <main className="mx-auto max-w-2xl px-4 py-4">
           {showLogger ? (
-            <Logger onFinish={finishWorkout} onBack={() => setMinimized(true)} />
+            <div className="space-y-3">
+              {/* The brief has to survive the Start button. Collapsed to one
+                  line here so the sets stay at the top of the screen. */}
+              <CodeRecall day={draftDay} compact />
+              <Logger onFinish={finishWorkout} onBack={() => setMinimized(true)} />
+            </div>
           ) : (
             <AnimatePresence mode="wait">
               <motion.div
