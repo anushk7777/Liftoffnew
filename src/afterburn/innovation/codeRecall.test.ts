@@ -284,6 +284,59 @@ describe('load, from the RPE actually logged', () => {
     expect(has(brief({ day: day(), sessions: withLast([set(35, 6)]) }), 'load')).toBe(false);
   });
 
+  it('does not let one anomalous session flip the opening weight', () => {
+    // RPE 10 last time, RPE 6 the time before. That is not a lift that has got
+    // heavier, it is one bad session — and this rule used to act on the latest
+    // outing alone while the rating rule next door demanded two.
+    // Only these two outings of the lift, so the one before really is the one
+    // before — quietHistory would sit between them and be read as the prior.
+    const contradictory = [
+      session({ date: daysAgo(8), completedAt: daysAgo(8), entries: [entry('Incline DB Press', [set(30, 10, 6)])] }),
+      session({ date: daysAgo(2), completedAt: daysAgo(2), entries: [entry('Incline DB Press', [set(30, 6, 10)])] }),
+    ];
+    expect(has(brief({ day: day(), sessions: contradictory }), 'load')).toBe(false);
+    // The mirror case: easy last time, hard the time before, is equally mute.
+    const mirrored = [
+      session({ date: daysAgo(8), completedAt: daysAgo(8), entries: [entry('Incline DB Press', [set(30, 6, 10)])] }),
+      session({ date: daysAgo(2), completedAt: daysAgo(2), entries: [entry('Incline DB Press', [set(30, 10, 6)])] }),
+    ];
+    expect(has(brief({ day: day(), sessions: mirrored }), 'load')).toBe(false);
+  });
+
+  it('says so when both outings agree', () => {
+    const twice = [
+      session({ date: daysAgo(8), completedAt: daysAgo(8), entries: [entry('Incline DB Press', [set(35, 6, 10)])] }),
+      session({ date: daysAgo(2), completedAt: daysAgo(2), entries: [entry('Incline DB Press', [set(35, 6, 10)])] }),
+    ];
+    expect(cueOf(brief({ day: day(), sessions: twice }), 'load')!.evidence).toMatch(/both of your last two outings/i);
+  });
+
+  it('still speaks from a single outing, and says that is what it is', () => {
+    const once = [
+      session({ date: daysAgo(2), completedAt: daysAgo(2), entries: [entry('Incline DB Press', [set(35, 6, 10)])] }),
+    ];
+    const c = cueOf(brief({ day: day(), sessions: once }), 'load')!;
+    expect(c.evidence).toMatch(/^Last time/);
+  });
+
+  it('gives a real target weight, not just "go up"', () => {
+    // Six sets across enough spread for the personal model to have a curve, all
+    // comfortably under target — the case where the logger would already have
+    // computed a number, but only after the weight had been chosen.
+    const sessions = Array.from({ length: 6 }, (_, i) =>
+      session({
+        date: daysAgo(30 - i * 5),
+        completedAt: daysAgo(30 - i * 5),
+        entries: [entry('Incline DB Press', [set(30, 12, 5), set(30, 10, 6), set(30, 8, 6.5)])],
+      }),
+    );
+    const c = cueOf(brief({ day: day(), sessions }), 'load')!;
+    expect(c.headline).toMatch(/has room/);
+    // Either a weight to try, or the honest "the jump is too big, add reps"
+    // answer — never the bare "go up" it used to give.
+    expect(c.headline).toMatch(/Try \d|push past/i);
+  });
+
   it('speaks the lifter’s unit', () => {
     const c = cueOf(brief({ day: day(), sessions: withLast([set(80, 6, 10)]), unit: 'lb' }), 'load')!;
     expect(c.evidence).toContain('80lb');
@@ -709,11 +762,71 @@ describe('placeholder slots', () => {
 
 // ---------------------------------------------------------------------------
 
+describe('the brief must not argue with itself', () => {
+  // The defect this pins was visible on one screen: "hold your top sets a point
+  // below target and drop the last set of each accessory", then "Incline DB
+  // Press has room — go up", then "take every optional set on chest today".
+  // Three cues, each true alone, leaving the reader with no instruction at all.
+  const under = (): RecoveryEntry[] => [
+    { id: 'r1', date: new Date(NOW.getTime() - 8 * 3_600_000).toISOString(), co2Score: 18 } as RecoveryEntry,
+    ...Array.from({ length: 5 }, (_, i) => ({
+      id: `b${i}`,
+      date: new Date(NOW.getTime() - (8 + 24 * (i + 1)) * 3_600_000).toISOString(),
+      co2Score: 58,
+    }) as RecoveryEntry),
+  ];
+  /** Two RPE points under target and five stars — every number says "add load". */
+  const roomToSpare = () => [
+    ...quietHistory(3),
+    session({ date: daysAgo(2), completedAt: daysAgo(2), entries: [entry('Incline DB Press', [set(30, 10, 6, 5), set(30, 10, 6, 5)])] }),
+    session({ date: daysAgo(6), completedAt: daysAgo(6), entries: [entry('Incline DB Press', [set(30, 10, 6, 5), set(30, 10, 6, 4)])] }),
+  ];
+
+  it('does not tell you to add weight on a day it told you to trim', () => {
+    const rested = brief({ day: day(), sessions: roomToSpare() });
+    expect(rested.cues.some((c) => /room|go up|push today/i.test(c.headline))).toBe(true);
+
+    const tired = brief({ day: day(), sessions: roomToSpare(), recovery: under() });
+    expect(cueOf(tired, 'readiness')!.headline).toMatch(/autoregulate/i);
+    expect(tired.cues.some((c) => /room|go up|push today/i.test(c.headline))).toBe(false);
+  });
+
+  it('does not tell you to add sets on a day it told you to drop them', () => {
+    // One press, three sets, no flye: chest is genuinely under its minimum, and
+    // on a rested day the brief says to take the optional sets.
+    const thin = Array.from({ length: 5 }, (_, i) =>
+      session({
+        date: daysAgo((5 - i) * 4),
+        completedAt: daysAgo((5 - i) * 4),
+        entries: [entry('Incline DB Press', [set(30, 9, 8), set(30, 9, 8.5), set(30, 8, 7.5)])],
+      }),
+    );
+    expect(brief({ day: day(), sessions: thin }).cues.some((c) => /take every optional set/i.test(c.headline))).toBe(true);
+    expect(brief({ day: day(), sessions: thin, recovery: under() }).cues.some((c) => /take every optional set/i.test(c.headline))).toBe(false);
+  });
+
+  it('still lets a cue that REDUCES work through', () => {
+    // Cutting back agrees with autoregulating rather than fighting it, so an
+    // overshoot must still be reported on a low-readiness day.
+    const overshot = [
+      ...quietHistory(3),
+      session({ date: daysAgo(2), completedAt: daysAgo(2), entries: [entry('Incline DB Press', [set(35, 6, 10)])] }),
+    ];
+    const b = brief({ day: day(), sessions: overshot, recovery: under() });
+    expect(b.cues.some((c) => /lighter/i.test(c.headline))).toBe(true);
+  });
+});
+
 describe('the motivational half', () => {
   it('quotes a gain you actually made on a lift you are about to do', () => {
+    // Four sessions minimum, the same floor the returns ledger uses — the
+    // significance test cannot reach its threshold from three however cleanly
+    // they climb.
     const sessions = [
       session({ date: daysAgo(40), completedAt: daysAgo(40), entries: [entry('Incline DB Press', [set(25, 8, 8)])] }),
+      session({ date: daysAgo(30), completedAt: daysAgo(30), entries: [entry('Incline DB Press', [set(27.5, 8, 8)])] }),
       session({ date: daysAgo(20), completedAt: daysAgo(20), entries: [entry('Incline DB Press', [set(30, 8, 8)])] }),
+      session({ date: daysAgo(12), completedAt: daysAgo(12), entries: [entry('Incline DB Press', [set(32.5, 8, 8)])] }),
       session({ date: daysAgo(5), completedAt: daysAgo(5), entries: [entry('Incline DB Press', [set(35, 8, 8)])] }),
     ];
     const s = brief({ day: day(), sessions }).spark!;
@@ -731,6 +844,44 @@ describe('the motivational half', () => {
       session({ date: daysAgo(5), completedAt: daysAgo(5), entries: [entry('Incline DB Press', [set(30, 8, 8)])] }),
     ];
     expect(brief({ day: day(), sessions }).spark?.kind).not.toBe('gain');
+  });
+
+  /** One load per session, oldest first. */
+  const loadSeries = (loads: number[]) =>
+    loads.map((w, i) =>
+      session({
+        date: daysAgo((loads.length - i) * 5),
+        completedAt: daysAgo((loads.length - i) * 5),
+        entries: [entry('Incline DB Press', [set(w, 8, 8)])],
+      }),
+    );
+
+  it('will not turn one bad first session into a year of progress', () => {
+    // The exact series that exposed this: a single low outing, then flat. The
+    // app's own fitted trend reports a gain of 0.00 kg; the first version of
+    // this line announced "you are 10.1 kg stronger", because it compared the
+    // first session against the last on the best set of each.
+    const flatAfterABadStart = loadSeries([24, 32, 33, 32, 33, 32, 33, 32]);
+    expect(brief({ day: day(), sessions: flatAfterABadStart }).spark?.kind).not.toBe('gain');
+  });
+
+  it('will not read unlucky endpoints on a noisy lift as a gain', () => {
+    // Same mean at both ends, wide scatter. First-vs-last claimed 10.1 kg and
+    // 15.2 kg on these two; the significance test rejects both.
+    for (const loads of [
+      [28, 36, 30, 34, 29, 35, 30, 36],
+      [26, 38, 27, 37, 28, 36, 27, 38],
+    ]) {
+      expect(brief({ day: day(), sessions: loadSeries(loads) }).spark?.kind, loads.join(',')).not.toBe('gain');
+    }
+  });
+
+  it('still reports a gain that is actually there', () => {
+    // A clean climb has to survive the stricter test, or the rule is useless.
+    const climbing = loadSeries([25, 27.5, 30, 32.5, 35, 37.5]);
+    const s = brief({ day: day(), sessions: climbing }).spark!;
+    expect(s.kind).toBe('gain');
+    expect(s.detail).toMatch(/fitted trend/);
   });
 
   it('counts down the last sessions of the week', () => {

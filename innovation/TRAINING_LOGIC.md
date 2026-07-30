@@ -672,7 +672,7 @@ invisible to it.
 | --- | --- | --- | --- |
 | 10 | Readiness | CO2 well below your own baseline, or well above | The reading is over 36h old, or missing |
 | 16 | Rating — push it | ≥4★ mean and ≥1 RPE under target | Fewer than 4 rated sets across 2 sessions |
-| 18/20 | Load | Last top set ≥1.5 RPE off target | No target, no logged RPE, or the day was marked rough |
+| 18/20 | Load | Last top set ≥1.5 RPE off target, and the outing before it does not contradict | No target, no logged RPE, the day was marked rough, or the previous outing was off target the other way |
 | 22 | Rating — do not load it | ≤2.5★ mean and ≥60% of sets ≤2★ | As above |
 | 26 | Restart | The last outing of this day was ended early or marked rough | It finished normally |
 | 30/32 | Volume | A muscle this day trains is over MRV or under MEV | The volume report is provisional |
@@ -683,6 +683,23 @@ invisible to it.
 
 Readiness sorts above load on purpose: what weight to put on the bar is the wrong
 question if today is a day to trim the session.
+
+### The permission to ask for more
+
+The first version of this shipped a contradiction, visible on one screen:
+
+> ① Autoregulate today — **hold your top sets a point below target** and drop the last set of each accessory.
+> ② Incline DB Press has room — **go up.**
+> ③ **Take every optional set** on chest today.
+
+Each cue was true alone; together they left the reader with no instruction. A veto
+already existed for notes and had simply never been extended to readiness, the
+other input that can overrule a number.
+
+So every rule that would add work — more weight, more sets — now asks permission
+first, and a readiness verdict of `under` refuses it. Cues that *reduce* work
+always pass: they agree with autoregulating rather than fighting it, so an
+overshoot is still reported on a low-readiness day.
 
 ### The motivational half
 
@@ -699,8 +716,14 @@ specific number the lifter earned beats any sentence the app could compose.
 So the "spark" is ranked, and each rung quotes something real:
 
 1. **A measured gain on a lift you are about to do** — "6kg stronger on Incline
-   DB Press than when you started it", over a span, above the same 2.5 kg bar the
-   rest of the app uses for a real change.
+   DB Press than when you started it", above the same 2.5 kg bar the rest of the
+   app uses for a real change, and **through the same fitted trend and
+   significance test**. The first version read the first session against the last
+   on `bestE1RM`: two endpoints of a noisy series, the least robust estimator
+   available. On a lifter whose loads went 24, 32, 33, 32, 33, 32, 33, 32 — one
+   bad first session, then flat — `fitTrend` reports a gain of **0.00 kg** and
+   that line announced **"you are 10.1 kg stronger"**. Congratulating someone for
+   a gain they did not make is worse than the platitude it replaced.
 2. **Proximity to finishing the week** — Kivetz et al. (948 coffee cards)
    measured effort accelerating as a goal comes into view.
 3. **Turning up** — sessions in the last four weeks. Not a streak: a streak
@@ -716,6 +739,10 @@ There is no fifth rung. "Let's go, champ" is not motivation, it is furniture.
 - *Three cues.* Arbitrary. Fewer risks dropping something that mattered; more
   risks the whole card going unread.
 - *One cue per kind.* Two lifts can both be badly rated and only one is named.
+- *A single outing is allowed to speak.* The previous one only has to not
+  contradict, rather than actively agree. One outing is genuinely what happened
+  last time, so silence would throw away the most recent evidence there is — but
+  it does mean a lift met once can set the opening weight.
 - *The rating thresholds (≤2.5★ mean, ≥60% poor, 4 sets, 2 sessions).* Judgement,
   not measurement — there is no ground truth for what a star means, and the
   numbers were picked to be conservative rather than fitted.

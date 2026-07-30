@@ -42,7 +42,10 @@ import { recoveryReadiness } from '../recovery';
 import { analyzeVolume, classifyExercise, isPlaceholderExercise, MUSCLE_LABEL } from '../volume';
 import type { Muscle } from '../volume';
 import { liftReturns } from './returns';
-import { sessionPoints } from './strength';
+import { learnedLoadHint } from '../progression';
+import { buildLoadModel } from './loadModel';
+import { equipmentOf, loadStep } from './equipment';
+import { sessionPoints, fitTrend, MIN_SESSIONS_FOR_VERDICT } from './strength';
 import { noteForExercise } from './recall';
 
 const DAY_MS = 86_400_000;
@@ -250,26 +253,53 @@ function loadCue(
   unit: WeightUnit,
   now: Date,
   note: LiftNote | null,
+  permission: Permission,
 ): RecallCue | null {
   const target = lift.targetRpe;
   if (target == null) return null;
 
-  const history = recentSets(sessions, lift.name, now);
   // A rough day makes everything read heavy; it says nothing about the load.
-  const last = history.find((h) => !h.roughDay);
+  const history = recentSets(sessions, lift.name, now).filter((h) => !h.roughDay);
+
+  /** The heaviest set of an outing that carries an RPE — the one the
+   *  prescription is actually about. Back-off sets are lighter and easier by
+   *  design, and judging the load on them would tell everyone to add weight
+   *  after every session. */
+  const topOf = (h: (typeof history)[number]) => {
+    const rated = h.sets.filter((s) => num(s.rpe) != null);
+    if (!rated.length) return null;
+    return rated.reduce((a, b) => ((num(b.weight) ?? 0) > (num(a.weight) ?? 0) ? b : a));
+  };
+
+  const last = history.find((h) => topOf(h) != null);
   if (!last) return null;
+  const top = topOf(last)!;
 
-  const rated = last.sets.filter((s) => num(s.rpe) != null);
-  if (!rated.length) return null;
-
-  const top = rated.reduce((a, b) => ((num(b.weight) ?? 0) > (num(a.weight) ?? 0) ? b : a));
   const rpe = num(top.rpe)!;
   const weight = num(top.weight)!;
   const reps = num(top.reps)!;
   const gap = round1(rpe - target);
+
+  // One session is not a pattern, and this rule used to act on exactly one —
+  // while the rating rule next door demanded two sessions and four sets. An
+  // unflagged bad day could therefore flip the opening weight on its own.
+  //
+  // The previous outing does not have to AGREE, but it must not contradict:
+  // RPE 10 last time and RPE 6 the time before is not a lift that has got
+  // heavier, it is one bad session. A single outing still speaks, because it is
+  // the only evidence there is and it is genuinely what happened last time.
+  const prior = history.slice(history.indexOf(last) + 1).find((h) => topOf(h) != null);
+  const priorTop = prior ? topOf(prior)! : null;
+  const priorGap = priorTop ? round1(num(priorTop.rpe)! - target) : null;
+  const contradicted =
+    priorGap != null && ((gap >= RPE_GAP && priorGap <= -RPE_GAP) || (gap <= -RPE_GAP && priorGap >= RPE_GAP));
+  if (contradicted) return null;
+
+  const agrees = priorGap != null && Math.sign(priorGap) === Math.sign(gap) && Math.abs(priorGap) >= RPE_GAP;
   const days = Math.max(0, Math.round((now.getTime() - last.t) / DAY_MS));
   const ago = days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
-  const evidence = `Last time, ${ago}: ${weight}${unit} × ${reps} @ RPE ${rpe}. The sheet asks for RPE ${target}.`;
+  const when = agrees ? `Both of your last two outings, most recently ${ago}` : `Last time, ${ago}`;
+  const evidence = `${when}: ${weight}${unit} × ${reps} @ RPE ${rpe}. The sheet asks for RPE ${target}.`;
 
   if (gap >= RPE_GAP) {
     // A note about form going corroborates the overshoot and sharpens it: the
@@ -287,16 +317,42 @@ function loadCue(
     };
   }
   if (gap <= -RPE_GAP) {
-    // The RPE gap says there is room. Your own note says the lift hurt, or that
-    // you did not finish the set. The note wins — `noteCue` carries the lift
-    // instead, and this stays quiet rather than arguing with it on the same card.
-    if (blocksLoading(note)) return null;
+    // The RPE gap says there is room. Something else may disagree: your own note
+    // saying the lift hurt, or a readiness reading saying today is a day to trim.
+    // Either outranks the gap, and this stays quiet rather than arguing with the
+    // cue above it on the same card.
+    if (!mayAddLoad(permission, note)) return null;
+
+    // "Go up" was the vaguest instruction in the brief, and needlessly so: the
+    // logger already computes the actual number from this lifter's own
+    // load-per-RPE curve — but only AFTER a set is logged, by which point the
+    // weight has been chosen. Same function, same rounding to what the equipment
+    // can actually add, moved to before the first set.
+    const step = loadStep(equipmentOf(lift.name), unit);
+    const hint = learnedLoadHint(
+      top.weight,
+      top.rpe,
+      String(target),
+      lift.reps,
+      top.reps,
+      buildLoadModel(sessions, lift.name, now.getTime()),
+      step,
+    );
+    const suggestion =
+      hint && hint.kind === 'weight' && hint.suggested > weight
+        ? ` Try ${hint.suggested}${unit}${hint.basis === 'personal' ? ` — that is your own ${round1(hint.kgPerRpe ?? 0)}${unit} per RPE point` : ''}.`
+        : hint && hint.kind === 'more-reps'
+          ? ` The smallest jump here is ${step}${unit}, which is ${hint.stepPct}% — push past ${hint.targetReps ?? reps} reps at ${weight}${unit} instead.`
+          : '';
+
     return {
       id: `load-light-${lift.name}`,
       kind: 'load',
       priority: 18,
       exercise: lift.name,
-      headline: `${lift.name} has room — go up. You finished ${Math.abs(gap)} of a point under target.`,
+      headline: suggestion
+        ? `${lift.name} has room.${suggestion}`
+        : `${lift.name} has room — go up. You finished ${Math.abs(gap)} of a point under target.`,
       evidence,
       basis:
         'An RPE below the prescription means reps were left in the tank the block did not intend to leave. This is the free progress.',
@@ -371,6 +427,7 @@ function ratingCue(
   subs: Map<string, string[]>,
   now: Date,
   note: LiftNote | null,
+  permission: Permission,
 ): RecallCue | null {
   const read = readRatings(sessions, lift.name, now);
   if (!read) return null;
@@ -399,10 +456,10 @@ function ratingCue(
     lift.targetRpe != null &&
     read.meanRpe != null &&
     read.meanRpe <= lift.targetRpe - 1 &&
-    // Same veto as the load cue. Stars and RPE both say push; the note says the
-    // lift hurt or the set was not finished, and the note is the only one of the
-    // three that knows something the numbers cannot show.
-    !blocksLoading(note)
+    // Same veto as the load cue: stars and RPE both say push, but a note about
+    // pain, or a readiness reading under your baseline, knows something neither
+    // of them can see.
+    mayAddLoad(permission, note)
   ) {
     return {
       id: `rating-easy-${lift.name}`,
@@ -437,6 +494,7 @@ function volumeCue(
   sessions: WorkoutSession[],
   program: WorkoutProgram | null | undefined,
   now: Date,
+  permission: Permission,
 ): RecallCue | null {
   const report = analyzeVolume(sessions, program, now);
   if (!report.hasData || report.provisional) return null;
@@ -463,7 +521,12 @@ function volumeCue(
     };
   }
 
-  const under = mine.find((m) => m.status === 'below' || m.status === 'untrained');
+  // Telling someone to take every optional set on a day the readiness cue has
+  // just told them to trim is the contradiction this whole permission exists for.
+  // The shortfall is real and it will still be there next week.
+  const under = permission.addWork
+    ? mine.find((m) => m.status === 'below' || m.status === 'untrained')
+    : undefined;
   if (under) {
     return {
       id: `volume-under-${under.muscle}`,
@@ -617,8 +680,29 @@ function noteFor(
 }
 
 /** A note that must stop the engine recommending more weight on that lift. */
-const blocksLoading = (n: LiftNote | null): boolean =>
+const noteBlocksLoading = (n: LiftNote | null): boolean =>
   !!n && (n.signals.includes('pain') || n.signals.includes('failure'));
+
+/**
+ * Whether the brief is allowed to ask for MORE today — more weight, more sets.
+ *
+ * The bug this fixes was visible on one screen: "hold your top sets a point
+ * below target and drop the last set of each accessory", then "Incline DB Press
+ * has room — go up", then "take every optional set on chest". Three cues, all
+ * true in isolation, and the reader is left with no instruction at all.
+ *
+ * A veto existed for notes and was never extended to readiness, which is the
+ * other input that can overrule a number. So both live here now, and every rule
+ * that would add work asks first. Cues that REDUCE work are always allowed
+ * through: they agree with autoregulating rather than fighting it.
+ */
+interface Permission {
+  /** False when recovery is down — trimming and adding cannot both be today's plan. */
+  addWork: boolean;
+}
+
+const mayAddLoad = (p: Permission, note: LiftNote | null): boolean =>
+  p.addWork && !noteBlocksLoading(note);
 
 function noteCue(
   day: ProgramDay,
@@ -821,20 +905,31 @@ function buildSpark(
 
   // 1. A measured gain on something you are about to do. The strongest version:
   //    it is specific, it is yours, and it is about to be tested again.
+  //
+  //    It has to clear the SAME bar as the returns ledger, and originally it did
+  //    not: this read the first session against the last on `bestE1RM`, which is
+  //    two endpoints of a noisy series and the least robust estimator available.
+  //    Measured on a lifter whose loads went 24, 32, 33, 32, 33, 32, 33, 32 —
+  //    one bad first session and then flat — `fitTrend` reports a gain of
+  //    **0.00 kg**, and this line announced "you are 10.1 kg stronger". A
+  //    motivational message congratulating someone for a gain they did not make
+  //    is worse than the platitude it was meant to replace. So the fit and its
+  //    significance test decide, exactly as they do everywhere else in here.
   let best: { name: string; gain: number; weeks: number } | null = null;
   for (const l of lifts) {
     const pts = sessionPoints(sessions ?? [], l.name);
-    if (pts.length < 3) continue;
-    const gain = pts[pts.length - 1].bestE1RM - pts[0].bestE1RM;
-    const weeks = Math.round((pts[pts.length - 1].t - pts[0].t) / (7 * DAY_MS));
-    if (gain < MIN_SPARK_GAIN || weeks < 2) continue;
-    if (!best || gain > best.gain) best = { name: l.name, gain, weeks };
+    if (pts.length < MIN_SESSIONS_FOR_VERDICT) continue;
+    const trend = fitTrend(pts);
+    if (!trend?.real || trend.gain < MIN_SPARK_GAIN) continue;
+    const weeks = Math.round(trend.spanDays / 7);
+    if (weeks < 2) continue;
+    if (!best || trend.gain > best.gain) best = { name: l.name, gain: trend.gain, weeks };
   }
   if (best) {
     return {
       kind: 'gain',
       headline: `You are ${Math.round(best.gain * 10) / 10}${unit} stronger on ${best.name} than when you started it.`,
-      detail: `Estimated 1RM, over ${best.weeks} weeks. You are about to train it again.`,
+      detail: `Estimated 1RM from a fitted trend, over ${best.weeks} weeks — not a lucky session against an unlucky one. You are about to train it again.`,
     };
   }
 
@@ -966,10 +1061,15 @@ export function codeRecall(input: RecallInput): RecallBrief {
       for (const e of d?.exercises ?? [])
         if (e?.name && e.substitutions?.length && !subs.has(e.name)) subs.set(e.name, e.substitutions);
 
+  // Readiness is read once and used twice: as a cue in its own right, and as the
+  // permission the add-work rules have to ask for.
+  const readiness = readinessCue(recovery, now);
+  const permission: Permission = { addWork: readiness?.id !== 'readiness-under' };
+
   const candidates: (RecallCue | null)[] = [
-    readinessCue(recovery, now),
+    readiness,
     restartCue(day, sessions, now),
-    volumeCue(day, sessions, program, now),
+    volumeCue(day, sessions, program, now, permission),
     orderCue(day, sessions, program, now),
     noteCue(day, sessions, noteRecallDays, now),
     calibrationCue(sessions, now),
@@ -982,8 +1082,8 @@ export function codeRecall(input: RecallInput): RecallBrief {
   // gap and the star ratings both say.
   for (const lift of liftsOf(day)) {
     const note = noteFor(sessions, lift.name, noteRecallDays, now);
-    candidates.push(loadCue(lift, sessions, unit, now, note));
-    candidates.push(ratingCue(lift, sessions, subs, now, note));
+    candidates.push(loadCue(lift, sessions, unit, now, note, permission));
+    candidates.push(ratingCue(lift, sessions, subs, now, note, permission));
   }
 
   const sorted = candidates

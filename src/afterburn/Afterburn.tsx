@@ -1352,6 +1352,15 @@ export default function Afterburn() {
   const showLogger = !!draft && !minimized;
   const showTabs = !draft || minimized;
 
+  // The day the in-progress workout belongs to, so the logger can carry the same
+  // brief the Workout tab showed before Start was tapped.
+  const draftDay = useMemo(() => {
+    if (!draft) return null;
+    const p = useAfterburn.getState().program;
+    const all = [...p.weeks.flatMap((w) => w.days ?? []), ...(p.custom ?? [])];
+    return all.find((d) => d.id === draft.dayId) ?? null;
+  }, [draft]);
+
   // The morning CO2 banner asks to be taken straight to the test. Without this
   // the button switched workspace and dropped you on whatever tab you left
   // open, which is exactly the friction the reminder exists to remove.
@@ -1492,7 +1501,12 @@ export default function Afterburn() {
 
         <main className="mx-auto max-w-2xl px-4 py-4">
           {showLogger ? (
-            <Logger onFinish={finishWorkout} onBack={() => setMinimized(true)} />
+            <div className="space-y-3">
+              {/* The brief has to survive the Start button. Collapsed to one
+                  line here so the sets stay at the top of the screen. */}
+              <CodeRecall day={draftDay} compact />
+              <Logger onFinish={finishWorkout} onBack={() => setMinimized(true)} />
+            </div>
           ) : (
             <AnimatePresence mode="wait">
               <motion.div

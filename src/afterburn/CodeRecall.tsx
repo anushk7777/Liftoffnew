@@ -54,12 +54,32 @@ function Cue({ cue, index }: { cue: RecallCue; index: number }) {
   );
 }
 
-export default function CodeRecall({ day }: { day: ProgramDay | null | undefined }) {
+/**
+ * `compact` is for inside the logger.
+ *
+ * The brief used to be replaced by the logger the moment you tapped Start —
+ * you read "open Incline DB Press lighter", started the workout, and the
+ * instruction was gone from the screen at exactly the point you were choosing
+ * the weight. Minimising the draft brought it back, which nobody was ever going
+ * to discover.
+ *
+ * So the logger carries a one-line version: the top cue, tappable to open the
+ * whole brief. Collapsed by default, because the logger's job is the set in
+ * front of you and a three-cue card at the top would push it down the screen.
+ */
+export default function CodeRecall({
+  day,
+  compact = false,
+}: {
+  day: ProgramDay | null | undefined;
+  compact?: boolean;
+}) {
   const sessions = useAfterburn((s) => s.sessions);
   const program = useAfterburn((s) => s.program);
   const recovery = useAfterburn((s) => s.recovery);
   const noteRecallDays = useAfterburn((s) => s.noteRecallDays);
   const rm = useReducedMotion();
+  const [expanded, setExpanded] = useState(false);
 
   // Re-derived only when the inputs change. The engine runs several trend fits,
   // and this sits on a screen that re-renders on every week/day interaction.
@@ -80,6 +100,28 @@ export default function CodeRecall({ day }: { day: ProgramDay | null | undefined
   // outcome than a padded one, and the card simply is not there.
   if (!brief.cues.length && !brief.spark) return null;
 
+  // In the logger, start collapsed to a single line. The spark is deliberately
+  // left out of the collapsed state: mid-workout the instructions are what
+  // matter, and there is nothing to be motivated into — you are already here.
+  if (compact && !expanded) {
+    if (!brief.cues.length) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        aria-expanded={false}
+        className="w-full flex items-center gap-2.5 rounded-xl border border-border bg-elevated px-3 py-2.5 min-h-[44px] text-left hover:border-ember/40 transition-colors"
+      >
+        <Zap className="w-4 h-4 text-ember shrink-0" aria-hidden />
+        <span className="flex-1 min-w-0 text-xs font-medium text-ink truncate">{brief.cues[0].headline}</span>
+        {brief.cues.length > 1 && (
+          <span className="text-[11px] font-semibold text-ink-subtle shrink-0">+{brief.cues.length - 1}</span>
+        )}
+        <ChevronRight className="w-4 h-4 text-ink-muted shrink-0" aria-hidden />
+      </button>
+    );
+  }
+
   return (
     <motion.section
       initial={rm ? false : { opacity: 0, y: 8 }}
@@ -93,8 +135,18 @@ export default function CodeRecall({ day }: { day: ProgramDay | null | undefined
           <Zap className="w-3.5 h-3.5 text-ember" />
           Code Recall
         </h2>
-        {brief.dayName && (
-          <span className="text-[11px] font-medium text-ink-subtle truncate">{brief.dayName}</span>
+        {compact ? (
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="text-[11px] font-semibold text-ink-muted hover:text-ink min-h-[40px] -my-2 px-1"
+          >
+            Hide
+          </button>
+        ) : (
+          brief.dayName && (
+            <span className="text-[11px] font-medium text-ink-subtle truncate">{brief.dayName}</span>
+          )
         )}
       </div>
 
@@ -116,12 +168,21 @@ export default function CodeRecall({ day }: { day: ProgramDay | null | undefined
         </div>
       )}
 
-      {/* Said plainly rather than dressed up: with no history behind it, the
-          cues above are the sheet's own instructions, not analysis. */}
+      {/* Said plainly rather than dressed up. With no history the cues above are
+          the sheet's own instructions, not analysis — and with a handful of
+          sessions they are real but thin, which the wording alone would not
+          convey. `depth` was computed from the start and only the first case was
+          ever surfaced. */}
       {brief.depth === 'none' && (
         <p className="text-[11px] text-ink-subtle leading-relaxed mt-3">
           Nothing logged yet, so this is reading your program rather than your training. It gets
           sharper with every session you record.
+        </p>
+      )}
+      {brief.depth === 'thin' && brief.cues.length > 0 && (
+        <p className="text-[11px] text-ink-subtle leading-relaxed mt-3">
+          Built on only a few logged sessions — treat these as a starting point rather than a
+          verdict.
         </p>
       )}
     </motion.section>
