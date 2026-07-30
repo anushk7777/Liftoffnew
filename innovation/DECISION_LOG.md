@@ -1029,11 +1029,153 @@ all once the test is logged.
 - **iOS delivers web push only to a PWA installed to the Home Screen.** In a
   plain Safari tab there is no push at all and the in-app nudge is the only path.
 
+## 13. Code Recall — putting the engine in front of the session
+
+Every engine in this log reports on training that is already over. The volume
+card, the returns ledger, the block report: all retrospective, none of it in
+front of the lifter at the one moment it could change what they do.
+
+`codeRecall` in `innovation/codeRecall.ts`, drawn at the top of the Workout tab.
+
+### 13.1 The signal that had never been read
+
+Every logged set carries a 1-5 star `rating`. Grepping for who consumed it found
+exactly two places — the widget that writes it, and the History row that prints
+it back. **Nothing had ever analysed it.** It had been collected for months and
+thrown away.
+
+It is the only subjective channel separate from RPE, and that separation is what
+makes it worth having. RPE says how hard a set was; the rating says how well it
+went. They come apart in both directions and each direction is a different
+instruction — and one of them is the opposite of what a load-only engine would
+say. A lift at the prescribed RPE that keeps rating one star is an execution
+problem: adding weight is the single thing that cannot help it, and adding weight
+is precisely what the RPE gap alone would have recommended.
+
+Thresholds (≤2.5★ mean, ≥60% of sets ≤2★, over ≥4 sets and ≥2 sessions) are
+judgement, not measurement. There is no ground truth for what a star means, so
+they were set conservatively — the cost of a missed cue is nothing, and the cost
+of a wrong one is that every other cue stops being believed.
+
+### 13.2 Refusing is the feature
+
+Half of `codeRecall.test.ts` asserts silence. Each rule has an explicit refusal:
+a readiness reading over 36 hours old, fewer than four rated sets, no target RPE
+on the sheet, a day the lifter marked rough, a provisional volume report, an
+expired note.
+
+The reasoning: three cues appear every session whether or not there is anything
+to say, so any rule willing to fire on thin evidence will fire *often*, and the
+lifter learns to skip the card. One wrong cue costs more than ten missing ones.
+
+Six mutations were introduced to check the refusals have teeth. Each was caught
+by exactly the test that should have caught it:
+
+| Mutation | Caught by |
+| --- | --- |
+| readiness staleness check removed | *refuses to quote a stale reading* |
+| unrated sets counted as zero stars | *ignores unrated sets rather than counting them as zero stars* |
+| rough days no longer skipped for the load cue | *ignores a day the lifter marked rough* |
+| future-dated sessions allowed through | *reads nothing from the future* |
+| one session allowed to be a rating "pattern" | *needs a pattern, not one bad day* |
+| the four-set minimum relaxed to two | *needs a pattern, not one bad day* |
+| the note veto on add-load cues removed | *vetoes the load cue on a lift whose note did not win the slot* |
+| the pain-negation guard removed | *does not read a clean bill of health as an injury* |
+
+The last two initially both survived: the original test could not tell the two
+guards apart, because its fixture failed the set count and the session count at
+the same time. A case with four poor sets in a **single** session separates them.
+
+### 13.3 Two bugs the rules found in the shared history
+
+- **Malformed sessions crashed the brief.** Fuzzing had already found `entries`
+  and `sets` arriving undefined from a restored backup, and every engine
+  downstream (`analyzeVolume`, `liftReturns`, `sessionPoints`) indexes into them
+  without asking. Code Recall is the first thing to touch all of them at once, so
+  it cleans the history at the door — one guard instead of thirty.
+- **A future-dated session was briefed on.** Clock skew or a hand-edited backup
+  could produce a cue about a workout that had not happened. Note recall already
+  refused this; the two must not disagree. Now dropped in the same sanitiser.
+
+### 13.3b Letting the notes steer
+
+Note recall (§7b of TRAINING_LOGIC) resurfaced notes verbatim. That is useful and
+it is not the same as letting them influence anything.
+
+The motivating case: a lift logged at RPE 6, rated five stars, with a note saying
+the shoulder pinched. The RPE gap says add weight. The star ratings say add
+weight. Both are wrong, and no amount of numeric evidence can see why.
+
+Notes are now read for five signals (pain, failure, form, set-up, positive), and
+**pain and failure veto every add-load cue on that lift** — the load rule and the
+rating rule both check it before recommending more weight. A pain note also sorts
+at priority 14, above both.
+
+Two lexicon decisions worth challenging:
+
+- *"Sore", "tight" and "stiff" are deliberately not pain.* They are what people
+  write after every hard session, and including them would veto a load increase
+  almost every time — the most valuable cue in the engine would stop firing.
+- *Negation is guarded in both word orders.* "No pain today" and "shoulder pain
+  free at last" must not read as injuries. This was caught by a test, not by
+  design: the first pass only handled the negation-first form, so the single best
+  note a lifter can write was being treated as the worst.
+
+The veto is not redundant with the one-cue-per-lift rule, though it looks it. A
+brief holds one note cue; when two lifts both carry pain notes, only one gets the
+slot, and without the explicit veto the other would still be offered a load
+increase. That is the case the regression test pins.
+
+### 13.4 Motivation, measured or absent
+
+The brief asked for "something motivational". The honest reading of that is a
+number the lifter earned, not a sentence the app composed.
+
+Amabile and Kramer (~12,000 diary entries, 238 people) found progress in
+meaningful work to be the single largest lifter of motivation, ahead of
+recognition and incentives. Bandura puts mastery experience above every other
+source of self-efficacy. Both say the same thing: quote their own result.
+
+So the spark is a ranked ladder — a measured gain on a lift about to be trained,
+then proximity to finishing the week (Kivetz et al., 948 coffee cards, ~20%
+acceleration near a goal), then sessions completed lately, then — with nothing
+measured yet — an implementation intention (Gollwitzer and Sheeran, 94 tests,
+d = 0.65) telling the lifter the one thing that makes the *next* brief real.
+
+There is deliberately no final rung. If none of those hold, nothing is shown.
+
+### 13.5 A red suite found on the way
+
+Two tests in `src/lib/habits.test.ts` were failing before any of this work
+started, and reproduced with the branch stashed. `streakFromDays` walked back
+from `new Date()` and took no `today` parameter, while the tests compared it
+against a fixed Monday. They passed for a few days and went red on the Thursday.
+
+Fixed the way every other engine here already works: an optional `today`,
+defaulting to now. A regression test reads the same three logged days from four
+vantage points, which also documents the grace-day behaviour in one place.
+
+### 13.6 What is still weak
+
+- **Three cues, one per kind, is arbitrary.** Two lifts can both be badly rated
+  and only one gets named.
+- **The rating thresholds are judgement.** Conservative, but unfitted — there is
+  no data on what a star means to this lifter, or to any lifter.
+- **A finished week gets no brief**, and neither does someone training only
+  custom days: there is no "next in the cycle" to point at.
+- **The order cue assumes exercise order is a choice.** On a fixed sheet, "spend
+  your freshest sets on X" may mean reordering the day, which is a bigger
+  suggestion than one line implies.
+- **Nothing validates the advice against outcomes.** Every other engine here has
+  a backtest; this one has none, because there is no recorded ground truth for
+  "was that the right thing to be told before a session". It is the obvious next
+  piece of work and the honest gap.
+
 
 ## Testing
 
 ```bash
-npm test        # 475 tests, 38 files
+npm test        # 551 tests, 39 files
 ```
 
 Beyond unit tests, each behavioural claim in this log was checked against

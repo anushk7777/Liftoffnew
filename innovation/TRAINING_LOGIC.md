@@ -17,6 +17,7 @@ lifter plans their own deloads.
 | Set-vs-set progress, RPE gap → load | `src/afterburn/progression.ts` |
 | Personal load-per-RPE model | `src/afterburn/innovation/loadModel.ts` |
 | Workout screen wiring | `src/afterburn/Afterburn.tsx` |
+| Pre-session brief (Code Recall) | `src/afterburn/innovation/codeRecall.ts` |
 
 ---
 
@@ -581,6 +582,150 @@ failure" would punish you for leaving the box empty.
 
 ---
 
+## 6. Code Recall — the pre-session brief
+
+Everything above is retrospective. The volume card, the returns ledger, the
+block report — all of it is delivered *after* the training it describes, and none
+of it is in front of you at the one moment it could change what you do: standing
+in the gym doorway about to start.
+
+Code Recall reads the same data and answers one question — *given what actually
+happened, how should I approach THIS session?* — as at most three instructions
+with the numbers that produced them.
+
+`codeRecall` in `innovation/codeRecall.ts`, drawn by `CodeRecall.tsx` at the top
+of the Workout tab.
+
+### The rules it plays by
+
+1. **Every cue is grounded in this lifter's data.** No generic coaching. If the
+   evidence is not there the cue does not appear — an app that always has three
+   tips is an app whose tips mean nothing.
+2. **Nothing is suggested that cannot be acted on in the next hour.** "Improve
+   your sleep" is true and useless at 6pm.
+3. **Three cues, maximum**, one per lift and one per kind. The fourth-best tip is
+   not worth the first three going unread.
+4. **It never modifies the program**, and it does not detect deloads.
+5. **Pure, and takes `now`**, so the whole brief is testable without a clock.
+
+### The signal nobody was reading
+
+Every logged set carries a 1–5 star `rating`, and until now **literally nothing
+in the app read it** — it was written to storage and never looked at again.
+
+It is the only subjective channel separate from RPE, and that separation is what
+makes it worth having. RPE says how *hard* a set was; the rating says how *well*
+it went. The two come apart in both directions, and each direction is a different
+instruction:
+
+| Pattern | What it means | The cue |
+| --- | --- | --- |
+| Poorly rated **at** the prescribed RPE | The load is right and the set still feels wrong | Do not add weight — fix the set-up first, and here are the sheet's own alternatives |
+| Well rated **under** the prescribed RPE | Clean and easy | This is the lift to push today |
+
+The first one matters most. Adding weight is the single thing that cannot help a
+lift that is already hard enough and still rating one star, and it is exactly
+what a load-only engine would tell you to do.
+
+### Notes steer it, they are not just repeated back
+
+A note is the only place the lifter says something the numbers cannot. "Left
+shoulder pinched on the last set" and "seat notch 4, not 5" sit in the same field
+as the load and the RPE, and until now the app only ever handed them back
+verbatim — which misses that some of them should **change** the advice.
+
+The case that matters: a lift logged at RPE 6 with five-star ratings and a note
+saying the shoulder pinched. Every number says add weight. That is the one
+instruction that cannot be right, and it is exactly what an engine reading only
+numbers produces.
+
+So each note is read for signals, and each signal does something:
+
+| Signal | Example | What it does |
+| --- | --- | --- |
+| **pain** | "left knee pain", "tweaked my back", "twinge" | **Vetoes** every add-load cue on that lift, and takes priority 14 — above the load and rating rules |
+| **failure** | "failed rep 8", "had to rack it" | Vetoes add-load; says repeat the weight before building on it |
+| **form** | "form broke", "used momentum", "sloppy" | Corroborates an overshoot — quoted inside the "open lighter" cue rather than competing with it |
+| **setup** | "seat notch 4", "pin 7", "different handle" | Warns the numbers are not comparable until the set-up matches |
+| **positive** | "felt great", "smooth" | Nothing on its own; kept so the lexicon is symmetric and testable |
+
+Two deliberate choices in the lexicon:
+
+- **"Sore", "tight" and "stiff" are NOT pain.** They are what people write after
+  every hard session. Including them would veto a load increase almost every
+  time, and the most valuable cue in the engine would never fire again.
+- **"No pain", "didn't hurt", "pain free" are guarded against**, in both word
+  orders. The worst false positive available is the best note a lifter can write
+  becoming the one that blocks their progress.
+
+The costs are not symmetric, which is why pain gets the benefit of the doubt
+everywhere else: a false positive costs one skipped load increase; a false
+negative tells someone with a sore shoulder to add weight.
+
+This is keyword matching, with the same weakness as the exercise classifier in
+§1b — it reads the words people usually use, and a note phrased another way is
+invisible to it.
+
+### The nine rules, in the order they compete
+
+| Priority | Rule | Fires when | Refuses when |
+| --- | --- | --- | --- |
+| 10 | Readiness | CO2 well below your own baseline, or well above | The reading is over 36h old, or missing |
+| 16 | Rating — push it | ≥4★ mean and ≥1 RPE under target | Fewer than 4 rated sets across 2 sessions |
+| 18/20 | Load | Last top set ≥1.5 RPE off target | No target, no logged RPE, or the day was marked rough |
+| 22 | Rating — do not load it | ≤2.5★ mean and ≥60% of sets ≤2★ | As above |
+| 26 | Restart | The last outing of this day was ended early or marked rough | It finished normally |
+| 30/32 | Volume | A muscle this day trains is over MRV or under MEV | The volume report is provisional |
+| 40 | Order | One of today's lifts is paying and another is flat | Fewer than two lifts have verdicts |
+| 14/19/24/34/50 | Note | You wrote a note on one of today's lifts, inside the window — priority by what it says (pain, missed reps, form, set-up, plain) | The window has expired |
+| 60 | Calibration | Your last 12+ sets are all the same RPE (sd < 0.35) | The ratings vary |
+| 70 | Technique | The sheet prescribes one for a last set | It does not |
+
+Readiness sorts above load on purpose: what weight to put on the bar is the wrong
+question if today is a day to trim the session.
+
+### The motivational half
+
+The user asked for something motivational, and the honest version of that is
+**measured, or absent**.
+
+Amabile and Kramer's diary study (~12,000 daily entries, 238 people) found that
+of every event that lifts motivation, the largest single one is evidence of
+concrete progress in meaningful work — ahead of recognition, incentives and
+encouragement. Bandura's account of self-efficacy puts mastery experience — your
+own past performance — above every other source. Both point the same way: a
+specific number the lifter earned beats any sentence the app could compose.
+
+So the "spark" is ranked, and each rung quotes something real:
+
+1. **A measured gain on a lift you are about to do** — "6kg stronger on Incline
+   DB Press than when you started it", over a span, above the same 2.5 kg bar the
+   rest of the app uses for a real change.
+2. **Proximity to finishing the week** — Kivetz et al. (948 coffee cards)
+   measured effort accelerating as a goal comes into view.
+3. **Turning up** — sessions in the last four weeks. Not a streak: a streak
+   punishes one missed day and this does not.
+4. **Nothing measured yet** → an implementation intention rather than a cheer
+   (Gollwitzer and Sheeran, 94 tests, ~8,000 participants, d = 0.65): "log the
+   RPE on every set today", which is the thing that makes the next brief real.
+
+There is no fifth rung. "Let's go, champ" is not motivation, it is furniture.
+
+### Decisions worth challenging
+
+- *Three cues.* Arbitrary. Fewer risks dropping something that mattered; more
+  risks the whole card going unread.
+- *One cue per kind.* Two lifts can both be badly rated and only one is named.
+- *The rating thresholds (≤2.5★ mean, ≥60% poor, 4 sets, 2 sessions).* Judgement,
+  not measurement — there is no ground truth for what a star means, and the
+  numbers were picked to be conservative rather than fitted.
+- *The brief is for the next unlogged session in the cycle.* A finished week gets
+  no brief, and a lifter using only custom days gets none either, because there
+  is no "next in the cycle" to point at.
+- *Readiness freshness is 36 hours.* Long enough for a reading taken yesterday
+  morning to still count for an evening session; short enough that Tuesday cannot
+  advise Saturday.
+
 ## 7. Two things the app knew but never told you — and getting one of them out
 
 ### 7a. The morning CO2 nudge
@@ -768,7 +913,7 @@ Ordered by how likely they are to matter.
 ## Testing
 
 `src/afterburn/{volume,classify,progression,co2Reminder,deepLink}.test.ts and
-src/afterburn/innovation/{loadModel,equipment,returns,strength,recall,co2Server,co2ServerParity}*.test.ts`
+src/afterburn/innovation/{loadModel,equipment,returns,strength,recall,codeRecall,co2Server,co2ServerParity}*.test.ts`
 — the behavioural claims above are covered, including the 11-day-cycle miscalibration, one rough
 session barely moving the prescription, a sustained real drop still being
 followed, every refusal case, and every exercise name the program can show.
@@ -782,8 +927,16 @@ four slots in a local day. One test hands the browser rule and the server rule
 the same instant and requires identical wording, so the screen and the push can
 never disagree.
 
+Code Recall is tested on its refusals as much as its rules — half of
+`codeRecall.test.ts` asserts that a cue stays silent without evidence, because a
+rule that fires on thin data is worse than no rule: it teaches the lifter to
+ignore the ones that are right. Six mutations were introduced deliberately to
+check those refusals have teeth (drop the readiness staleness check, count
+unrated sets as zero stars, stop ignoring rough days, let future-dated sessions
+through, and relax each of the two rating guards); every one was caught.
+
 ```bash
-npm test        # 475 tests, 38 files
+npm test        # 551 tests, 39 files
 
 # The schedule is timezone logic, so run it somewhere else too:
 TZ=Asia/Kathmandu npm test

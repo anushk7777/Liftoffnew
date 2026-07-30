@@ -6,12 +6,20 @@ export const dayKey = (d: string | Date) => format(new Date(d), 'yyyy-MM-dd');
 // Walk backwards from today over a set of completed day-keys, allowing a single
 // "grace" day (spent, not counted) so one slip doesn't reset the streak.
 // Returns the current streak and whether the grace day is still available.
-export function streakFromDays(days: Set<string>): { streak: number; freezeAvailable: boolean } {
+//
+// `today` is a parameter, defaulting to now, for the same reason every other
+// engine here takes one: without it the answer depends on the day the test runs.
+// Two tests compared this against a fixed date and passed for a week before
+// going red on a Thursday, which is the worst possible way to find out.
+export function streakFromDays(
+  days: Set<string>,
+  today: Date = new Date(),
+): { streak: number; freezeAvailable: boolean } {
   if (days.size === 0) return { streak: 0, freezeAvailable: true };
 
   let streak = 0;
   let freeze = true;
-  const cursor = startOfDay(new Date());
+  const cursor = startOfDay(today);
   // Don't punish today before it's been logged.
   if (!days.has(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1);
 

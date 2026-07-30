@@ -31,6 +31,19 @@ describe('streakFromDays', () => {
     expect(streak).toBe(2);
   });
 
+  it('reads the streak as of a given day, not only today', () => {
+    // Two habit tests compared this against a fixed date, passed for days, and
+    // then went red on a Thursday — because this walked back from the real
+    // clock and nothing could pin it. Same three logged days, four vantage
+    // points, and the whole grace-day behaviour visible in one place.
+    const days = new Set(['2026-07-25', '2026-07-26', '2026-07-27']);
+    const on = (iso: string) => streakFromDays(days, new Date(`${iso}T12:00:00`)).streak;
+    expect(on('2026-07-27')).toBe(3); // logged today
+    expect(on('2026-07-28')).toBe(3); // today not yet logged, and not punished
+    expect(on('2026-07-29')).toBe(3); // one missed day, bridged by the grace day
+    expect(on('2026-07-30')).toBe(0); // two missed — the streak is gone
+  });
+
   it('spends the single grace day to bridge one gap', () => {
     // today + a one-day hole + two more days -> grace bridges the hole
     const days = new Set([keyDaysAgo(0), keyDaysAgo(2), keyDaysAgo(3)]);

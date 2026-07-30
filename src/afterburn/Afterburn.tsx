@@ -17,6 +17,7 @@ import WorkoutIgnition from './WorkoutIgnition';
 import { randomIgnitionPhrase } from './ignition';
 import type { PRHit } from './store';
 import ProgramLibrary from './ProgramLibrary';
+import CodeRecall from './CodeRecall';
 import Progress from './Progress';
 import Coach from './Coach';
 import PlateCalc from './PlateCalc';
@@ -303,6 +304,16 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
   const phase = week?.name.includes('·') ? week.name.split('·').pop()!.trim() : null;
   // Next workout in the async cycle = first day this week not yet logged.
   const nextDay = week?.days.find((d) => !done.has(dayCompletionKey(week.id, d.id)));
+  // The session Code Recall briefs: the one you are mid-way through if there is
+  // one, otherwise the next in the cycle. A finished week has no next session,
+  // and briefing an arbitrary day would be worse than briefing none.
+  const briefDay = useMemo(() => {
+    if (draft) {
+      const all = [...program.weeks.flatMap((w) => w.days ?? []), ...(program.custom ?? [])];
+      return all.find((d) => d.id === draft.dayId) ?? null;
+    }
+    return nextDay ?? null;
+  }, [draft, program, nextDay]);
   // Pinned "primary" workout floats to the top of its list.
   const sortPrimary = (days: ProgramDay[]) => [...days].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
 
@@ -333,6 +344,10 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
         <h1 className="font-display text-2xl font-bold">{program.name}</h1>
         <p className="text-xs text-ink-subtle mt-0.5">Logging in {program.unit} · RPE 1–10</p>
       </div>
+
+      {/* The brief goes above everything the lifter has to scroll past. It is
+          read once, standing up, in the ten seconds before starting. */}
+      <CodeRecall day={briefDay} />
 
       {/* Week selector — only when the program ships scheduled weeks. A fresh
           install has none, so users go straight to "My workouts" below. */}

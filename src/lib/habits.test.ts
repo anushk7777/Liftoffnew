@@ -36,13 +36,13 @@ describe('habitStreak', () => {
       '2026-07-24', '2026-07-27',
     ]);
     // The bug this fixes: the day-by-day walk sees Tuesday as a miss.
-    expect(streakFromDays(days).streak).toBeLessThanOrEqual(2);
+    expect(streakFromDays(days, MON).streak).toBeLessThanOrEqual(2);
     expect(habitStreak(days, mwf, MON)).toBe(12);
   });
 
   it('lets a once-a-week habit build a streak at all', () => {
     const days = new Set(['2026-07-06', '2026-07-13', '2026-07-20', '2026-07-27']);
-    expect(streakFromDays(days).streak).toBe(1);
+    expect(streakFromDays(days, MON).streak).toBe(1);
     expect(habitStreak(days, mondays, MON)).toBe(4);
   });
 
@@ -79,7 +79,7 @@ describe('habitStreak', () => {
 
   it('still behaves like the daily streak for a daily habit', () => {
     const days = new Set(['2026-07-25', '2026-07-26', '2026-07-27']);
-    expect(habitStreak(days, daily, MON)).toBe(streakFromDays(days).streak);
+    expect(habitStreak(days, daily, MON)).toBe(streakFromDays(days, MON).streak);
   });
 });
 
