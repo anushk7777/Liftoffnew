@@ -308,12 +308,20 @@ function ProgramView({ onStart }: { onStart: (fresh?: boolean) => void }) {
   // one, otherwise the next in the cycle. A finished week has no next session,
   // and briefing an arbitrary day would be worse than briefing none.
   const briefDay = useMemo(() => {
-    if (draft) {
-      const all = [...program.weeks.flatMap((w) => w.days ?? []), ...(program.custom ?? [])];
-      return all.find((d) => d.id === draft.dayId) ?? null;
-    }
-    return nextDay ?? null;
-  }, [draft, program, nextDay]);
+    const all = [...program.weeks.flatMap((w) => w.days ?? []), ...(program.custom ?? [])];
+    if (draft) return all.find((d) => d.id === draft.dayId) ?? null;
+    if (nextDay) return nextDay;
+    // Two cases used to fall through here and get no card at all: a week you have
+    // finished, and a program of nothing but custom days — both because there was
+    // no "next in the cycle" to point at. Falling back to the day you most
+    // recently trained is the honest answer, since it is also the one you are
+    // most likely to repeat.
+    const lastTrained = [...sessions]
+      .sort((a, b) => (b.completedAt ?? b.date).localeCompare(a.completedAt ?? a.date))
+      .map((s) => all.find((d) => d.id === s.dayId))
+      .find((d): d is ProgramDay => !!d);
+    return lastTrained ?? all[0] ?? null;
+  }, [draft, program, nextDay, sessions]);
   // Pinned "primary" workout floats to the top of its list.
   const sortPrimary = (days: ProgramDay[]) => [...days].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
 

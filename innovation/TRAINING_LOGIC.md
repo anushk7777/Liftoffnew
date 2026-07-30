@@ -734,6 +734,40 @@ So the "spark" is ranked, and each rung quotes something real:
 
 There is no fifth rung. "Let's go, champ" is not motivation, it is furniture.
 
+### The one tap that makes a backtest possible
+
+Every other engine in here was calibrated against ground truth: the strength
+verdict has a backtest over simulated lifters, the threshold has a holdout, the
+ledger has a comparison against the engine it replaced. Code Recall has none, and
+the reason is worse than an oversight — **nothing anywhere recorded whether a
+pre-session instruction was followed**, so there was no ground truth to fit
+against and no way to reconstruct one after the fact.
+
+Each cue now carries two chips: *Did this* and *Not useful*. One tap writes a row
+keyed on the cue's stable id and the day it briefed — `cueOutcomes` in the store,
+persisted and synced like everything else.
+
+It buys almost nothing today. In a few months it is the only dataset that could
+say which of these nine rules earns its place, and whether following a cue is
+followed by a better session. That is the work this makes possible and does not
+itself do.
+
+- **One row per (cue, day).** Answering again replaces the answer, so a change of
+  mind is not two observations.
+- **The same cue on a different day is its own row** — the calibration rule firing
+  on Push A and again on Pull A is two observations, not one overwritten.
+- **Trimmed to the last 500**, newest kept, so a year of briefs cannot grow the
+  persisted store without bound.
+
+### Which day gets briefed
+
+The day you are about to do: the one you are mid-way through if a draft exists,
+otherwise the next unlogged day in the cycle. Two cases used to fall through and
+get **no card at all** — a week you have finished, and a program of nothing but
+custom days, both because there was no "next in the cycle" to point at. Both now
+fall back to the day you most recently trained, which is also the one you are
+most likely to repeat.
+
 ### Decisions worth challenging
 
 - *Three cues.* Arbitrary. Fewer risks dropping something that mattered; more
@@ -746,9 +780,12 @@ There is no fifth rung. "Let's go, champ" is not motivation, it is furniture.
 - *The rating thresholds (≤2.5★ mean, ≥60% poor, 4 sets, 2 sessions).* Judgement,
   not measurement — there is no ground truth for what a star means, and the
   numbers were picked to be conservative rather than fitted.
-- *The brief is for the next unlogged session in the cycle.* A finished week gets
-  no brief, and a lifter using only custom days gets none either, because there
-  is no "next in the cycle" to point at.
+- *The fallback day is the one most recently trained.* For a finished week that
+  is usually right; for a custom-day program with several days in rotation it is
+  a guess, and there is no way to know which one you are about to do.
+- *The feedback chips ask two different kinds of question.* "Not useful" is
+  answerable before the session; "did this" really only is afterwards, and
+  nothing prompts you to come back and say so.
 - *Readiness freshness is 36 hours.* Long enough for a reading taken yesterday
   morning to still count for an evening session; short enough that Tuesday cannot
   advise Saturday.
@@ -963,7 +1000,7 @@ unrated sets as zero stars, stop ignoring rough days, let future-dated sessions
 through, and relax each of the two rating guards); every one was caught.
 
 ```bash
-npm test        # 551 tests, 39 files
+npm test        # 565 tests, 39 files
 
 # The schedule is timezone logic, so run it somewhere else too:
 TZ=Asia/Kathmandu npm test

@@ -188,8 +188,16 @@ the separation is the point: RPE says how hard a set was, the rating says how
 well it went. A lift that is hard enough and still rates one star is an execution
 problem, and adding weight — the one thing a load-only engine would suggest — is
 the one thing that cannot help. The motivational half is measured or absent;
-there is no rung for "let's go, champ". → `TRAINING_LOGIC.md` §6,
-`DECISION_LOG.md` §13
+there is no rung for "let's go, champ".
+
+A step-back review an hour later found three defects in it, all mine: the card
+could contradict itself ("hold your top sets below target" beside "go up"), the
+motivational line read two endpoints of a noisy series and announced 10.1 kg of
+progress where the app's own fitted trend says 0.00, and the brief was replaced
+by the logger at the exact moment you would act on it. All three fixed, each
+pinned by a regression built from the series that exposed it. Each cue now also
+carries a one-tap verdict — the seed of the ground truth this engine, alone among
+them, had no way to collect. → `TRAINING_LOGIC.md` §6, `DECISION_LOG.md` §13
 
 **"Make sure the model doesn't overfit."**
 It is **not** overfitted to the seeds it was tuned on — five unseen draws
@@ -228,7 +236,7 @@ Full ranked lists live at the end of each document.
 ## Running it
 
 ```bash
-npm test     # 551 tests, 39 files
+npm test     # 565 tests, 39 files
 npm run lint
 npm run build
 ```

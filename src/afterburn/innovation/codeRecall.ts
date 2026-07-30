@@ -110,6 +110,32 @@ export interface RecallBrief {
   depth: 'none' | 'thin' | 'solid';
 }
 
+/**
+ * What the lifter said about a cue.
+ *
+ * Every other engine in Afterburn has a backtest; this one cannot have one,
+ * because nothing anywhere records whether a pre-session instruction was
+ * followed or whether it helped. There is no ground truth to fit against and no
+ * way to manufacture one after the fact.
+ *
+ * So this is the seed of it. One tap per cue, stored against the cue's stable id
+ * and the day it briefed, joinable to whatever session was logged for that day.
+ * It buys nothing today beyond hiding a cue you have answered — and in a few
+ * months it is the only dataset that could tell us which of these nine rules
+ * actually earns its place.
+ */
+export interface CueOutcome {
+  /** The cue's stable id, e.g. `load-light-Incline DB Press`. */
+  cueId: string;
+  kind: CueKind;
+  /** The program day it briefed — the join key to the session that followed. */
+  dayId: string;
+  /** When the lifter answered, ISO. */
+  answeredAt: string;
+  /** `did` = acted on it. `skipped` = read it and chose not to. */
+  verdict: 'did' | 'skipped';
+}
+
 export interface RecallInput {
   /** The session about to be done. */
   day: ProgramDay | null | undefined;

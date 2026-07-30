@@ -1155,6 +1155,45 @@ Fixed the way every other engine here already works: an optional `today`,
 defaulting to now. A regression test reads the same three logged days from four
 vantage points, which also documents the grace-day behaviour in one place.
 
+### 13.7 The zoomed-out review, and the three defects it found
+
+A step-back audit of the feature within the hour of shipping it, done by running
+it rather than reading it. Three defects, all mine, all invisible to the 76 tests
+that had just passed.
+
+**The card contradicted itself.** Under-recovered plus a lift under target
+produced, on one screen: "hold your top sets a point below target and drop the
+last set of each accessory", then "Incline DB Press has room — go up", then "take
+every optional set on chest today". Each true alone; together, no instruction at
+all. A veto existed for notes and had never been extended to readiness — the other
+input that can overrule a number. Every add-work rule now asks permission, and
+`under` refuses it; cues that reduce work still pass, because they agree with
+autoregulating.
+
+**The motivational line celebrated gains that had not happened.** It read the
+first session against the last on `bestE1RM` — two endpoints of a noisy series —
+while §5a of TRAINING_LOGIC refuses to call a gain without Theil-Sen and a
+significance test. On loads of 24, 32, 33, 32, 33, 32, 33, 32 the fit reports
+**0.00 kg** and the line announced **"you are 10.1 kg stronger"**. The most
+embarrassing possible version of the "measured, or absent" principle: measured
+badly, and therefore worse than absent. Now goes through `fitTrend` with
+`real === true` and a four-session floor.
+
+**The brief vanished at the moment it would be acted on.** `showLogger ? Logger :
+ProgramView` — read the cue, tap Start, and the instruction leaves the screen
+exactly as the weight is chosen. Minimising the draft brought it back, which
+nobody would find. The logger now carries a collapsed one-liner.
+
+Also sharpened in the same pass: the load rule acted on a single outing while the
+rating rule next door demanded two sessions and four sets, so the previous outing
+must now at least not contradict; "go up" gained the actual target weight from the
+personal load model that the logger was already computing after the fact; and
+`depth: 'thin'` — computed since the first commit and never surfaced — now says so.
+
+**Checked and found fine:** performance, at 24 ms for a full brief over 150
+sessions and 3,600 sets. Reported rather than optimised, because there was
+nothing to optimise. A perf concern would have been easy to invent and false.
+
 ### 13.6 What is still weak
 
 - **Three cues, one per kind, is arbitrary.** Two lifts can both be badly rated
@@ -1166,16 +1205,21 @@ vantage points, which also documents the grace-day behaviour in one place.
 - **The order cue assumes exercise order is a choice.** On a fixed sheet, "spend
   your freshest sets on X" may mean reordering the day, which is a bigger
   suggestion than one line implies.
-- **Nothing validates the advice against outcomes.** Every other engine here has
-  a backtest; this one has none, because there is no recorded ground truth for
-  "was that the right thing to be told before a session". It is the obvious next
-  piece of work and the honest gap.
+- **Nothing validates the advice against outcomes yet.** Every other engine here
+  has a backtest; this one still has none. What changed is that it is now
+  *possible*: the `cueOutcomes` ledger records whether each cue was followed,
+  keyed so a session can be joined to it. The backtest itself is unwritten, and
+  will stay unwritten until there are months of answers to fit against.
+- **The feedback chips conflate two questions.** "Not useful" is answerable
+  before the session; "did this" really only afterwards, and nothing asks you to
+  come back and say so — so the ledger will be biased towards cues answered in
+  the doorway.
 
 
 ## Testing
 
 ```bash
-npm test        # 551 tests, 39 files
+npm test        # 565 tests, 39 files
 ```
 
 Beyond unit tests, each behavioural claim in this log was checked against

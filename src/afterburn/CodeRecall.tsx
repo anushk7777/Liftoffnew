@@ -16,27 +16,52 @@ import { codeRecall } from './innovation/codeRecall';
 import type { RecallCue } from './innovation/codeRecall';
 import type { ProgramDay } from './types';
 
-/** The reasoning, one tap away. Same pattern the Progress tab uses, so the
- *  gesture is already learned by the time anyone reaches this. */
-function Why({ children }: { children: string }) {
-  const [open, setOpen] = useState(false);
+/**
+ * The two taps that make a backtest possible later.
+ *
+ * Every other engine in Afterburn was calibrated against ground truth. This one
+ * has none: nothing recorded whether a pre-session instruction was followed, so
+ * there is nothing to check the nine rules against and no way to reconstruct it
+ * after the fact. Answering a cue costs one tap and is the only way that dataset
+ * ever comes into existence.
+ *
+ * Kept as text chips at the same weight as "Why" — this is a card read in ten
+ * seconds, and a pair of buttons per cue must not out-shout the instruction.
+ */
+function Verdict({ cue, dayId }: { cue: RecallCue; dayId: string | null }) {
+  const answered = useAfterburn((s) => s.cueOutcomes.find((o) => o.cueId === cue.id && o.dayId === dayId));
+  const record = useAfterburn((s) => s.recordCueOutcome);
+  if (!dayId) return null;
+
+  const chip = (verdict: 'did' | 'skipped', label: string) => (
+    <button
+      type="button"
+      onClick={() => record({ cueId: cue.id, kind: cue.kind, dayId, verdict })}
+      aria-pressed={answered?.verdict === verdict}
+      className={cn(
+        'min-h-[40px] -my-1.5 px-2 rounded-md text-[11px] font-medium transition-colors',
+        answered?.verdict === verdict
+          ? 'bg-ember/15 text-ember'
+          : 'text-ink-muted hover:text-ink',
+      )}
+    >
+      {label}
+    </button>
+  );
+
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex items-center gap-1 min-h-[40px] -my-1.5 text-[11px] font-medium text-ink-muted hover:text-ink transition-colors"
-      >
-        <ChevronRight className={cn('w-3 h-3 transition-transform', open && 'rotate-90')} />
-        Why
-      </button>
-      {open && <p className="text-xs text-ink-muted leading-relaxed mt-1">{children}</p>}
-    </>
+    <div className="flex items-center gap-1">
+      {chip('did', 'Did this')}
+      {chip('skipped', 'Not useful')}
+    </div>
   );
 }
 
-function Cue({ cue, index }: { cue: RecallCue; index: number }) {
+function Cue({ cue, index, dayId }: { cue: RecallCue; index: number; dayId: string | null }) {
+  // The disclosure state lives here rather than in a `Why` component so the
+  // expanded reasoning can sit BELOW the control row instead of becoming a flex
+  // sibling of the verdict chips.
+  const [why, setWhy] = useState(false);
   return (
     <li className="flex gap-3">
       <span
@@ -48,7 +73,19 @@ function Cue({ cue, index }: { cue: RecallCue; index: number }) {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-ink leading-snug">{cue.headline}</p>
         <p className="text-xs text-ink-muted leading-relaxed mt-1">{cue.evidence}</p>
-        <Why>{cue.basis}</Why>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setWhy((v) => !v)}
+            aria-expanded={why}
+            className="flex items-center gap-1 min-h-[40px] -my-1.5 text-[11px] font-medium text-ink-muted hover:text-ink transition-colors"
+          >
+            <ChevronRight className={cn('w-3 h-3 transition-transform', why && 'rotate-90')} />
+            Why
+          </button>
+          <Verdict cue={cue} dayId={dayId} />
+        </div>
+        {why && <p className="text-xs text-ink-muted leading-relaxed mt-1">{cue.basis}</p>}
       </div>
     </li>
   );
@@ -153,7 +190,7 @@ export default function CodeRecall({
       {brief.cues.length > 0 && (
         <ol className="space-y-3.5">
           {brief.cues.map((c, i) => (
-            <Cue key={c.id} cue={c} index={i} />
+            <Cue key={c.id} cue={c} index={i} dayId={day?.id ?? null} />
           ))}
         </ol>
       )}
