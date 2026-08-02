@@ -18,6 +18,7 @@ lifter plans their own deloads.
 | Personal load-per-RPE model | `src/afterburn/innovation/loadModel.ts` |
 | Workout screen wiring | `src/afterburn/Afterburn.tsx` |
 | Pre-session brief (Code Recall) | `src/afterburn/innovation/codeRecall.ts` |
+| What to put on the bar, set by set | `src/afterburn/innovation/prescribe.ts` |
 
 ---
 
@@ -825,6 +826,78 @@ most likely to repeat.
   morning to still count for an evening session; short enough that Tuesday cannot
   advise Saturday.
 
+## 6a. The prescription — what to put on the bar
+
+`prescribe` in `innovation/prescribe.ts`, drawn on each exercise card in the
+logger.
+
+Everything above this line is a **critic**. It reads what you lifted and says
+what it thought — the set verdict, the volume status, the returns ledger, the
+pre-session brief. All of it retrospective, and all of it leaving the one
+decision that actually happens **17 times a session** (this program averages 6.3
+exercises and 17.3 working sets a day) entirely to the lifter.
+
+The load model has been able to answer that question since it was built. It had
+only ever been asked *"was that right?"*, never *"what should I do?"*. Same
+curve, read the other way.
+
+### The ladder, and saying which rung you are on
+
+A number whose provenance you cannot see is a number you cannot argue with, so
+the basis is always shown:
+
+| Rung | When | What it says |
+| --- | --- | --- |
+| `personal` | The lifter's own load-per-RPE curve is confident | "From your own 12 sets: 32.5kg should land near RPE 8 at 10 reps — up 2.5kg on last time." |
+| `repeat` | The rep target was missed at that load | "You got 6 of 10 at 40kg. Same weight — clear the reps before it goes up." |
+| `rule` | Falling back to 3% per RPE point | "Last time came in at RPE 7 against a target of 8. **A rough 3% per point** puts today at 30kg." |
+| `sheet` | Nothing lifted yet | Reps and RPE only, and it says so. |
+
+`repeat` deliberately **outranks the model**. Double progression is the sheet's
+own rule, and the curve cannot see that the reps were missed — it would happily
+suggest going up after a set that was not completed.
+
+**The sheet is read, never rewritten.** Reps and target RPE come from
+`plan.ts` exactly as authored; the last set takes its own `lastSetRpe` when the
+program splits them. This only fills in the weight — the number the sheet
+deliberately leaves blank because it depends on the lifter, not the block.
+
+### The fade nothing had ever measured
+
+Set 3 is not set 1. Everyone knows this and no engine here had ever looked at it:
+how much a given lifter fades across the sets of a given exercise is personal,
+sitting in their own log, and invisible to them.
+
+`dropOff` reads it. Measured on **effort-adjusted load, not raw weight** —
+dropping from 10 reps to 6 at the same weight is a fade too, and a profile built
+on weight alone calls that flat and then prescribes set 3 far too heavy.
+
+- **Median across outings**, so one session cut short cannot define the profile.
+- **Three outings minimum**, otherwise a flat profile is assumed: being wrong
+  flat is a smaller error than being wrong in a direction.
+- **Never rising.** The profile describes fatigue; a later set reading heavier is
+  noise, and prescribing it would contradict the rep target.
+- **Ratios beyond ±25%/35% are discarded** — a set at a third of the first is a
+  swapped exercise or a typo, not fatigue.
+- **Beyond the measured positions the last factor carries**, rather than
+  extrapolating a trend off the end of the data.
+
+### Decisions worth challenging
+
+- *The top of the rep range is the target.* Double progression says load goes up
+  after you clear the range, so that is the number worth aiming at — but a lifter
+  who reads "8-10" as "8 is fine" will find the prescription always slightly hard.
+- *3% per RPE point is a population average*, used whenever the personal curve
+  cannot answer. Stated as one, but still a guess about this lifter.
+- *The prescription hides once you start logging.* By then the call is made and a
+  suggestion for a set in progress is noise. It also means you cannot compare
+  what you did against what was suggested, mid-set.
+- *Nothing yet checks whether the number was any good.* This is the obvious next
+  piece: a prescription is the first thing this app has produced that is
+  **falsifiable at the moment it is given**, and grading it against what was
+  actually lifted would be objective ground truth — better than the self-reported
+  cue taps, and collected automatically.
+
 ## 7. Two things the app knew but never told you — and getting one of them out
 
 ### 7a. The morning CO2 nudge
@@ -1035,7 +1108,7 @@ unrated sets as zero stars, stop ignoring rough days, let future-dated sessions
 through, and relax each of the two rating guards); every one was caught.
 
 ```bash
-npm test        # 565 tests, 39 files
+npm test        # 592 tests, 40 files
 
 # The schedule is timezone logic, so run it somewhere else too:
 TZ=Asia/Kathmandu npm test

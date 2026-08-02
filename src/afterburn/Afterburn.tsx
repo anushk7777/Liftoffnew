@@ -9,6 +9,7 @@ import { setVerdict, ghostLabel, exerciseProgress, learnedLoadHint } from './pro
 import { equipmentOf, loadStep, EQUIPMENT_LABEL } from './innovation/equipment';
 import { noteForExercise, agoLabel } from './innovation/recall';
 import { codeRecall } from './innovation/codeRecall';
+import { prescribe } from './innovation/prescribe';
 import type { RecallCue } from './innovation/codeRecall';
 import { readCo2DeepLink, consumeCo2DeepLink } from './deepLink';
 import { buildLoadModel } from './innovation/loadModel';
@@ -786,6 +787,29 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
   // One brief for the whole session, indexed by lift, so each exercise card can
   // show the cue that is about IT. Computed once here rather than per card: the
   // engine runs several trend fits and there are eight cards on a Push day.
+  // One prescription per lift in the day, computed up front rather than lazily:
+  // the exercise list is known and finite, and a memo that mutates a cache on
+  // demand is a memo whose result depends on call order.
+  const prescriptions = useMemo(() => {
+    const out = new Map<string, ReturnType<typeof prescribe>>();
+    for (const slot of draft.entries) {
+      if (!slot?.name || out.has(slot.name)) continue;
+      out.set(
+        slot.name,
+        prescribe({
+          exercise: slot.name,
+          workingSets: slot.sets.length || 3,
+          reps: slot.target.reps,
+          rpe: slot.target.rpe,
+          lastSetRpe: slot.target.lastSetRpe,
+          sessions,
+          unit,
+        }),
+      );
+    }
+    return out;
+  }, [draft.entries, sessions, unit]);
+
   const cueByLift = useMemo(() => {
     const day = [...program.weeks.flatMap((w) => w.days ?? []), ...(program.custom ?? [])]
       .find((d) => d.id === draft.dayId) ?? null;
@@ -800,7 +824,15 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
     const byLift = new Map<string, RecallCue>();
     // `all` rather than `cues`: a lift crowded out of the headline three still
     // deserves its cue when you are standing in front of it.
-    for (const c of brief.all) if (c.exercise && !byLift.has(c.exercise)) byLift.set(c.exercise, c);
+    //
+    // `technique` is dropped here for the same reason `readiness` is dropped from
+    // the bar above: this card ALREADY prints "Last set: Long-length Partials"
+    // together with the full explanation of what that means, a few rows up.
+    // Repeating it in fewer words is not a reminder, it is clutter — and being
+    // the lowest-priority cue, it only ever appeared when there was nothing
+    // better to say. Caught from a screenshot of the real app.
+    for (const c of brief.all)
+      if (c.exercise && c.kind !== 'technique' && !byLift.has(c.exercise)) byLift.set(c.exercise, c);
     return byLift;
   }, [program, draft.dayId, sessions, recovery, unit, noteRecallDaysForCues]);
 
@@ -903,6 +935,25 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
             if (src) updateSet(exIdx, setIdx, { weight: src.weight, reps: src.reps });
           });
         };
+
+        // What to put on the bar TODAY, rather than what was on it last time.
+        // "Use last" copies history; this is the progression the engine actually
+        // believes in, set by set, including the fade it has measured across
+        // your own sets on this lift.
+        const rx = prescriptions.get(ex.name);
+        const useRx = () => {
+          if (!rx) return;
+          ex.sets.forEach((_, setIdx) => {
+            const s = rx.sets[Math.min(setIdx, rx.sets.length - 1)];
+            if (!s) return;
+            updateSet(exIdx, setIdx, {
+              weight: s.weight == null ? '' : String(s.weight),
+              reps: s.reps == null ? '' : String(s.reps),
+            });
+          });
+        };
+        const rxUsable = !!rx && rx.sets.some((s) => s.weight != null);
+        const anyLogged = ex.sets.some((s) => s.weight || s.reps);
         return (
         <div key={ex.exerciseId} className="card p-4">
           {/* NAME — a picker when the exercise has substitutions or is a weak-point slot */}
@@ -1013,6 +1064,42 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
               <button onClick={prefill} className="btn btn-secondary !py-1 !px-2 text-[11px] shrink-0">
                 Use last
               </button>
+            </div>
+          )}
+
+          {/* The prescription: the actual numbers, before the first rep. Hidden
+              once you have started logging — by then you have made the call, and
+              a suggestion for a set you are already doing is noise. */}
+          {rxUsable && !anyLogged && (
+            <div className="mt-2 rounded-lg border border-ember/30 px-3 py-2" style={{ background: 'var(--ember-soft)' }}>
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-ember">Today</span>
+                <button
+                  onClick={useRx}
+                  className="btn btn-secondary !py-1 !px-2 text-[11px] shrink-0 min-h-[36px]"
+                >
+                  Use these
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink">
+                {rx!.sets.map((s, i) => (
+                  <span key={i} className="tabular-nums">
+                    <span className="text-ink-subtle">{i + 1}.</span>{' '}
+                    <span className="font-semibold">
+                      {s.weight != null ? `${s.weight}${unit}` : '—'}
+                      {s.reps != null ? ` × ${s.reps}` : ''}
+                    </span>
+                    {s.rpe != null && <span className="text-ink-muted"> @{s.rpe}</span>}
+                  </span>
+                ))}
+              </div>
+              <p className="text-[11px] text-ink-muted leading-relaxed mt-1.5">
+                {rx!.why}
+                {rx!.tentative && ' Still learning this lift, so treat it as a starting point.'}
+                {!rx!.drop.assumed && rx!.drop.factors.length > 1 && (
+                  <> Later sets are eased off because that is what your own last {rx!.drop.samples} outings did.</>
+                )}
+              </p>
             </div>
           )}
 
