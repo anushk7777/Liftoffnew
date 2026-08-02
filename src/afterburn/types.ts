@@ -86,6 +86,21 @@ export interface LoggedExercise {
   notes: string;
 }
 
+/** A set as the app PRESCRIBED it, snapshotted when the session started.
+ *
+ *  Recorded rather than recomputed: the model changes over time, so replaying
+ *  today's engine over last month's session would grade a prescription that was
+ *  never actually shown — and would flatter itself every time it improved. */
+export interface PrescribedSet {
+  exercise: string;
+  index: number;
+  weight: number | null;
+  reps: number | null;
+  rpe: number | null;
+  /** Which rung of the ladder produced it, so accuracy can be read per basis. */
+  basis: string;
+}
+
 export interface WorkoutSession {
   id: string;
   dayId: string;
@@ -100,6 +115,9 @@ export interface WorkoutSession {
    *  model — they know before the app can infer it. */
   roughDay?: boolean;
   entries: LoggedExercise[];
+  /** What the app suggested for this session, captured before the first rep.
+   *  Absent on every session logged before prescriptions existed. */
+  prescribed?: PrescribedSet[];
 }
 
 /** A bodyweight check-in for the Progress tab. */
