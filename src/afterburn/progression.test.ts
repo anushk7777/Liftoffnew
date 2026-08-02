@@ -55,10 +55,12 @@ describe('setVerdict', () => {
     expect(v.label).toContain('+5 kg');
   });
 
-  it('stays silent until both sides have a weight and reps', () => {
+  it('stays silent until the CURRENT set has a weight and reps', () => {
     expect(setVerdict(set('80', ''), set('80', '8')).kind).toBe('none');
-    expect(setVerdict(set('80', '8'), undefined).kind).toBe('none');
     expect(setVerdict(undefined, set('80', '8')).kind).toBe('none');
+    // A performed set with no counterpart used to be silent too. It is not
+    // silence-worthy: see 'a set you did not do last time' below.
+    expect(setVerdict(set('80', '8'), undefined).label).toBe('new set');
   });
 
   it('ignores unparseable input rather than guessing', () => {
@@ -101,10 +103,18 @@ describe('exerciseProgress', () => {
     expect(r.pct).toBeCloseTo(25, 0);
   });
 
-  it('only counts positions logged on both sides', () => {
+  it('counts a set added beyond last time, and ignores one not yet done', () => {
+    // This used to assert `{ kind: 'same', pct: 0 }` for the first case — an
+    // extra set reading as "level". A screenshot of the real app showed exactly
+    // that: two sets last time, three this time, and the summary said nothing
+    // had changed.
     const now = [set('80', '8'), set('80', '8')];
     const then = [set('80', '8')]; // no second set last time
-    expect(exerciseProgress(now, then)).toEqual({ kind: 'same', pct: 0 });
+    expect(exerciseProgress(now, then).kind).toBe('up');
+
+    // The other direction is unchanged: a set still to come must not read as a
+    // drop while the lifter is mid-exercise.
+    expect(exerciseProgress([set('80', '8')], [set('80', '8'), set('80', '8')])).toEqual({ kind: 'same', pct: 0 });
   });
 
   it('says nothing with no comparable history', () => {
@@ -254,4 +264,54 @@ describe('loadHint — reps before weight', () => {
     expect(h.kind).toBe('reps');
     expect(h.suggested).toBe(100);
   });
+});
+
+describe('a set you did not do last time', () => {
+  // From a real screenshot: last time was two sets of 40×15@10. This time the
+  // lifter did 40×15@9, 40×15@9, and then a THIRD set of 40×16@8 — more reps at
+  // lower effort than anything before it. Sets 1 and 2 showed green chips and
+  // set 3 showed nothing at all, which reads as "that set did not count".
+  it('is labelled rather than left blank', () => {
+    const v = setVerdict(set('40', '16', '8'), undefined);
+    expect(v.label).toBe('new set');
+    // Neutral: there is genuinely nothing to compare it against, so it must not
+    // be dressed up as progress either.
+    expect(v.kind).toBe('same');
+  });
+
+  it('still says nothing for a set not yet filled in', () => {
+    expect(setVerdict(set('', ''), undefined)).toEqual({ kind: 'none', label: '' });
+    expect(setVerdict(set('40', ''), undefined)).toEqual({ kind: 'none', label: '' });
+  });
+});
+
+describe('exerciseProgress counts a set you added', () => {
+  const s = (w: string, r: string) => set(w, r);
+
+  it('does not report "level" when an extra set was done', () => {
+    // The screenshot case: 2×(40×15) last time, 2×(40×15) + 40×16 this time.
+    // Skipping the unmatched position reported "level" — the opposite of what
+    // happened.
+    const last = [s('40', '15'), s('40', '15')];
+    const now = [s('40', '15'), s('40', '15'), s('40', '16')];
+    const p = exerciseProgress(now, last);
+    expect(p.kind).toBe('up');
+    expect(p.pct).toBeGreaterThan(50);
+  });
+
+  it('does not punish an exercise that is only half logged yet', () => {
+    // Mid-workout, one of three sets in. Counting the missing two would report a
+    // collapse while the lifter is still working.
+    const last = [s('40', '15'), s('40', '15'), s('40', '15')];
+    const now = [s('40', '15')];
+    expect(exerciseProgress(now, last).kind).toBe('same');
+  });
+
+  it('is unchanged when the set counts match', () => {
+    const last = [s('40', '15'), s('40', '15')];
+    expect(exerciseProgress([s('40', '15'), s('40', '15')], last).kind).toBe('same');
+    expect(exerciseProgress([s('45', '15'), s('45', '15')], last).kind).toBe('up');
+    expect(exerciseProgress([s('35', '15'), s('35', '15')], last).kind).toBe('down');
+  });
+
 });

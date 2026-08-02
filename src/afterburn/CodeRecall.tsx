@@ -214,6 +214,7 @@ export default function CodeRecall({
     ? brief.cues.filter((c) => !c.exercise && c.kind !== 'readiness')
     : brief.cues;
 
+
   if (compact && !expanded) {
     if (!sessionCues.length) return null;
     return (

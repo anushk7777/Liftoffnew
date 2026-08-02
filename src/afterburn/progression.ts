@@ -48,7 +48,16 @@ export function setVerdict(
   const lw = num(last?.weight);
   const lr = num(last?.reps);
 
-  // Nothing to say until both sides have a comparable pair.
+  // A set that was performed but has no counterpart is a set you did not do
+  // last time. Returning nothing here left a blank chip under set 3 while sets 1
+  // and 2 showed green ones — which reads as "that set did not count", when in
+  // fact it is the most work you have ever done on the lift. Neutral, because
+  // there is genuinely nothing to compare it against; labelled, because silence
+  // was the wrong answer.
+  if (cw != null && cr != null && (lw == null || lr == null)) {
+    return { kind: 'same', label: 'new set' };
+  }
+  // Nothing to say until the current set has been filled in.
   if (cw == null || cr == null || lw == null || lr == null) return { kind: 'none', label: '' };
 
   const dw = Math.round((cw - lw) * 100) / 100;
@@ -104,7 +113,20 @@ export function exerciseProgress(
     const cr = num(currentSets[i]?.reps);
     const lw = num(lastSets[i]?.weight);
     const lr = num(lastSets[i]?.reps);
-    if (cw == null || cr == null || lw == null || lr == null) continue;
+    if (cw == null || cr == null) continue;
+
+    // An EXTRA set — beyond anything logged last time — is real work and can
+    // only add. Skipping it (the original behaviour) meant adding a third set to
+    // a two-set exercise reported "level", which is the opposite of what
+    // happened. Sets MISSING from this side are still ignored, so an exercise
+    // half logged does not read as a collapse mid-workout.
+    if (lw == null || lr == null) {
+      if (i >= lastSets.length) {
+        cv += cw * cr;
+        pairs++;
+      }
+      continue;
+    }
     cv += cw * cr;
     lv += lw * lr;
     pairs++;

@@ -824,7 +824,15 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
     const byLift = new Map<string, RecallCue>();
     // `all` rather than `cues`: a lift crowded out of the headline three still
     // deserves its cue when you are standing in front of it.
-    for (const c of brief.all) if (c.exercise && !byLift.has(c.exercise)) byLift.set(c.exercise, c);
+    //
+    // `technique` is dropped here for the same reason `readiness` is dropped from
+    // the bar above: this card ALREADY prints "Last set: Long-length Partials"
+    // together with the full explanation of what that means, a few rows up.
+    // Repeating it in fewer words is not a reminder, it is clutter — and being
+    // the lowest-priority cue, it only ever appeared when there was nothing
+    // better to say. Caught from a screenshot of the real app.
+    for (const c of brief.all)
+      if (c.exercise && c.kind !== 'technique' && !byLift.has(c.exercise)) byLift.set(c.exercise, c);
     return byLift;
   }, [program, draft.dayId, sessions, recovery, unit, noteRecallDaysForCues]);
 
