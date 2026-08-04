@@ -1,16 +1,27 @@
 name: Daily Health Snapshot
 
 # Runs every morning and records one row of real numbers — bundle size, test
-# count, dependency drift — in docs/HEALTH.md, committing only when something
-# actually moved.
+# count, dependency drift — in docs/HEALTH.md.
+#
+# One row per date means one commit per day, so the contribution graph stays
+# green off genuine measurement rather than off empty commits. That distinction
+# is the whole design: an empty daily commit would be a lie told to a graph, and
+# anyone reading the history later — including you — would have to work out
+# which commits meant anything.
 #
 # It commits straight to main rather than opening a PR: this is an append-only
 # measurement, not a change to the app, and a PR a day would be noise.
 on:
   schedule:
-    # 06:15 UTC. Deliberately not on the hour — GitHub's scheduler is busiest at
-    # :00 and delays runs by up to an hour there.
+    # Twice, deliberately. GitHub silently DROPS scheduled runs when its
+    # scheduler is busy — there is no retry and no notification — so a
+    # once-a-day job loses days at random. The evening run is a second chance at
+    # the same date, and is a no-op if the morning one already recorded it.
+    #
+    # Not on the hour: the scheduler is busiest at :00 and delays runs there by
+    # up to an hour.
     - cron: '15 6 * * *'
+    - cron: '15 18 * * *'
   workflow_dispatch:
 
 permissions:
@@ -34,23 +45,56 @@ jobs:
 
       - run: npm ci
 
-      # The bundle numbers come from a real production build, so this also acts
-      # as a daily check that main still builds at all.
-      - run: npm run build
+      # Non-fatal on purpose. A broken main is exactly the day you most want a
+      # row — the snapshot records it as a bundle of "?" rather than skipping
+      # the measurement and leaving a hole where the evidence should be.
+      - name: Build
+        continue-on-error: true
+        run: npm run build
 
       - name: Measure
         run: node scripts/health.mjs
 
-      - name: Commit if anything moved
+      - name: Record the day
+        env:
+          # AUTHORED AS THE REPO OWNER, and this is the line that decides whether
+          # any of this works. GitHub counts a contribution against the commit's
+          # AUTHOR email, and only when that email belongs to the account. Left
+          # as github-actions[bot] — which the first version of this was — the
+          # job runs faithfully every morning, commits every morning, and the
+          # graph stays grey, because every one of those commits belongs to the
+          # bot. The committer stays the bot: honest about what actually ran it.
+          AUTHOR: Anushk Dua <153355489+anushk7777@users.noreply.github.com>
         run: |
+          set -euo pipefail
+
           git config user.name  'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add docs/HEALTH.md
-          # `--quiet --exit-code` is the whole point: no change, no commit. A
-          # scheduled job that commits regardless would be recording nothing.
+
+          # No change, no commit. A new date is always a new row, so the normal
+          # daily path always has something to record; this only stops a re-run
+          # on the same date from committing the same measurement twice.
           if git diff --cached --quiet --exit-code; then
-            echo 'Nothing moved today — no commit.'
-          else
-            git commit -m 'chore: daily health snapshot'
-            git push
+            echo 'Already recorded today, and nothing moved — no commit.'
+            exit 0
           fi
+
+          git commit --author="$AUTHOR" -m 'chore: daily health snapshot'
+
+          # main can move between checkout and push. Rebase and retry rather
+          # than dropping the day's measurement over a race with another job.
+          for attempt in 1 2 3; do
+            if git push; then
+              git log -1 --format='recorded: %h  author %an <%ae>  committer %cn'
+              exit 0
+            fi
+            echo "push rejected (attempt $attempt) — rebasing onto the current main"
+            git pull --rebase origin main || {
+              echo '::error::Rebase onto main failed; leaving the tree alone.'
+              exit 1
+            }
+            sleep $((attempt * 5))
+          done
+          echo '::error::Could not push the daily snapshot after three attempts.'
+          exit 1

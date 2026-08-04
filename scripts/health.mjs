@@ -42,19 +42,76 @@ function bundle() {
   return { total: Math.round(total / 1024), largest: Math.round(largest / 1024) };
 }
 
-/** Tests and files, read from vitest's own summary rather than counted by hand. */
+/** Escape sequences, so a parse never depends on how the output was painted. */
+const stripAnsi = (s) => String(s).replace(/\[[0-9;]*[A-Za-z]/g, '');
+
+/**
+ * Tests and files, from vitest's machine-readable report.
+ *
+ * The first version scraped the rendered summary with `/Tests\s+(\d+)\s+passed/`
+ * and recorded **"? ? X"** on the very first CI run — reporting a passing suite
+ * as broken, because a failed parse also drops `green` to false.
+ *
+ * The cause was never reproduced. The same command, the same Node version, with
+ * `CI=true` and `GITHUB_ACTIONS=true` set, parses correctly here; and the
+ * runner's Measure step took the suite's normal 12 seconds, so vitest ran to
+ * completion. What made its output unreadable there is unknown — and it stayed
+ * unknown because `execSync` captures the output, so the log recorded the "?"
+ * and nothing else.
+ *
+ * Two changes follow, and the second matters as much as the first:
+ *
+ *   1. The reading no longer depends on rendered output at all.
+ *      `--reporter=json` is a contract; a summary line is a rendering, and this
+ *      rendering broke on the one machine that mattered.
+ *   2. When it still cannot read a count, it PRINTS WHAT IT SAW. A measurement
+ *      that fails silently is worse than no measurement; next time the log will
+ *      say why instead of shrugging.
+ *
+ * The text parse survives as a fallback, with colour stripped in case that was
+ * it after all.
+ */
 function tests() {
-  // The default reporter, deliberately: `--reporter=basic` drops the very
-  // summary line this parses, and the first version of this script recorded "?"
-  // for both counts because of it.
-  const out = execSync('npx vitest run 2>&1 || true', {
-    cwd: root,
-    encoding: 'utf8',
-    maxBuffer: 32 * 1024 * 1024,
-  });
+  const report = join(root, 'node_modules', '.cache', 'liftoff-health-tests.json');
+  mkdirSync(dirname(report), { recursive: true });
+  // NO_COLOR belt-and-braces for the fallback path; `|| true` because a failing
+  // suite must still produce a row rather than throw away the whole snapshot.
+  const raw = safe(
+    () =>
+      execSync(`npx vitest run --reporter=json --outputFile=${JSON.stringify(report)} 2>&1 || true`, {
+        cwd: root,
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
+        env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' },
+      }),
+    '',
+  );
+
+  const j = safe(() => JSON.parse(readFileSync(report, 'utf8')), null);
+  if (j && Number.isFinite(j.numTotalTests) && j.numTotalTests > 0) {
+    return {
+      count: j.numTotalTests,
+      // `testResults` is one entry per FILE. `numTotalTestSuites` counts
+      // `describe` blocks — 195 of them against 41 files — and using it silently
+      // changed what the column meant mid-history, which is the kind of break a
+      // trend table cannot survive.
+      files: Array.isArray(j.testResults) ? j.testResults.length : null,
+      green: (j.numFailedTests ?? 0) === 0,
+    };
+  }
+
+  const out = stripAnsi(raw);
   const t = out.match(/Tests\s+(\d+)\s+passed/);
   const f = out.match(/Test Files\s+(\d+)\s+passed/);
   const failed = /Tests\s+\d+\s+failed/.test(out);
+  if (!t) {
+    // The whole point of the rewrite: never fail quietly again.
+    console.error('health: could not read a test count from either the JSON report or the output.');
+    console.error(`health: json report present = ${existsSync(report)}`);
+    console.error('health: last 2000 chars of what vitest printed ----------------');
+    console.error(out.slice(-2000) || '(nothing at all)');
+    console.error('health: -----------------------------------------------------');
+  }
   return { count: t ? Number(t[1]) : null, files: f ? Number(f[1]) : null, green: !failed && !!t };
 }
 
@@ -84,6 +141,15 @@ A row a day, written by \`.github/workflows/health.yml\`. Nothing here is
 generated for its own sake — these are the numbers that drift quietly and are
 expensive to notice late: how much JavaScript a phone has to download, how many
 tests stand behind a change, and how far the dependencies have fallen behind.
+
+One row per date is also one commit per day, which is what keeps the
+contribution graph green. That is deliberate and it is the honest version: each
+of those commits carries a measurement actually taken that day, so the history
+still means something to whoever reads it later.
+
+\`Green\` is the test suite. A bundle of \`?\` means the production build failed
+that day — the snapshot is taken anyway, because a broken main is exactly the
+day the record is worth having.
 
 Read the columns as trends, not as targets.
 
