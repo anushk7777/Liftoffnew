@@ -11,15 +11,19 @@ permissions:
   contents: write
   pull-requests: write
 
+env:
+  # Machine-owned: recreated from main every week, never committed to by hand.
+  UPDATE_BRANCH: chore/automated-dependency-maintenance
+
 jobs:
   maintenance:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           # 22, not 20: GitHub deprecated Node 20 on its runners and every run
           # since has carried the warning.
@@ -44,15 +48,77 @@ jobs:
         # scratch directory, which exists on no CI runner. Seven consecutive
         # Sunday runs died here and the failure read like a dependency problem.
 
+      # Recorded before the push so the report step below can tell "the branch
+      # was pushed and only the PR was refused" from "nothing happened at all" —
+      # without that, a leftover branch from a previous week would make any
+      # failure look survivable.
+      - name: Note the update branch's current tip
+        id: before
+        run: echo "sha=$(git ls-remote origin "refs/heads/$UPDATE_BRANCH" | cut -f1)" >> "$GITHUB_OUTPUT"
+
       # Open a PR with the dependency changes instead of pushing straight to the
       # deployed branch. No-op when `npm update` changed nothing.
+      #
+      # `continue-on-error` because of a specific, known, non-code failure — see
+      # the report step. It is deliberately paired with a check that fails the
+      # job for anything else, so this is not a blanket "ignore errors".
       - name: Open dependency-update PR
+        id: pr
+        continue-on-error: true
         uses: peter-evans/create-pull-request@v6
         with:
+          # Falls back to the built-in token. If a PAT is ever added as a repo
+          # secret, PR creation starts working with no other change.
+          token: ${{ secrets.MAINTENANCE_PAT || github.token }}
           commit-message: 'chore: automated weekly dependency maintenance'
-          branch: chore/automated-dependency-maintenance
+          branch: ${{ env.UPDATE_BRANCH }}
           delete-branch: true
           title: 'chore: automated weekly dependency maintenance'
           body: |
             Automated weekly `npm update`. Typecheck, build, and tests passed in CI.
             Review the lockfile/`package.json` diff before merging.
+
+      # A weekly red X that means "a checkbox in Settings is unticked" trains you
+      # to ignore the weekly red X. This separates the one tolerable outcome from
+      # every other one, and says out loud which happened.
+      - name: Report what happened
+        env:
+          OUTCOME: ${{ steps.pr.outcome }}
+          PR_URL: ${{ steps.pr.outputs.pull-request-url }}
+          BEFORE: ${{ steps.before.outputs.sha }}
+          # `schedule` payloads are thin; an undefined lookup is null in GitHub
+          # expressions rather than an error, so the fallback catches it.
+          COMPARE: ${{ github.server_url }}/${{ github.repository }}/compare/${{ github.event.repository.default_branch || 'main' }}...${{ env.UPDATE_BRANCH }}?expand=1
+        run: |
+          set -euo pipefail
+          after="$(git ls-remote origin "refs/heads/$UPDATE_BRANCH" | cut -f1)"
+
+          if [ "$OUTCOME" = 'success' ]; then
+            if [ -n "$PR_URL" ]; then
+              echo "Dependency update ready for review: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo 'Dependencies already current — nothing to update this week.' >> "$GITHUB_STEP_SUMMARY"
+            fi
+            exit 0
+          fi
+
+          # The branch moved, so `npm update` ran, the result passed build and
+          # tests, and it is pushed and reviewable. Only the PR is missing.
+          if [ -n "$after" ] && [ "$after" != "$BEFORE" ]; then
+            {
+              echo '### Update is ready — the pull request could not be opened'
+              echo
+              echo "The verified lockfile is on \`$UPDATE_BRANCH\`. It passed typecheck, build and tests on this runner."
+              echo
+              echo 'Opening the PR needs one repository setting that GitHub leaves off by default:'
+              echo
+              echo '> **Settings → Actions → General → Workflow permissions →**'
+              echo '> **"Allow GitHub Actions to create and approve pull requests"**'
+              echo
+              echo "Until that is ticked, open it in one click: $COMPARE"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "::error::The dependency-update step failed and pushed nothing to $UPDATE_BRANCH. This is a real failure — read the step log above."
+          exit 1
