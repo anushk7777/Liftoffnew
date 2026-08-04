@@ -236,7 +236,7 @@ Full ranked lists live at the end of each document.
 ## Running it
 
 ```bash
-npm test     # 565 tests, 39 files
+npm test     # 632 tests, 41 files
 npm run lint
 npm run build
 ```

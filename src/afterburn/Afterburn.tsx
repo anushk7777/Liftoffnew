@@ -10,6 +10,8 @@ import { equipmentOf, loadStep, EQUIPMENT_LABEL } from './innovation/equipment';
 import { noteForExercise, agoLabel } from './innovation/recall';
 import { codeRecall } from './innovation/codeRecall';
 import { prescribe } from './innovation/prescribe';
+import { gradeAll } from './innovation/grade';
+import { calibrateAll } from './innovation/calibrate';
 import type { RecallCue } from './innovation/codeRecall';
 import { readCo2DeepLink, consumeCo2DeepLink } from './deepLink';
 import { buildLoadModel } from './innovation/loadModel';
@@ -777,6 +779,7 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
   const setExerciseNotes = useAfterburn((s) => s.setExerciseNotes);
   const swapDraftExercise = useAfterburn((s) => s.swapDraftExercise);
   const updateSet = useAfterburn((s) => s.updateSet);
+  const snapshotPrescription = useAfterburn((s) => s.snapshotPrescription);
   const weakPoints = useAfterburn((s) => s.program.weakPoints ?? NO_WEAK_POINTS);
   const [plateOpen, setPlateOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
@@ -790,6 +793,13 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
   // One prescription per lift in the day, computed up front rather than lazily:
   // the exercise list is known and finite, and a memo that mutates a cache on
   // demand is a memo whose result depends on call order.
+  //
+  // The corrections come first: what every past prescription got wrong, turned
+  // into a per-lift multiplier — and only where the correction beat doing
+  // nothing on sets it was never fitted to. Lifts without that evidence get 1,
+  // which is to say the engine leaves them exactly as they were.
+  const corrections = useMemo(() => calibrateAll(gradeAll(sessions)).corrections, [sessions]);
+
   const prescriptions = useMemo(() => {
     const out = new Map<string, ReturnType<typeof prescribe>>();
     for (const slot of draft.entries) {
@@ -804,11 +814,47 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
           lastSetRpe: slot.target.lastSetRpe,
           sessions,
           unit,
+          correction: corrections[slot.name],
         }),
       );
     }
     return out;
-  }, [draft.entries, sessions, unit]);
+  }, [draft.entries, sessions, unit, corrections]);
+
+  // Has a single number been logged yet? Once one has, the prescription stops
+  // being a prediction and becomes a record — see the effect below.
+  const startedLogging = draft.entries.some((e) => e.sets.some((s) => s.weight?.trim() || s.reps?.trim()));
+
+  // FREEZE THE PREDICTION.
+  //
+  // Kept in step with what is on screen right up until the first rep — swap an
+  // exercise or add a set before you start and the record follows — and frozen
+  // the instant anything is logged. That boundary is the whole point: a
+  // prediction edited after the result is known is not a prediction, and an
+  // engine allowed to do that would score beautifully and mean nothing.
+  useEffect(() => {
+    if (startedLogging) return;
+    const flat = draft.entries.flatMap((e) => {
+      const rx = prescriptions.get(e.name);
+      if (!rx) return [];
+      return e.sets.map((set, i) => {
+        const s = rx.sets[Math.min(i, rx.sets.length - 1)];
+        return {
+          exercise: e.name,
+          index: i,
+          setId: set.id,
+          weight: s?.weight ?? null,
+          reps: s?.reps ?? null,
+          rpe: s?.rpe ?? null,
+          basis: rx.basis,
+          // The correction the PLATES actually took, not the one asked for —
+          // see SetPrescription.correction.
+          correction: s?.correction ?? 1,
+        };
+      });
+    });
+    snapshotPrescription(flat);
+  }, [startedLogging, prescriptions, corrections, draft.entries, snapshotPrescription]);
 
   const cueByLift = useMemo(() => {
     const day = [...program.weeks.flatMap((w) => w.days ?? []), ...(program.custom ?? [])]
@@ -1096,7 +1142,12 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
               <p className="text-[11px] text-ink-muted leading-relaxed mt-1.5">
                 {rx!.why}
                 {rx!.tentative && ' Still learning this lift, so treat it as a starting point.'}
-                {!rx!.drop.assumed && rx!.drop.factors.length > 1 && (
+                {/* Only when the sets on screen ACTUALLY differ. A measured fade
+                    of 2% on a 40 kg lift rounds to the same plate three times,
+                    and this line then explained an easing-off that the three
+                    identical numbers beside it plainly contradicted. Found by
+                    reading the real card, not by a test. */}
+                {!rx!.drop.assumed && new Set(rx!.sets.map((s) => s.weight)).size > 1 && (
                   <> Later sets are eased off because that is what your own last {rx!.drop.samples} outings did.</>
                 )}
               </p>

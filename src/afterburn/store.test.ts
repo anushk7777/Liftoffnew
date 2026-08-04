@@ -201,3 +201,62 @@ describe('cue outcomes — the seed of the ground truth this engine has none of'
     expect(kept[0].cueId).toBe('c100');
   });
 });
+
+describe('the frozen prescription', () => {
+  const draftWith = (sets: { id: string; weight?: string; reps?: string }[]) =>
+    useAfterburn.setState({
+      draft: {
+        id: 'draft',
+        dayId: 'd1',
+        dayName: 'Push',
+        date: '2026-03-10T10:00:00.000Z',
+        entries: [
+          {
+            exerciseId: 'e1',
+            name: 'Bench',
+            target: {},
+            notes: '',
+            sets: sets.map((s) => ({ id: s.id, weight: s.weight ?? '', reps: s.reps ?? '', rpe: '', rating: 0, done: false })),
+          },
+        ],
+      } as unknown as WorkoutSession,
+      sessions: [],
+    });
+
+  const rx = (setId: string, weight: number) => ({ exercise: 'Bench', index: 0, setId, weight, reps: 8, rpe: 8, basis: 'personal', correction: 1 });
+
+  it('stores what the app suggested on the session in progress', () => {
+    draftWith([{ id: 'a' }]);
+    useAfterburn.getState().snapshotPrescription([rx('a', 100)]);
+    expect(useAfterburn.getState().draft!.prescribed).toEqual([rx('a', 100)]);
+  });
+
+  it('does not touch the store when the suggestion has not changed', () => {
+    draftWith([{ id: 'a' }]);
+    const snap = useAfterburn.getState().snapshotPrescription;
+    snap([rx('a', 100)]);
+    const before = useAfterburn.getState().draft;
+    snap([rx('a', 100)]);
+    // Same object identity: no persist, no cloud push, no re-render.
+    expect(useAfterburn.getState().draft).toBe(before);
+    snap([rx('a', 102.5)]);
+    expect(useAfterburn.getState().draft).not.toBe(before);
+  });
+
+  it('is a no-op with no session in progress', () => {
+    useAfterburn.setState({ draft: null });
+    useAfterburn.getState().snapshotPrescription([rx('a', 100)]);
+    expect(useAfterburn.getState().draft).toBeNull();
+  });
+
+  it('survives finishing, trimmed to the sets that were actually done', () => {
+    draftWith([{ id: 'a', weight: '100', reps: '8' }, { id: 'b' }]);
+    useAfterburn.getState().snapshotPrescription([rx('a', 100), { ...rx('b', 95), index: 1 }]);
+    useAfterburn.getState().finishDraft();
+    const [saved] = useAfterburn.getState().sessions;
+    // Set b was never performed, so finishing dropped it from `entries`; a
+    // prescription for it could never be graded and is dropped too.
+    expect(saved.entries[0].sets.map((s) => s.id)).toEqual(['a']);
+    expect(saved.prescribed).toEqual([rx('a', 100)]);
+  });
+});

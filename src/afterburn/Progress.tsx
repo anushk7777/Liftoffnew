@@ -17,6 +17,7 @@ import { GOALS, weightTrendKgPerWeek } from './nutrition';
 import { AnimatedNumber } from '../components/ui';
 import { useReducedMotion, springSoft } from '../lib/motion';
 import Chart from './Chart';
+import SelfCheck from './SelfCheck';
 import type { ChartPoint } from './Chart';
 
 const tileVariants = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
@@ -802,6 +803,11 @@ export default function Progress() {
           </div>
         </motion.section>
       )}
+
+      {/* The engine's own record. Sits directly after the panels that hand out
+          opinions, because it is the one that says how much they are worth.
+          Renders nothing until a prescription has actually been tested. */}
+      <SelfCheck />
 
       {/* Weekly training volume — overall progress, not per-exercise */}
       <section className="space-y-3">

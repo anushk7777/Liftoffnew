@@ -892,11 +892,128 @@ on weight alone calls that flat and then prescribes set 3 far too heavy.
 - *The prescription hides once you start logging.* By then the call is made and a
   suggestion for a set in progress is noise. It also means you cannot compare
   what you did against what was suggested, mid-set.
-- *Nothing yet checks whether the number was any good.* This is the obvious next
-  piece: a prescription is the first thing this app has produced that is
-  **falsifiable at the moment it is given**, and grading it against what was
-  actually lifted would be objective ground truth — better than the self-reported
-  cue taps, and collected automatically.
+## 6b. Grading the prescription, and correcting from it
+
+A prescription is the first thing this app has ever produced that is
+**falsifiable at the moment it is given**: it names a weight you are about to
+test. Everything else here — the volume status, the returns ledger, the brief —
+is an opinion about the past, and an opinion about the past can be wrong forever
+without anyone noticing.
+
+So the prescription is frozen when the session starts and scored against what was
+actually lifted. Two things follow, and the second matters more: you can see
+whether to trust it, and it produces **ground truth automatically**, from
+ordinary use, with nothing extra to tap.
+
+### The one number
+
+A prescription targets a weight for N reps at a given RPE, and it can miss in two
+directions at once. One rep is worth roughly one RPE point — that is the
+definition of the scale — so the two collapse into:
+
+```
+miss = (RPE you gave − RPE asked for) + (reps asked for − reps you got)
+```
+
+Positive means too heavy. The channels reinforce when they agree and cancel when
+they disagree: 12 reps at RPE 9 against a target of 10 at RPE 8 is a wash, and
+should be.
+
+Read with the median, never the mean. One mistyped weight is a five-point
+outlier, and a mean would let one fat finger rewrite the engine's opinion of
+itself.
+
+### Freezing, and why it is the whole thing
+
+The record is written while the session is open and **stops the instant a set is
+logged**. Up to that point it tracks the screen — swap an exercise or add a set
+and the record follows. After it, nothing can touch it.
+
+That boundary is the feature. A prediction edited after the result is known is
+not a prediction, and an engine allowed to do that would score beautifully and
+mean nothing. For the same reason nothing is ever recomputed: replaying today's
+engine over last month's session would grade a number that was never shown, and
+would flatter itself every single time it improved.
+
+Sets are matched by their own id, not by position. Finishing a session prunes the
+blank sets and closes the gap, so a positional match would line set 1's
+prescription up against set 2's result.
+
+### Changing itself, under guard
+
+One thing may change, per lift: a load multiplier. Not the program, not the rep
+targets, not the RPE the sheet asks for — only the weight the app suggests, which
+is the app's own opinion and the only thing it has any business tuning.
+
+The rule is not "learn from outcomes". It is:
+
+> A change is adopted only if it can be shown to have helped on data it was not
+> fitted to, by more than the noise — and every decision, adopted or rejected, is
+> written down with the numbers behind it.
+
+Validation is walk-forward: fit the bias on the earlier sets, measure on the later
+ones the fit never saw, adopt only if it is better there. Fitting on everything
+and reporting the improvement is circular — a constant offset can always reduce
+error on the data it was computed from, and the number would be meaningless and
+always positive.
+
+Three brakes:
+
+- **±10%, hard.** Beyond that it is not calibration, it is a swapped exercise, a
+  changed gym or an injury, and absorbing it into a multiplier would hide it. So
+  it is reported instead.
+- **12 sets before a lift may be touched at all**, five of them held out.
+- **The bar scales with the lift's own noise** (a fraction of the MAD of its
+  misses), so a scattered lift has to clear more than a consistent one.
+
+### Two ways this loop eats itself, and what stops them
+
+*It oscillates.* A correction that works drives later misses to zero. Pool those
+with the biased sets that earned it and the measured bias halves, the correction
+retracts, the bias returns — forever, and each individual step measured
+correctly. So every graded set records **the correction that was in force when it
+was prescribed**, and the fit undoes it first. Every set then sits on one scale
+whatever was in force the day it was lifted, and the fit converges on a fixed
+point instead of hunting.
+
+*It runs away.* The factor recorded is the one that **reached the bar**, not the
+one that was asked for. A −3% shade on 40 kg is 38.8, which is 40 again on a
+2.5 kg step: requested, then entirely absorbed by rounding. Recording the request
+would make the next fit subtract an adjustment that never happened, over-read the
+remaining bias, and ask for a bigger correction — and then a bigger one.
+
+The same rounding produced a visible bug: the card read "shaded down 3%" above
+three sets all showing 40 kg. Claims are now keyed on the weight actually
+changing, and name the weight rather than the percentage.
+
+### What it says about itself
+
+The Progress tab carries the record: median miss in reps, which way it errs,
+how often you used its number, whether it is getting closer, and accuracy split
+by which rung of the ladder produced the number — which is how you find out
+whether the personal curve is actually beating a rule of thumb rather than
+assuming it must.
+
+Then the self-changes, with the held-out numbers beside each one. The headline is
+deliberately *how many lifts it checked and left alone*, because that is the part
+that makes the rest believable. It renders nothing at all until something has
+been graded: an empty accuracy panel implies a measurement that has not happened.
+
+### Decisions worth challenging
+
+- *The counterfactual is a model, not a measurement.* "What the miss would have
+  been at another weight" assumes 3% per RPE point holds locally. Nobody
+  re-lifted the set. This is the weakest link in the loop and the validation is
+  only as good as that linearity.
+- *A rejection leaves the previous factor in force.* Each recompute asks "does
+  correcting at all beat leaving it alone", from scratch, so the correction is a
+  pure function of the logged history — no path dependence, but also no memory of
+  a correction that was right last month and cannot be re-confirmed this month.
+- *The correction is per exercise name.* Swap to a variant and its history, and
+  its correction, do not follow.
+- *Sets logged without an RPE do not grade at all.* On a program where the last
+  set has a technique rather than a target, that quietly removes the hardest sets
+  from the sample.
 
 ## 7. Two things the app knew but never told you — and getting one of them out
 
@@ -1081,6 +1198,17 @@ Ordered by how likely they are to matter.
 12. **Equipment is guessed from the exercise name.** A gym with 1 kg micro
    plates or 5 kg dumbbell jumps will get the step wrong, and there is no way
    to tell it otherwise. Letting the lifter set the step per lift would fix it.
+   This now bites twice: on a coarse step, a learned correction under about 3%
+   is rounded away entirely and never reaches the bar, so the engine can be
+   right about a lift and unable to act on it.
+13. **The self-correction's counterfactual is modelled, not measured.** Whether
+   a correction "helped" is judged by scaling each set's miss by 3% per RPE
+   point — nobody re-lifted the set at the other weight. The walk-forward
+   validation is honest about which data it used and dishonest about nothing
+   else, but it is only as good as that linearity assumption.
+14. **Sets logged without an RPE cannot be graded.** On days where the last set
+   carries an intensity technique instead of a target, the hardest sets drop out
+   of the sample the engine scores itself on.
 
 ## Testing
 
@@ -1108,7 +1236,7 @@ unrated sets as zero stars, stop ignoring rough days, let future-dated sessions
 through, and relax each of the two rating guards); every one was caught.
 
 ```bash
-npm test        # 592 tests, 40 files
+npm test        # 632 tests, 41 files
 
 # The schedule is timezone logic, so run it somewhere else too:
 TZ=Asia/Kathmandu npm test

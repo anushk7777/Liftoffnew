@@ -112,8 +112,25 @@ export interface CalibrationEvent {
  * linearity assumption, which holds near working weights and degrades at the
  * extremes.
  */
+/**
+ * The miss this set would have shown with NO correction in force.
+ *
+ * This is what makes the loop stable. Once a correction works, the sets it
+ * produces miss by nothing — and pooling those with the biased sets that earned
+ * the correction would report a bias near zero, retract the correction, and let
+ * the bias come straight back. The engine would hunt forever and look fine doing
+ * it, because each individual step would be measured correctly.
+ *
+ * Undoing the correction first puts every set on one scale, whatever was in
+ * force the day it was lifted, so the fit converges on a fixed point.
+ */
+export function rawMiss(g: GradedSet): number {
+  const f = Number.isFinite(g.correction) && g.correction ? g.correction : 1;
+  return g.miss - (f - 1) / PCT_PER_RPE;
+}
+
 export function missUnder(g: GradedSet, factor: number): number {
-  return g.miss + (factor - 1) / PCT_PER_RPE;
+  return rawMiss(g) + (factor - 1) / PCT_PER_RPE;
 }
 
 const err = (sets: GradedSet[], factor: number): number =>
@@ -125,6 +142,12 @@ const err = (sets: GradedSet[], factor: number): number =>
  * Returns the event either way — a rejection is as much a part of the record as
  * an adoption, and a log that only contains successes is a log that cannot be
  * used to catch drift.
+ *
+ * `current` is the baseline the proposal must beat, and defaults to 1: "does
+ * correcting this lift at all beat leaving it alone?". Asking it that way each
+ * time makes the answer a pure function of the logged history — no path
+ * dependence, no state to migrate, and no way for one bad fortnight to become
+ * permanent by never being re-asked.
  */
 export function calibrateLift(
   exercise: string,
@@ -164,8 +187,10 @@ export function calibrateLift(
   const fitOn = sets.slice(0, sets.length - holdout);
   const testOn = sets.slice(sets.length - holdout);
 
-  // The bias to remove, in RPE points, from the FIT half only.
-  const bias = median(fitOn.map((g) => g.miss));
+  // The bias to remove, in RPE points, from the FIT half only — measured with
+  // whatever correction was already in force undone, so this is an ABSOLUTE
+  // proposal rather than an increment on top of the last one.
+  const bias = median(fitOn.map(rawMiss));
   const proposedRaw = 1 - bias * PCT_PER_RPE;
   const proposed = Math.round(Math.min(1 + MAX_CORRECTION, Math.max(1 - MAX_CORRECTION, proposedRaw)) * 1000) / 1000;
 
