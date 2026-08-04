@@ -1,7 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fitTrend, sessionPoints, DRIFT_PER_REP, MIN_MEANINGFUL_KG, Z_CRITICAL } from './strength';
 import type { WorkoutSession } from '../types';
+
+/** Where the backtest dumps its working, when it can.
+ *
+ *  These files are diagnostics for a human reading a calibration run, not
+ *  assertions — so the write must never be able to fail the suite. It used to be
+ *  a hardcoded absolute path inside one machine's scratch directory, which meant
+ *  the whole test suite failed on every CI runner on earth: seven consecutive
+ *  Sunday maintenance runs died here, and the failure looked like a dependency
+ *  problem rather than a stray path.
+ *
+ *  `node_modules/.cache` is already gitignored and already exists wherever npm
+ *  has run, which is everywhere this suite runs. */
+function dumpLab(name: string, body: string): void {
+  try {
+    const dir = join(process.cwd(), 'node_modules', '.cache', 'liftoff-lab');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, name), body);
+  } catch {
+    /* a diagnostic dump is never worth failing a test over */
+  }
+}
 
 // Calibration by backtest.
 //
@@ -144,7 +166,7 @@ describe('threshold calibration', () => {
       );
     }
     lines.push('', `best z = ${best.z} (score ${best.score.toFixed(3)})`);
-    writeFileSync('/tmp/claude-0/-home-user-Liftoffnew/b5453a7c-91dd-57ef-9d9c-819db9424195/scratchpad/lab/sweep.txt', lines.join('\n'));
+    dumpLab('sweep.txt', lines.join('\n'));
     expect(best.z).toBeGreaterThanOrEqual(0);
   });
 
@@ -178,7 +200,7 @@ describe('threshold calibration', () => {
         `${String(nSessions).padStart(8)}  ${(caught * 100).toFixed(0).padStart(6)}%  ${((stal.moved / stal.total) * 100).toFixed(0).padStart(10)}%  ${((drif.moved / drif.total) * 100).toFixed(0).padStart(12)}%`,
       );
     }
-    writeFileSync('/tmp/claude-0/-home-user-Liftoffnew/b5453a7c-91dd-57ef-9d9c-819db9424195/scratchpad/lab/sessions.txt', lines.join('\n'));
+    dumpLab('sessions.txt', lines.join('\n'));
     expect(lines.length).toBeGreaterThan(3);
   });
 

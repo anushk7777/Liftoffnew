@@ -1,7 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fitTrend, sessionPoints } from './strength';
 import type { WorkoutSession } from '../types';
+
+/** Where the backtest dumps its working, when it can.
+ *
+ *  These files are diagnostics for a human reading a calibration run, not
+ *  assertions — so the write must never be able to fail the suite. It used to be
+ *  a hardcoded absolute path inside one machine's scratch directory, which meant
+ *  the whole test suite failed on every CI runner on earth: seven consecutive
+ *  Sunday maintenance runs died here, and the failure looked like a dependency
+ *  problem rather than a stray path.
+ *
+ *  `node_modules/.cache` is already gitignored and already exists wherever npm
+ *  has run, which is everywhere this suite runs. */
+function dumpLab(name: string, body: string): void {
+  try {
+    const dir = join(process.cwd(), 'node_modules', '.cache', 'liftoff-lab');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, name), body);
+  } catch {
+    /* a diagnostic dump is never worth failing a test over */
+  }
+}
 
 // OLD engine, reproduced exactly: best-set e1RM, OLS slope, flat 2.5kg/2% floor.
 const epley = (w: number, r: number) => w * (1 + r / 30);
@@ -138,5 +160,5 @@ it('records the full old-vs-new table for the record', () => {
     out.push(`  NEW: ${keys.filter(k => newTot[k]).map(k => `${k} ${pct(newTot[k])}`).join('  ')}`);
     out.push('');
   }
-  writeFileSync('/tmp/claude-0/-home-user-Liftoffnew/b5453a7c-91dd-57ef-9d9c-819db9424195/scratchpad/lab/compare.txt', out.join('\n'));
+  dumpLab('compare.txt', out.join('\n'));
 });
