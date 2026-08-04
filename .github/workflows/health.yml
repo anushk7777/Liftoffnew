@@ -1,0 +1,56 @@
+name: Daily Health Snapshot
+
+# Runs every morning and records one row of real numbers — bundle size, test
+# count, dependency drift — in docs/HEALTH.md, committing only when something
+# actually moved.
+#
+# It commits straight to main rather than opening a PR: this is an append-only
+# measurement, not a change to the app, and a PR a day would be noise.
+on:
+  schedule:
+    # 06:15 UTC. Deliberately not on the hour — GitHub's scheduler is busiest at
+    # :00 and delays runs by up to an hour there.
+    - cron: '15 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# A snapshot that overlaps itself would race on the same file.
+concurrency:
+  group: health-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # The bundle numbers come from a real production build, so this also acts
+      # as a daily check that main still builds at all.
+      - run: npm run build
+
+      - name: Measure
+        run: node scripts/health.mjs
+
+      - name: Commit if anything moved
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/HEALTH.md
+          # `--quiet --exit-code` is the whole point: no change, no commit. A
+          # scheduled job that commits regardless would be recording nothing.
+          if git diff --cached --quiet --exit-code; then
+            echo 'Nothing moved today — no commit.'
+          else
+            git commit -m 'chore: daily health snapshot'
+            git push
+          fi

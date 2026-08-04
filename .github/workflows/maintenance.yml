@@ -21,7 +21,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22, not 20: GitHub deprecated Node 20 on its runners and every run
+          # since has carried the warning.
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -37,6 +39,10 @@ jobs:
 
       - name: Test
         run: npm test
+        # Until 2026-08 this step failed on EVERY scheduled run — three test
+        # files wrote diagnostics to an absolute path from one developer's
+        # scratch directory, which exists on no CI runner. Seven consecutive
+        # Sunday runs died here and the failure read like a dependency problem.
 
       # Open a PR with the dependency changes instead of pushing straight to the
       # deployed branch. No-op when `npm update` changed nothing.
