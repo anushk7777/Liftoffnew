@@ -65,6 +65,10 @@ export interface GradedSet {
   actualRpe: number;
   /** Signed, in RPE points. Positive = the prescription was too heavy. */
   miss: number;
+  /** The learned correction in force when this set was prescribed (1 = none).
+   *  Carried through so the calibrator can compare a set prescribed under a
+   *  correction with one prescribed without — see `calibrate.ts`. */
+  correction: number;
   /** Whether the lifter used the weight they were given. A set done at a
    *  different weight still grades — the point is whether the PRESCRIPTION was
    *  right, not whether it was obeyed — but the two must be separable. */
@@ -98,7 +102,13 @@ export function gradeSession(session: WorkoutSession | null | undefined): Graded
   for (const p of prescribed) {
     if (!p?.exercise || p.weight == null || p.reps == null || p.rpe == null) continue;
     const entry = (session.entries ?? []).find((e) => e?.name === p.exercise);
-    const actual: LoggedSet | undefined = entry?.sets?.[p.index];
+    // By id when there is one. Finishing a session prunes the blank sets and
+    // closes the gap, so a positional lookup can hand back a DIFFERENT set than
+    // the one that was predicted for — and grade the engine on it. Only records
+    // written before `setId` existed fall back to position.
+    const actual: LoggedSet | undefined = p.setId
+      ? entry?.sets?.find((st) => st?.id === p.setId)
+      : entry?.sets?.[p.index];
     const aw = num(actual?.weight);
     const ar = num(actual?.reps);
     const ae = num(actual?.rpe);
@@ -117,6 +127,7 @@ export function gradeSession(session: WorkoutSession | null | undefined): Graded
       actualReps: ar,
       actualRpe: ae,
       miss: Math.round((ae - p.rpe + (p.reps - ar)) * 10) / 10,
+      correction: Number.isFinite(p.correction) && p.correction ? p.correction : 1,
       followed: Math.abs(aw - p.weight) < 0.01,
     });
   }

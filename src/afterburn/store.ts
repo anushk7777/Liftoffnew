@@ -11,7 +11,7 @@ import { withWeakPoints } from './pureBodybuilding';
 import { DEFAULT_NUTRITION } from './nutrition';
 import { DEFAULT_RECALL_DAYS } from './innovation/recall';
 import type { NutritionProfile } from './nutrition';
-import type { BodyEntry, LoggedExercise, LoggedSet, ProgramDay, ProgramExercise, RecoveryEntry, WeekPlan, WeightUnit, WorkoutProgram, WorkoutSession } from './types';
+import type { BodyEntry, LoggedExercise, LoggedSet, PrescribedSet, ProgramDay, ProgramExercise, RecoveryEntry, WeekPlan, WeightUnit, WorkoutProgram, WorkoutSession } from './types';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const blankSet = (): LoggedSet => ({ id: uid(), weight: '', reps: '', rpe: '', rating: 0, done: false });
@@ -414,6 +414,9 @@ interface AfterburnState {
   removeSet: (exIdx: number) => void;
   setExerciseNotes: (exIdx: number, notes: string) => void;
   swapDraftExercise: (exIdx: number, name: string) => void;
+  /** Freeze what the app suggested for the session in progress, so it can be
+   *  graded later against what was actually lifted. See `snapshotPrescription`. */
+  snapshotPrescription: (prescribed: PrescribedSet[]) => void;
   setPrimaryDay: (dayId: string) => void;
   addCustomDay: (name: string) => string;
   addExercise: (dayId: string, ex: Omit<ProgramExercise, 'id'>) => void;
@@ -554,10 +557,19 @@ export const useAfterburn = create<AfterburnState>()(
       finishDraft: (opts) => {
         const d = get().draft;
         if (!d) return;
+        const entries = performedEntries(d.entries);
+        // Keep the frozen prescription only for sets that actually happened.
+        // Finishing already discards the blank ones from `entries`, so a
+        // prescription for a set nobody did is a row that can never be graded
+        // and never be reconstructed against — dead weight in every sync from
+        // here on. What remains is exactly "what you were told, for what you
+        // did".
+        const performedIds = new Set(entries.flatMap((e) => e.sets.map((st) => st.id)));
         const session: WorkoutSession = {
           ...d,
           completedAt: new Date().toISOString(),
-          entries: performedEntries(d.entries),
+          entries,
+          prescribed: d.prescribed?.filter((p) => !p.setId || performedIds.has(p.setId)),
           endedEarly: opts?.endedEarly || undefined,
           endNote: opts?.endedEarly ? opts?.note?.trim() || undefined : undefined,
           // Kept in history and on the charts, but excluded from the load model:
@@ -623,6 +635,27 @@ export const useAfterburn = create<AfterburnState>()(
           if (!s.draft) return s;
           const entries = s.draft.entries.map((e, i) => (i !== exIdx ? e : { ...e, name }));
           return { draft: { ...s.draft, entries } };
+        }),
+
+      // WHAT THE APP SAID, FROZEN.
+      //
+      // Called by the logger with the prescription it is displaying, and only
+      // while nothing has been logged yet — see the effect in Afterburn.tsx. So
+      // the record is exactly what was on screen at the moment the first rep
+      // happened, which is the only version of it that can be graded honestly.
+      //
+      // Nothing here recomputes: replaying today's engine over last month's
+      // session would grade a number that was never shown, and would flatter
+      // itself every single time the engine improved.
+      snapshotPrescription: (prescribed) =>
+        set((s) => {
+          if (!s.draft) return s;
+          // Compared before writing because this runs on every change to the
+          // prescription inputs, and each write costs a persist plus a cloud
+          // push. Small and bounded — one entry per set of the day.
+          const a = s.draft.prescribed;
+          if (a && a.length === prescribed.length && JSON.stringify(a) === JSON.stringify(prescribed)) return s;
+          return { draft: { ...s.draft, prescribed } };
         }),
       // Pin a single day as "primary" (clears the flag on every other day).
       setPrimaryDay: (dayId) =>

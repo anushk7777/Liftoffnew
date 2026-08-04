@@ -66,6 +66,18 @@ const lastNumber = (v: string | undefined | null): number | null => {
  *  and the app would have prescribed an empty bar. The lightest makeable load is
  *  the step itself, so that is the floor. */
 const round = (n: number, step: number) => Math.max(step, Math.round(n / step) * step);
+
+/** The most a learned correction may move a suggestion, enforced here as well as
+ *  where it is computed. The prescriber does not trust its caller: a factor is
+ *  the one number that arrives from outside this file, and a bug upstream must
+ *  not be able to put an absurd weight on the bar. `prescribe.correction.test.ts`
+ *  asserts this equals `calibrate.MAX_CORRECTION` so the two cannot drift. */
+export const MAX_APPLIED_CORRECTION = 0.1;
+
+const clampCorrection = (f: number | undefined): number => {
+  if (f == null || !Number.isFinite(f)) return 1;
+  return Math.min(1 + MAX_APPLIED_CORRECTION, Math.max(1 - MAX_APPLIED_CORRECTION, f));
+};
 const median = (xs: number[]): number => {
   if (!xs.length) return 0;
   const s = [...xs].sort((a, b) => a - b);
@@ -187,6 +199,18 @@ export interface SetPrescription {
   reps: number | null;
   /** The RPE the sheet asks for on this set (the last set often differs). */
   rpe: number | null;
+  /**
+   * The learned correction that ACTUALLY REACHED THE BAR on this set, after
+   * rounding to what the equipment can make. 1 means none did.
+   *
+   * Not the factor that was asked for. A −3% shade on 40 kg is 38.8, which is
+   * 40 again on a 2.5 kg step: the correction was requested and then entirely
+   * absorbed. Recording the request would make the calibrator subtract an
+   * adjustment that never happened, over-read the remaining bias, and ask for a
+   * bigger correction next time — the runaway version of the oscillation the
+   * normalisation exists to prevent.
+   */
+  correction: number;
 }
 
 export interface LiftPrescription {
@@ -216,6 +240,17 @@ export interface PrescribeInput {
   now?: Date;
   /** Injected in tests; built from `sessions` otherwise. */
   model?: LoadModel;
+  /**
+   * The engine's learned correction for this lift, from `calibrate.ts`. 1 means
+   * none, which is the case until a lift has enough graded sets to prove a
+   * correction helps on data it was not fitted to.
+   *
+   * Applied to the two rungs that are the app's own opinion — the personal curve
+   * and the population rule — and deliberately NOT to `repeat`, where the whole
+   * instruction is "same weight, clear the reps". Scaling that weight would
+   * contradict the advice printed beside it.
+   */
+  correction?: number;
 }
 
 /** The most recent outing that actually has usable sets, ignoring rough days. */
@@ -278,24 +313,55 @@ export function prescribe(input: PrescribeInput): LiftPrescription {
   const finalRpe = firstNumber(lastSetRpe) ?? earlyRpe;
 
   const rpeFor = (i: number) => (i === n - 1 ? finalRpe : earlyRpe);
-  const shell = (weight: number | null, basis: PrescriptionBasis, why: string, tentative = false): LiftPrescription => ({
+
+  // What the engine has learned about its own error on THIS lift. Never silent:
+  // when it moves the number, it says so in the same breath, because a
+  // self-adjusting suggestion you cannot see adjusting is one you cannot audit.
+  const corr = clampCorrection(input.correction);
+
+  /**
+   * The note, but only when the correction SURVIVED ROUNDING.
+   *
+   * A 3% shade on 40 kg is 38.8, which rounds straight back to 40 on a 2.5 kg
+   * step — and the first version of this said "shaded down 3%" above three sets
+   * all reading 40 kg. A claim the numbers beside it contradict is worse than no
+   * claim at all, so the note is keyed on the weight actually changing, and
+   * names the weight rather than the percentage.
+   */
+  const corrNote = (plain: number, corrected: number): string =>
+    corrected === plain
+      ? ''
+      : ` Shaded ${corrected < plain ? 'down' : 'up'} from ${plain}${unit} because that is how far this lift has been running off its own prescriptions.`;
+  const shell = (
+    weight: number | null,
+    basis: PrescriptionBasis,
+    why: string,
+    tentative = false,
+    /** The same weight with no learned correction applied. Defaults to the
+     *  weight itself, i.e. "no correction was involved on this rung". */
+    uncorrected: number | null = weight,
+  ): LiftPrescription => ({
     exercise,
     basis,
     why,
     tentative,
     drop,
-    sets: Array.from({ length: n }, (_, i) => ({
-      index: i,
-      weight:
-        weight == null
-          ? null
-          : // The fade applies to the sets after the first. Beyond the measured
-            // profile the last known factor carries, rather than extrapolating a
-            // trend off the end of the data.
-            round(weight * (drop.factors[Math.min(i, drop.factors.length - 1)] ?? 1), step),
-      reps: targetReps,
-      rpe: rpeFor(i),
-    })),
+    sets: Array.from({ length: n }, (_, i) => {
+      // The fade applies to the sets after the first. Beyond the measured
+      // profile the last known factor carries, rather than extrapolating a
+      // trend off the end of the data.
+      const fade = drop.factors[Math.min(i, drop.factors.length - 1)] ?? 1;
+      const w = weight == null ? null : round(weight * fade, step);
+      // Rounded the same way, so the ratio is what the plates actually did.
+      const plain = uncorrected == null ? null : round(uncorrected * fade, step);
+      return {
+        index: i,
+        weight: w,
+        reps: targetReps,
+        rpe: rpeFor(i),
+        correction: w == null || plain == null || plain <= 0 ? 1 : Math.round((w / plain) * 1000) / 1000,
+      };
+    }),
   });
 
   const last = lastOuting(sessions, exercise, now);
@@ -330,14 +396,18 @@ export function prescribe(input: PrescribeInput): LiftPrescription {
   if (model.confidence !== 'none' && targetReps != null && earlyRpe != null) {
     const predicted = model.predict(targetReps, earlyRpe);
     if (predicted != null && predicted > 0) {
-      const w = round(predicted, step);
+      // Corrected before rounding: correcting after it would let the step size
+      // swallow a real 2% adjustment on a light accessory.
+      const plain = round(predicted, step);
+      const w = round(predicted * corr, step);
       const delta = Math.round((w - lastWeight) * 10) / 10;
       const move = delta > 0 ? `up ${delta}${unit}` : delta < 0 ? `down ${Math.abs(delta)}${unit}` : 'the same';
       return shell(
         w,
         'personal',
-        `From your own ${model.samples} sets on this lift: ${w}${unit} should land near RPE ${earlyRpe} at ${targetReps} reps — ${move} on last time.`,
+        `From your own ${model.samples} sets on this lift: ${w}${unit} should land near RPE ${earlyRpe} at ${targetReps} reps — ${move} on last time.${corrNote(plain, w)}`,
         model.confidence === 'low',
+        plain,
       );
     }
   }
@@ -345,13 +415,22 @@ export function prescribe(input: PrescribeInput): LiftPrescription {
   // 3. The population rule.
   if (lastRpe != null && earlyRpe != null) {
     const gap = earlyRpe - lastRpe;
-    const w = round(lastWeight * (1 + gap * 0.03), step);
+    const base = lastWeight * (1 + gap * 0.03);
+    const plain = round(base, step);
+    const w = round(base * corr, step);
     return shell(
       w,
       'rule',
-      Math.abs(gap) < 0.5
-        ? `Last time was on target at ${lastWeight}${unit}. Repeating it until there is enough history to model this lift.`
-        : `Last time came in at RPE ${lastRpe} against a target of ${earlyRpe}. A rough 3% per point puts today at ${w}${unit}.`,
+      (Math.abs(gap) < 0.5
+        ? // "Repeating it" would be a lie once a correction moves the number —
+          // but only once it actually has, which on a coarse step it often has
+          // not. Keyed on the weight, not on the factor.
+          w === plain
+          ? `Last time was on target at ${lastWeight}${unit}. Repeating it until there is enough history to model this lift.`
+          : `Last time was on target at ${lastWeight}${unit}, so today is ${w}${unit}.`
+        : `Last time came in at RPE ${lastRpe} against a target of ${earlyRpe}. A rough 3% per point puts today at ${w}${unit}.`) + corrNote(plain, w),
+      false,
+      plain,
     );
   }
 

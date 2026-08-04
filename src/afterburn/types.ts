@@ -94,11 +94,29 @@ export interface LoggedExercise {
 export interface PrescribedSet {
   exercise: string;
   index: number;
+  /** The `LoggedSet.id` this was written for.
+   *
+   *  Position alone is not safe to grade on: finishing a session prunes blank
+   *  sets and closes the gap, so skipping set 1 and doing sets 2 and 3 would
+   *  line set 1's prescription up against set 2's result and score the engine on
+   *  a set it never predicted. The id survives pruning, removal and reordering;
+   *  `index` is kept for display and as the fallback for records written before
+   *  this field existed. */
+  setId?: string;
   weight: number | null;
   reps: number | null;
   rpe: number | null;
   /** Which rung of the ladder produced it, so accuracy can be read per basis. */
   basis: string;
+  /** The learned correction in force when this was written (1 = none).
+   *
+   *  Without it the loop oscillates. A correction that works drives later misses
+   *  to zero; pooling those with the biased sets that justified it shrinks the
+   *  measured bias, which shrinks the correction, which brings the bias back.
+   *  Recording the factor makes every set comparable — a miss of 0 under a −3%
+   *  correction is known to be a miss of +1 without one — so the fit converges
+   *  instead of hunting. */
+  correction?: number;
 }
 
 export interface WorkoutSession {

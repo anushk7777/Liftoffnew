@@ -1216,10 +1216,113 @@ nothing to optimise. A perf concern would have been easy to invent and false.
   the doorway.
 
 
+## 14. Making the engine grade itself, and change itself
+
+The prescription had been shipping for a while with nothing checking whether its
+numbers were any good. Wiring that up is what turns a suggestion into something
+with a track record — and it is also the only source of objective ground truth
+this app has ever had, since every other engine here was calibrated against
+simulated lifters.
+
+### 14.1 Freeze, don't recompute
+
+The obvious implementation is to replay today's engine over an old session and
+score it. That is wrong in a way that would never show up: the model changes over
+time, so you would be grading a number that was never displayed — and the score
+would improve every time the engine did, for free.
+
+So the prescription is written onto the session while it is open. The subtle part
+is *when it stops moving*: it tracks the screen right up until the first set is
+logged, then freezes forever. Before the first rep, swapping an exercise or adding
+a set genuinely changes what the app is predicting, and the record should follow.
+After it, a prediction edited with the result in hand is not a prediction.
+
+### 14.2 The pruning trap
+
+Grading matched prescription to result by position, which is wrong because
+finishing a session drops the blank sets and closes the gap. Skip set 1, do sets
+2 and 3, and set 1's prescription lines up against set 2's result — the engine
+scored on a prediction it never made. Each prescribed row now carries the
+`LoggedSet.id` it was written for; position survives only as the fallback for
+records written before the field existed.
+
+### 14.3 Walk-forward, or the number means nothing
+
+A constant offset can always reduce error on the data it was computed from. Fit
+the bias on everything, report the improvement, and you get a positive number
+every time regardless of whether the correction would help going forward.
+
+So: fit on the earlier sets, measure on the later ones the fit never saw, adopt
+only if it wins there. The test that pins this builds a lift whose bias *reverses*
+halfway through — pooled, the halves cancel to a bias of zero and a naive fit
+would call it perfectly calibrated while it is wrong by 1.5 points in both
+directions.
+
+### 14.4 Two ways the loop eats itself
+
+Both were found by reasoning about the feedback path rather than by a failing
+test, and both would have looked fine indefinitely.
+
+**Oscillation.** A correction that works drives later misses to zero. Pool those
+with the biased sets that earned it and the measured bias halves; the correction
+retracts; the bias comes back. Forever — with every individual step measured
+correctly. Fixed by recording, on every graded set, the correction in force when
+it was prescribed, and undoing it before fitting. The test asserts the pooled
+median is 0.5 and would propose 0.985, against the 0.97 that is actually right.
+
+**Runaway.** The factor recorded has to be the one that *reached the bar*. A −3%
+shade on 40 kg is 38.8, which is 40 again on a 2.5 kg step. Record the request
+rather than the result and the next fit subtracts an adjustment that never
+happened, over-reads the remaining bias, and asks for more.
+
+### 14.5 Two false statements, found only by looking
+
+The suite was green and the card said, above three sets all reading 40 kg:
+
+> Shaded down 3% … Later sets are eased off because that is what your own last
+> 8 outings did.
+
+Neither was true. The 3% had been rounded away, and the measured fade was too
+small to survive the same rounding. Both claims are now keyed on the numbers
+actually changing, and the correction names the weight it moved from rather than
+a percentage that the plates may not have honoured.
+
+This is the fourth time in this codebase a defect has been invisible to a green
+suite and obvious on screen. The pattern is always the same: a sentence computed
+from an input, printed beside a number computed from the same input *plus
+rounding*.
+
+### 14.6 Reporting what it left alone
+
+The panel's headline is how many lifts it checked and **did not** change. That is
+deliberate. "Changed 1 of 2 lifts and left 1 alone after checking" is a stronger
+claim than any accuracy figure, because it is the sentence a system that was
+quietly drifting could not say. Rejections stay in the log for the same reason —
+a log containing only successes cannot be used to catch drift.
+
+Adopted corrections are shown in the accent colour, not red-for-down and
+green-for-up: a correction has no good or bad direction, and colouring half of
+them as an alarm would misread them.
+
+### 14.7 What is still weak
+
+- **The counterfactual is modelled, not measured.** "What the miss would have
+  been at another weight" assumes 3% per RPE point holds locally. Nobody
+  re-lifted the set. Everything downstream inherits that assumption.
+- **A coarse equipment step can absorb a correction entirely**, so the engine can
+  be right about a lift and unable to act on it. Letting the lifter set the step
+  per lift is the fix, and is already weakness #12.
+- **Sets without an RPE do not grade**, which on this program quietly removes the
+  last set of many exercises — often the hardest one.
+- **Corrections key on the exercise name.** Swap to a variant and it starts over.
+- **Nothing yet grades the grader.** The accuracy panel reports the engine's
+  error; nothing reports whether the *accuracy panel* is well calibrated, and
+  with a few dozen sets the trend split is a coarse instrument.
+
 ## Testing
 
 ```bash
-npm test        # 565 tests, 39 files
+npm test        # 632 tests, 41 files
 ```
 
 Beyond unit tests, each behavioural claim in this log was checked against
