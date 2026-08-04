@@ -18,4 +18,3 @@ Read the columns as trends, not as targets.
 
 | Date | Tests | Files | Green | Bundle | Largest chunk | Outdated deps |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-08-04 | 632 | 41 | ✅ | 1533 KB | 665 KB | 25 |
