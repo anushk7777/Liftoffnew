@@ -127,13 +127,47 @@ function outdated() {
   return Object.keys(parsed ?? {}).length;
 }
 
+/**
+ * Days since the weekly maintenance job last succeeded.
+ *
+ * THE COLUMN THAT EXISTS BECAUSE NOTHING WATCHED THE WATCHER.
+ *
+ * That job has broken silently twice. First it ran every Sunday and failed every
+ * Sunday for seven weeks. Then it stopped firing altogether for eight — a cron
+ * at midnight, the most contended minute GitHub has, dropped without retry or
+ * notice. Both times it was found by someone going to look, months later.
+ *
+ * A failed run is at least visible in the Actions tab. A run that never happens
+ * is invisible everywhere, which is the worse of the two and the reason this is
+ * measured daily rather than trusted. If this number climbs past about 8, the
+ * weekly job is not weekly any more.
+ *
+ * Needs a token, so it reads "?" when run locally — a missing measurement, which
+ * is the honest value, rather than a zero that would read as healthy.
+ */
+async function maintenanceAgeDays() {
+  const repo = process.env.GITHUB_REPOSITORY;
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  if (!repo || !token) return null;
+  const url = `https://api.github.com/repos/${repo}/actions/workflows/maintenance.yml/runs?status=success&per_page=1`;
+  const res = await fetch(url, {
+    headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json' },
+  });
+  if (!res.ok) return null;
+  const j = await res.json();
+  const last = j?.workflow_runs?.[0]?.run_started_at;
+  if (!last) return null;
+  return Math.max(0, Math.round((Date.now() - Date.parse(last)) / 86_400_000));
+}
+
 const day = new Date().toISOString().slice(0, 10);
 const b = safe(bundle, { total: null, largest: null });
 const t = safe(tests, { count: null, files: null, green: false });
 const o = safe(outdated, null);
+const m = await maintenanceAgeDays().catch(() => null);
 const n = (v, suffix = '') => (v == null ? '?' : `${v}${suffix}`);
 
-const row = `| ${day} | ${n(t.count)} | ${n(t.files)} | ${t.green ? '✅' : '❌'} | ${n(b.total, ' KB')} | ${n(b.largest, ' KB')} | ${n(o)} |`;
+const row = `| ${day} | ${n(t.count)} | ${n(t.files)} | ${t.green ? '✅' : '❌'} | ${n(b.total, ' KB')} | ${n(b.largest, ' KB')} | ${n(o)} | ${n(m)} |`;
 
 const HEADER = `# Health
 
@@ -151,10 +185,15 @@ still means something to whoever reads it later.
 that day — the snapshot is taken anyway, because a broken main is exactly the
 day the record is worth having.
 
+\`Maint age\` is days since the weekly dependency job last succeeded. It exists
+because that job has broken silently twice — seven weeks of failing every Sunday,
+then eight weeks of not firing at all — and nobody noticed either time. Past
+about 8, the weekly job has stopped being weekly.
+
 Read the columns as trends, not as targets.
 
-| Date | Tests | Files | Green | Bundle | Largest chunk | Outdated deps |
-| --- | --- | --- | --- | --- | --- | --- |
+| Date | Tests | Files | Green | Bundle | Largest chunk | Outdated deps | Maint age |
+| --- | --- | --- | --- | --- | --- | --- | --- |
 `;
 
 mkdirSync(dirname(OUT), { recursive: true });

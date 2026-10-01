@@ -122,21 +122,26 @@ export function dropOff(
   exerciseName: string,
   now: Date = new Date(),
   sinceDays = 90,
+  exerciseId?: string,
 ): DropOff {
   if (!exerciseName) return FLAT;
   const cutoff = now.getTime() - sinceDays * DAY_MS;
 
-  /** Per set position, the ratios seen across outings. */
-  const byPosition = new Map<number, number[]>();
-  let outings = 0;
+  // Scoped to the slot when one is known. A top set and its back-offs are the
+  // same lift with different shapes — one set against three — and a fade profile
+  // built from both at once describes neither.
+  const measure = (id?: string): DropOff | null => {
+    /** Per set position, the ratios seen across outings. */
+    const byPosition = new Map<number, number[]>();
+    let outings = 0;
 
-  for (const s of sessions ?? []) {
-    if (s?.roughDay) continue;
-    const t = Date.parse(s?.completedAt ?? s?.date ?? '');
-    if (Number.isNaN(t) || t < cutoff || t > now.getTime()) continue;
+    for (const s of sessions ?? []) {
+      if (s?.roughDay) continue;
+      const t = Date.parse(s?.completedAt ?? s?.date ?? '');
+      if (Number.isNaN(t) || t < cutoff || t > now.getTime()) continue;
 
-    for (const e of s.entries ?? []) {
-      if (e?.name !== exerciseName) continue;
+      for (const e of s.entries ?? []) {
+        if (!slotMatch(e, exerciseName, id)) continue;
       const work = (e.sets ?? []).map((st: LoggedSet) => {
         const w = num(st?.weight);
         const r = num(st?.reps);
@@ -160,20 +165,25 @@ export function dropOff(
         counted = true;
       }
       if (counted) outings++;
+      }
     }
-  }
 
-  if (outings < MIN_DROPOFF_OUTINGS) return FLAT;
+    if (outings < MIN_DROPOFF_OUTINGS) return null;
 
-  const factors = [1];
-  for (let i = 1; ; i++) {
-    const arr = byPosition.get(i);
-    if (!arr || arr.length < MIN_DROPOFF_OUTINGS) break;
-    // Never allow a later set to be prescribed heavier than an earlier one: the
-    // profile describes fatigue, and a rising one is noise.
-    factors.push(Math.min(median(arr), factors[i - 1]));
-  }
-  return { factors, samples: outings, assumed: false };
+    const factors = [1];
+    for (let i = 1; ; i++) {
+      const arr = byPosition.get(i);
+      if (!arr || arr.length < MIN_DROPOFF_OUTINGS) break;
+      // Never allow a later set to be prescribed heavier than an earlier one: the
+      // profile describes fatigue, and a rising one is noise.
+      factors.push(Math.min(median(arr), factors[i - 1]));
+    }
+    return { factors, samples: outings, assumed: false };
+  };
+
+  // Slot first, then the whole lift, then assume no fade. Falling back is better
+  // than a flat profile when a slot is new but the lift is not.
+  return (exerciseId ? measure(exerciseId) : null) ?? measure(undefined) ?? FLAT;
 }
 
 // ---------------------------------------------------------------------------
@@ -227,6 +237,16 @@ export interface LiftPrescription {
 
 export interface PrescribeInput {
   exercise: string;
+  /**
+   * The program slot this is for, when there is one.
+   *
+   * A day can run the same lift twice with different targets — a top set then
+   * back-offs — and without this the second slot reads the first one's history
+   * and is prescribed the first one's weight. The load model stays pooled by
+   * NAME on purpose (see below); only "what did I do here last time" and the
+   * fade profile are scoped to the slot.
+   */
+  exerciseId?: string;
   /** Working set count from the sheet. */
   workingSets: number;
   /** Rep target as written, e.g. "8-10". */
@@ -254,23 +274,40 @@ export interface PrescribeInput {
 }
 
 /** The most recent outing that actually has usable sets, ignoring rough days. */
+/**
+ * Does this logged entry belong to the slot being prescribed for?
+ *
+ * By program slot when one is known, because a day can run the same lift twice
+ * with different targets and the two must not read each other's history. By
+ * name otherwise — and as a fallback whenever the slot matches nothing, which
+ * covers everything logged before a program was reloaded (ids change, names
+ * usually do not) and every exercise added by hand.
+ */
+const slotMatch = (e: { name?: string; exerciseId?: string }, name: string, exerciseId?: string): boolean =>
+  exerciseId ? e?.exerciseId === exerciseId : e?.name === name;
+
 function lastOuting(
   sessions: WorkoutSession[],
   name: string,
   now: Date,
+  exerciseId?: string,
 ): { t: number; sets: LoggedSet[] } | null {
-  let best: { t: number; sets: LoggedSet[] } | null = null;
-  for (const s of sessions ?? []) {
-    if (s?.roughDay) continue;
-    const t = Date.parse(s?.completedAt ?? s?.date ?? '');
-    if (Number.isNaN(t) || t > now.getTime()) continue;
-    for (const e of s.entries ?? []) {
-      if (e?.name !== name) continue;
-      const sets = (e.sets ?? []).filter((st) => num(st?.weight) != null && num(st?.reps) != null);
-      if (sets.length && (!best || t > best.t)) best = { t, sets };
+  const scan = (id?: string): { t: number; sets: LoggedSet[] } | null => {
+    let best: { t: number; sets: LoggedSet[] } | null = null;
+    for (const s of sessions ?? []) {
+      if (s?.roughDay) continue;
+      const t = Date.parse(s?.completedAt ?? s?.date ?? '');
+      if (Number.isNaN(t) || t > now.getTime()) continue;
+      for (const e of s.entries ?? []) {
+        if (!slotMatch(e, name, id)) continue;
+        const sets = (e.sets ?? []).filter((st) => num(st?.weight) != null && num(st?.reps) != null);
+        if (sets.length && (!best || t > best.t)) best = { t, sets };
+      }
     }
-  }
-  return best;
+    return best;
+  };
+  // Slot first, name second. Never return nothing just because the ids moved.
+  return (exerciseId ? scan(exerciseId) : null) ?? scan(undefined);
 }
 
 /**
@@ -307,7 +344,7 @@ export function prescribe(input: PrescribeInput): LiftPrescription {
 
   const n = Math.max(1, Math.floor(workingSets || 1));
   const step = loadStep(equipmentOf(exercise), unit);
-  const drop = dropOff(sessions, exercise, now);
+  const drop = dropOff(sessions, exercise, now, 90, input.exerciseId);
   const targetReps = lastNumber(reps);
   const earlyRpe = firstNumber(rpe);
   const finalRpe = firstNumber(lastSetRpe) ?? earlyRpe;
@@ -364,7 +401,7 @@ export function prescribe(input: PrescribeInput): LiftPrescription {
     }),
   });
 
-  const last = lastOuting(sessions, exercise, now);
+  const last = lastOuting(sessions, exercise, now, input.exerciseId);
 
   // 4. Nothing lifted yet.
   if (!last) {
@@ -392,6 +429,10 @@ export function prescribe(input: PrescribeInput): LiftPrescription {
   }
 
   // 1. The lifter's own curve.
+  // Pooled by NAME, deliberately. The load-per-RPE curve describes the lifter's
+  // strength on a movement, and a set of 5 at 140 and a set of 8 at 120 are both
+  // honest points on the same curve — splitting them by slot would halve the
+  // sample for no gain. Only "last time here" and the fade profile are scoped.
   const model = input.model ?? buildLoadModel(sessions, exercise, now.getTime());
   if (model.confidence !== 'none' && targetReps != null && earlyRpe != null) {
     const predicted = model.predict(targetReps, earlyRpe);

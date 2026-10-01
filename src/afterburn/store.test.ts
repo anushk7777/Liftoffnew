@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weeklyVolume, volumeByProgramWeek, volumeTrend, detectPRs, formatVolume, exerciseProgress, useAfterburn } from './store';
+import { weeklyVolume, volumeByProgramWeek, volumeTrend, detectPRs, formatVolume, exerciseProgress, lastPerformance, useAfterburn } from './store';
 import type { WorkoutSession } from './types';
 
 // Minimal session builder — only the fields weeklyVolume/detectPRs read.
@@ -258,5 +258,73 @@ describe('the frozen prescription', () => {
     // prescription for it could never be graded and is dropped too.
     expect(saved.entries[0].sets.map((s) => s.id)).toEqual(['a']);
     expect(saved.prescribed).toEqual([rx('a', 100)]);
+  });
+});
+
+describe('lastPerformance on a day that runs the same lift twice', () => {
+  // Powerbuilding + Arms, day 1: a top set of 5 and then two back-off sets of
+  // 8, both called "BACK SQUAT", on slots w1d1e1 and w1d1e2. 11 of its 61 days
+  // are shaped like this.
+  const set = (weight: number, reps: number) => ({ id: `${weight}x${reps}`, weight: String(weight), reps: String(reps), rpe: '', rating: 0, done: true });
+  const lastWeek = {
+    id: 'prev',
+    dayId: 'd1',
+    dayName: 'Full Body 1',
+    date: '2026-09-23T10:00:00.000Z',
+    completedAt: '2026-09-23T10:00:00.000Z',
+    entries: [
+      { exerciseId: 'w1d1e1', name: 'BACK SQUAT', target: {}, notes: '', sets: [set(140, 5)] },
+      { exerciseId: 'w1d1e2', name: 'BACK SQUAT', target: {}, notes: '', sets: [set(120, 8), set(120, 8)] },
+    ],
+  } as unknown as WorkoutSession;
+
+  it('gives each slot its own history instead of the heavier one to both', () => {
+    expect(lastPerformance([lastWeek], 'BACK SQUAT', 'w1d1e1')!.sets.map((s) => `${s.weight}x${s.reps}`)).toEqual(['140x5']);
+    expect(lastPerformance([lastWeek], 'BACK SQUAT', 'w1d1e2')!.sets.map((s) => `${s.weight}x${s.reps}`)).toEqual(['120x8', '120x8']);
+  });
+
+  it('is the bug it replaces: by name alone, both cards got the top set', () => {
+    // No id passed and no occurrence — the old behaviour, kept as the fallback.
+    // The back-off card would advertise 140x5 as the thing to beat, and then
+    // judge two correct sets of 8 at 120 as a regression against it.
+    expect(lastPerformance([lastWeek], 'BACK SQUAT')!.sets.map((s) => `${s.weight}x${s.reps}`)).toEqual(['140x5']);
+  });
+
+  it('falls back to position when the ids no longer match, e.g. after a program swap', () => {
+    expect(lastPerformance([lastWeek], 'BACK SQUAT', 'reloaded-id', 1)!.sets[0].weight).toBe('120');
+    expect(lastPerformance([lastWeek], 'BACK SQUAT', 'reloaded-id', 0)!.sets[0].weight).toBe('140');
+  });
+
+  it('falls back to the first entry when the position does not exist either', () => {
+    expect(lastPerformance([lastWeek], 'BACK SQUAT', undefined, 7)!.sets[0].weight).toBe('140');
+  });
+
+  it('still prefers the most recent session, per slot', () => {
+    const thisWeek = {
+      ...lastWeek,
+      id: 'newer',
+      date: '2026-09-30T10:00:00.000Z',
+      completedAt: '2026-09-30T10:00:00.000Z',
+      entries: [
+        { exerciseId: 'w1d1e1', name: 'BACK SQUAT', target: {}, notes: '', sets: [set(145, 5)] },
+        { exerciseId: 'w1d1e2', name: 'BACK SQUAT', target: {}, notes: '', sets: [set(125, 8)] },
+      ],
+    } as unknown as WorkoutSession;
+    expect(lastPerformance([lastWeek, thisWeek], 'BACK SQUAT', 'w1d1e2')!.sets[0].weight).toBe('125');
+  });
+
+  it('skips a session where that slot was logged blank and keeps looking', () => {
+    const skipped = {
+      ...lastWeek,
+      id: 'blank',
+      date: '2026-09-30T10:00:00.000Z',
+      completedAt: '2026-09-30T10:00:00.000Z',
+      entries: [{ exerciseId: 'w1d1e2', name: 'BACK SQUAT', target: {}, notes: '', sets: [{ id: 'b', weight: '', reps: '', rpe: '', rating: 0, done: false }] }],
+    } as unknown as WorkoutSession;
+    expect(lastPerformance([lastWeek, skipped], 'BACK SQUAT', 'w1d1e2')!.sets[0].weight).toBe('120');
+  });
+
+  it('returns null when the lift has never been logged', () => {
+    expect(lastPerformance([lastWeek], 'FRONT SQUAT', 'nope')).toBeNull();
   });
 });

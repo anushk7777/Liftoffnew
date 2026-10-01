@@ -14,10 +14,16 @@ still means something to whoever reads it later.
 that day — the snapshot is taken anyway, because a broken main is exactly the
 day the record is worth having.
 
+`Maint age` is days since the weekly dependency job last succeeded. It exists
+because that job has broken silently twice — seven weeks of failing every Sunday,
+then eight weeks of not firing at all — and nobody noticed either time. Past
+about 8, the weekly job has stopped being weekly. Rows before 2026-10-01 have no
+value because it was not being measured.
+
 Read the columns as trends, not as targets.
 
-| Date | Tests | Files | Green | Bundle | Largest chunk | Outdated deps |
-| --- | --- | --- | --- | --- | --- | --- |
+| Date | Tests | Files | Green | Bundle | Largest chunk | Outdated deps | Maint age |
+| --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-08-04 | 632 | 41 | ✅ | 1533 KB | 665 KB | 25 |
 | 2026-08-05 | 632 | 41 | ✅ | 1533 KB | 665 KB | 26 |
 | 2026-08-06 | 632 | 41 | ✅ | 1533 KB | 665 KB | 26 |

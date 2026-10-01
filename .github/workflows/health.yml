@@ -53,6 +53,12 @@ jobs:
         run: npm run build
 
       - name: Measure
+        env:
+          # Read-only use: the snapshot asks the Actions API when the weekly
+          # maintenance job last succeeded, so a cron that has quietly stopped
+          # firing shows up as a climbing number here instead of going unnoticed
+          # for two months, which is exactly what happened.
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/health.mjs
 
       - name: Record the day
