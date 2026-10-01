@@ -1153,11 +1153,32 @@ push at all, and the in-app nudge is still the only path.
 
 Ordered by how likely they are to matter.
 
-1. **`lastPerformance` matches on exercise name only.** A program running the
-   same lift twice in a day (top set and back-offs) shows both cards the same
-   reference, so a heavy triple can be offered as the comparison for a set of
-   eight. Matching on rep target or cycle slot would fix it. Visible today on
-   Pure Bodybuilding's squat days.
+1. ~~**`lastPerformance` matches on exercise name only.**~~ **Fixed 2026-10-01.**
+   It now matches the program SLOT (`exerciseId`), falling back to the name and
+   then to the position among same-named entries.
+
+   The entry here used to read "visible today on Pure Bodybuilding's squat days",
+   and that was wrong — measured against the real sheets, Pure Bodybuilding has
+   **zero** days containing a repeated exercise name. It is **Powerbuilding +
+   Arms** that does, on **11 of its 61 days**: BACK SQUAT, BARBELL BENCH PRESS
+   and DEADLIFT each appear twice in a day as a top set plus back-offs
+   (`w1d1e1` is 1×5 at 75-80%, `w1d1e2` is 2×8 at 70%).
+
+   The damage was worse than "shows the wrong reference". Both cards were handed
+   the top set, so the back-off card advertised a heavy triple as the thing to
+   beat — and then `exerciseProgress` and `setVerdict` judged two correct sets of
+   8 at 70% as a **regression** against a set they were never meant to match.
+
+   **And the same flaw was in the prescription**, found by taking the screenshot
+   the fix was supposed to prove. The `prescriptions` map was keyed by exercise
+   name, so the back-off card was told to put **140 kg on the bar for 5** when
+   its own sheet said 8 at 70%. `prescribe` itself matched history by name too,
+   so even once the map was keyed per slot it still read the heavier slot's last
+   outing. Now `lastOuting` and `dropOff` take the slot, with a fall back to the
+   lift when the slot has no history of its own (a reloaded program moves the
+   ids). The load model stays pooled by name on purpose: a 5 at 140 and an 8 at
+   120 are both honest points on one strength curve, and splitting them would
+   halve the sample for nothing.
 2. **The load model pools all rep ranges for a lift.** A single line is fitted
    across singles and sets of fifteen, where the true relationship flattens at
    the high-rep end. Predictions near the edges of the logged range are the
@@ -1201,6 +1222,22 @@ Ordered by how likely they are to matter.
    This now bites twice: on a coarse step, a learned correction under about 3%
    is rounded away entirely and never reaches the bar, so the engine can be
    right about a lift and unable to act on it.
+
+   **Measured 2026-10-01, and it is worse than "sometimes".** Every one of Pure
+   Bodybuilding's 480 exercise slots sits on a 2.5 kg or coarser step (370 at
+   2.5 kg, 110 at 5 kg); Powerbuilding is the same at 384. A correction only
+   moves the bar once it clears half a step, so:
+
+   | step | a −3% correction acts only above | a −5% correction acts only above |
+   | --- | --- | --- |
+   | 2.5 kg | 42 kg | 25 kg |
+   | 5 kg (pin stacks) | 83 kg | 50 kg |
+
+   On a 12 kg dumbbell the correction would need 10.4% to move anything, and
+   `MAX_CORRECTION` caps it at 10% — so on light isolation work the
+   self-correcting engine is not merely blunt, it is **structurally incapable of
+   ever acting**. This is the single highest-value fix available to Afterburn
+   and it is a settings feature, not an algorithm.
 13. **The self-correction's counterfactual is modelled, not measured.** Whether
    a correction "helped" is judged by scaling each set's miss by 3% per RPE
    point — nobody re-lifted the set at the other weight. The walk-forward
@@ -1236,7 +1273,7 @@ unrated sets as zero stars, stop ignoring rough days, let future-dated sessions
 through, and relax each of the two rating guards); every one was caught.
 
 ```bash
-npm test        # 632 tests, 41 files
+npm test        # 644 tests, 41 files
 
 # The schedule is timezone logic, so run it somewhere else too:
 TZ=Asia/Kathmandu npm test

@@ -767,6 +767,21 @@ function RestBar({ secondsLeft, total, onAdd, onSkip }: { secondsLeft: number; t
 const END_REASONS = ["Didn't feel recovered", 'Out of time', 'Pain / niggle', 'Other'];
 const NO_WEAK_POINTS: never[] = []; // stable identity so selectors/useMemo don't churn
 
+/**
+ * Identity of one slot in the day, not of the lift in it.
+ *
+ * A program can run the same lift twice in a day with different targets —
+ * Powerbuilding's day 1 is a top set of 5 at 75-80% and then two back-off sets
+ * of 8 at 70%, both called BACK SQUAT. Keying anything by name alone collapses
+ * the two, and the second one silently inherits the first one's answer.
+ *
+ * That has now been found twice in this file: once in the "Last time" reference
+ * and once in the prescription, where the back-off card was told to put 140 kg
+ * on the bar for 5 when its own sheet said 8 at 70%. Both were invisible to the
+ * suite and obvious in a screenshot.
+ */
+const slotKey = (e: { exerciseId?: string; name: string }, i: number): string => e.exerciseId || `${e.name}#${i}`;
+
 function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean; note?: string; roughDay?: boolean }) => void; onBack: () => void }) {
   const noteRecallDays = useAfterburn((s) => s.noteRecallDays);
   const draft = useAfterburn((s) => s.draft)!;
@@ -802,12 +817,15 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
 
   const prescriptions = useMemo(() => {
     const out = new Map<string, ReturnType<typeof prescribe>>();
-    for (const slot of draft.entries) {
-      if (!slot?.name || out.has(slot.name)) continue;
+    draft.entries.forEach((slot, i) => {
+      if (!slot?.name) return;
+      const key = slotKey(slot, i);
+      if (out.has(key)) return;
       out.set(
-        slot.name,
+        key,
         prescribe({
           exercise: slot.name,
+          exerciseId: slot.exerciseId,
           workingSets: slot.sets.length || 3,
           reps: slot.target.reps,
           rpe: slot.target.rpe,
@@ -817,7 +835,7 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
           correction: corrections[slot.name],
         }),
       );
-    }
+    });
     return out;
   }, [draft.entries, sessions, unit, corrections]);
 
@@ -834,8 +852,8 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
   // engine allowed to do that would score beautifully and mean nothing.
   useEffect(() => {
     if (startedLogging) return;
-    const flat = draft.entries.flatMap((e) => {
-      const rx = prescriptions.get(e.name);
+    const flat = draft.entries.flatMap((e, slotIdx) => {
+      const rx = prescriptions.get(slotKey(e, slotIdx));
       if (!rx) return [];
       return e.sets.map((set, i) => {
         const s = rx.sets[Math.min(i, rx.sets.length - 1)];
@@ -973,7 +991,14 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
 
       {draft.entries.map((ex, exIdx) => {
         const restSec = restToSeconds(ex.target.rest);
-        const last = lastPerformance(sessions, ex.name);
+        // The slot, not just the name — a day that runs the same lift twice
+        // (top set then back-offs) must not show both cards the heavier one.
+        const last = lastPerformance(
+          sessions,
+          ex.name,
+          ex.exerciseId,
+          draft.entries.slice(0, exIdx).filter((e) => e.name === ex.name).length,
+        );
         const prefill = () => {
           if (!last) return;
           ex.sets.forEach((_, setIdx) => {
@@ -986,7 +1011,7 @@ function Logger({ onFinish, onBack }: { onFinish: (opts?: { endedEarly?: boolean
         // "Use last" copies history; this is the progression the engine actually
         // believes in, set by set, including the fade it has measured across
         // your own sets on this lift.
-        const rx = prescriptions.get(ex.name);
+        const rx = prescriptions.get(slotKey(ex, exIdx));
         const useRx = () => {
           if (!rx) return;
           ex.sets.forEach((_, setIdx) => {

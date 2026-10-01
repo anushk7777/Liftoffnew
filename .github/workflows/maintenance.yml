@@ -2,8 +2,19 @@ name: Scheduled Maintenance
 
 on:
   schedule:
-    # Runs at 00:00 every Sunday (0)
-    - cron: '0 0 * * 0'
+    # Sunday 04:37 UTC, and the odd minute is the point.
+    #
+    # This was '0 0 * * 0' and it stopped firing after 2026-08-02 — eight
+    # consecutive Sundays with no run at all, which is why the dependency PR
+    # went stale and `outdated` climbed from 25 to 29 with nobody noticing.
+    # Midnight-on-the-hour is the single most contended minute in GitHub's
+    # scheduler; it drops runs there under load, with no retry and no notice.
+    # On a weekly job a dropped run costs the whole week.
+    #
+    # `health.yml` is the control: same repo, same period, scheduled at :15 past
+    # an odd hour, and it fired 118 times over the same window without missing a
+    # day. Its runs still land 3-5 hours late, so lateness is expected here too.
+    - cron: '37 4 * * 0'
   workflow_dispatch:
 
 # Needed for the action to push a branch and open a PR.
@@ -32,6 +43,22 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # The npm that ships with the runner's Node (10.9.7) crashes on this
+      # project's `npm update`:
+      #
+      #     npm error Cannot read properties of null (reading 'edgesOut')
+      #     at #loadPeerSet (@npmcli/arborist/lib/arborist/build-ideal-tree.js)
+      #
+      # It is an arborist bug walking vitest's optional peer block, reproducible
+      # on a clean checkout and fixed upstream. `--legacy-peer-deps` also gets
+      # past it, but by switching peer resolution off entirely — which would let
+      # a genuinely incompatible pair through on exactly the job whose purpose is
+      # to keep dependencies sane. Upgrading npm fixes the bug instead of hiding
+      # it: verified locally, peers respected, 0 vulnerabilities, 639 tests green
+      # on the resulting tree.
+      - name: Use an npm that can resolve this tree
+        run: npm install -g npm@12
 
       # Update deps first, then gate the bump on typecheck + build + tests so a
       # bad minor/patch can't reach the deployed branch unverified.

@@ -1319,10 +1319,83 @@ them as an alarm would misread them.
   error; nothing reports whether the *accuracy panel* is well calibrated, and
   with a few dozen sets the trend split is a coarse instrument.
 
+## 15. Three months idle, and what that exposed (2026-10-01)
+
+Nothing was logged and no app code changed for 58 days. The automation ran
+perfectly the whole time — 58 rows, 58 days, no gaps, suite green daily — which
+is exactly why it is worth writing down what it did **not** catch.
+
+### 15.1 The weekly job stopped, and the daily job never said so
+
+The Sunday maintenance cron was `0 0 * * 0`. It last fired on 2 August; eight
+Sundays then passed with no run at all. GitHub drops scheduled runs under load,
+with no retry and no notice, and midnight-on-the-hour is the single most
+contended minute it has. `health.yml` is the control: same repo, same window,
+scheduled at :15 past an odd hour, 118 runs without missing a day.
+
+This is the second time this job has broken silently. The first time it ran and
+failed every week for seven weeks. A failed run is at least visible in the
+Actions tab; a run that never happens is invisible everywhere, which is why the
+daily snapshot now records **days since the maintenance job last succeeded**.
+Nothing was watching the watcher, so now something is.
+
+### 15.2 `npm update` crashes on this project
+
+```
+npm error Cannot read properties of null (reading 'edgesOut')
+  at #loadPeerSet (@npmcli/arborist/lib/arborist/build-ideal-tree.js)
+```
+
+An arborist bug walking vitest's optional peer block, reproducible on a clean
+checkout with the runner's bundled npm 10.9.7. `--legacy-peer-deps` gets past it
+by switching peer resolution off entirely — on the one job whose whole purpose is
+keeping dependencies coherent — so the fix is npm 12, which resolves it properly:
+peers respected, 0 vulnerabilities, 644 tests green on the result.
+
+Worth noting that `npm install --strict-peer-deps` succeeds against the existing
+lockfile. The conflict only appears when resolving forward, which is why three
+months of green CI said nothing about it.
+
+### 15.3 The same bug, twice, in one file — and only a screenshot found it
+
+A program can run one lift twice in a day with different targets. Powerbuilding
+does it on 11 of 61 days. Anything keyed by exercise name collapses the two.
+
+It was in `lastPerformance`, which was the known weakness being fixed. The unit
+tests went green, and the screenshot taken to prove the fix showed the back-off
+card still being prescribed **140 kg for 5** when its sheet said 8 at 70% —
+because the `prescriptions` map was keyed by name as well, and `prescribe` then
+matched history by name underneath that.
+
+Three layers, one habit. The lesson is not "test harder": the first fix was
+tested and mutation-checked and still only half the bug. It is that a name is not
+an identity, and that the project's own rule — drive the real build and look —
+earned its place for the fourth time.
+
+The misattribution is worth recording too. The weakness list said this was
+"visible today on Pure Bodybuilding's squat days". Measured against the actual
+sheet, Pure Bodybuilding has **zero** days with a repeated exercise name. The
+note had been carried forward unchecked.
+
+### 15.4 What the idle period says about priorities
+
+The grading and self-correction engine shipped in August and has still never seen
+a real prescription, because nothing was logged. Before more engine is built, two
+things are worth knowing, both measured rather than assumed:
+
+- **100% of both programs' slots sit on a 2.5 kg or coarser step.** A correction
+  only moves the bar once it clears half a step, so a −3% correction does nothing
+  below 42 kg, and nothing below 83 kg on a 5 kg pin stack. On a 12 kg dumbbell
+  it would need 10.4% against a 10% cap — it can never act at all. Per-lift
+  increments are the highest-value fix available, and it is a settings feature.
+- **190 of Pure Bodybuilding's 480 slots (40%) end in an intensity technique.**
+  Those are the hardest sets, and a set logged without an RPE cannot be graded,
+  so the engine's sample is missing the part that matters most.
+
 ## Testing
 
 ```bash
-npm test        # 632 tests, 41 files
+npm test        # 644 tests, 41 files
 ```
 
 Beyond unit tests, each behavioural claim in this log was checked against

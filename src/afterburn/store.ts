@@ -114,17 +114,42 @@ export function completionMap(sessions: WorkoutSession[]): Map<string, string> {
   return m;
 }
 
-/** Most recent prior logged performance for an exercise (by name) — the basis
- *  for progressive overload. Skips the in-progress draft (not yet in sessions). */
+/**
+ * Most recent prior logged performance for an exercise — the basis for
+ * progressive overload. Skips the in-progress draft (not yet in sessions).
+ *
+ * MATCHED ON THE SLOT, NOT JUST THE NAME.
+ *
+ * A program can run the same lift twice in one day, and Powerbuilding + Arms
+ * does it on 11 of its 61 days: `w1d1e1` is a top set of 5 at 75-80%, `w1d1e2`
+ * is two back-off sets of 8 at 70%, and both are called "BACK SQUAT". Matching
+ * on the name alone handed BOTH cards the top set's numbers — so the back-off
+ * card advertised a heavy triple as the thing to beat, and every back-off set
+ * was then judged a regression against a set it was never meant to match.
+ *
+ * `exerciseId` is stable within a program and distinct per slot, so it is the
+ * right key. The name is kept as a fallback for sessions logged before a
+ * program swap (ids change, names usually do not) and for ad-hoc exercises
+ * added by hand, which carry no program id.
+ *
+ * `occurrence` disambiguates the fallback: when two entries in the same session
+ * share a name, "the second BACK SQUAT of the day" is still a better guess than
+ * "the first one", which is what `.find()` silently gave everybody.
+ */
 export function lastPerformance(
   sessions: WorkoutSession[],
   exerciseName: string,
+  exerciseId?: string,
+  occurrence = 0,
 ): { date: string; sets: LoggedSet[] } | null {
+  const usable = (e: LoggedExercise) => e.sets.some((st) => st.weight || st.reps);
   const sorted = [...sessions].sort((a, b) => (b.completedAt ?? b.date).localeCompare(a.completedAt ?? a.date));
+
   for (const s of sorted) {
-    const entry: LoggedExercise | undefined = s.entries.find(
-      (e) => e.name === exerciseName && e.sets.some((st) => st.weight || st.reps),
-    );
+    const byId = exerciseId ? s.entries.find((e) => e.exerciseId === exerciseId && usable(e)) : undefined;
+    // Same name, same position among the same-named entries of that session.
+    const sameName = s.entries.filter((e) => e.name === exerciseName && usable(e));
+    const entry: LoggedExercise | undefined = byId ?? sameName[occurrence] ?? sameName[0];
     if (entry) return { date: s.completedAt ?? s.date, sets: entry.sets.filter((st) => st.weight || st.reps) };
   }
   return null;

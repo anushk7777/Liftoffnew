@@ -6,7 +6,8 @@
 // be made to report one it did not earn. So most of what follows sets a trap and
 // asserts the engine walks around it.
 import { describe, it, expect } from 'vitest';
-import { prescribe, MAX_APPLIED_CORRECTION } from './prescribe';
+import { prescribe, dropOff, MAX_APPLIED_CORRECTION } from './prescribe';
+import { buildLoadModel } from './loadModel';
 import { gradeSession, gradeAll, accuracy, trend, accuracyByBasis } from './grade';
 import type { GradedSet } from './grade';
 import { calibrateLift, calibrateAll, evolutionSummary, rawMiss, missUnder, MAX_CORRECTION, PCT_PER_RPE, MIN_SETS_TO_CALIBRATE } from './calibrate';
@@ -431,5 +432,78 @@ describe('the whole loop', () => {
     const b = prescribe({ exercise: 'Bench', workingSets: 1, reps: '8', rpe: '8', sessions: history, now: new Date(T0 + 40 * DAY), correction: corrections.Bench });
     expect(b.sets[0].weight).toBe(a.sets[0].weight);
     expect(b.why).toBe(a.why);
+  });
+});
+
+describe('a day that runs the same lift twice', () => {
+  // Powerbuilding day 1: w1d1e1 is a top set of 5 at 75-80%, w1d1e2 is two
+  // back-off sets of 8 at 70%. Both are called BACK SQUAT.
+  const at = new Date(T0).toISOString();
+  const twoSlots: WorkoutSession[] = [
+    {
+      id: 'prev',
+      dayId: 'w1d1',
+      dayName: 'Full Body 1',
+      date: at,
+      completedAt: at,
+      entries: [
+        { exerciseId: 'w1d1e1', name: 'BACK SQUAT', target: {}, notes: '', sets: [set('a', 140, 5, 7.5)] },
+        { exerciseId: 'w1d1e2', name: 'BACK SQUAT', target: {}, notes: '', sets: [set('b', 120, 8, 8), set('c', 120, 8, 8)] },
+      ],
+    } as unknown as WorkoutSession,
+  ];
+  const rx = (exerciseId: string | undefined, reps: string, rpe: string) =>
+    prescribe({ exercise: 'BACK SQUAT', exerciseId, workingSets: 1, reps, rpe, sessions: twoSlots, now: new Date(T0 + DAY) });
+
+  it('prescribes each slot from its own history, not the heavier slot', () => {
+    expect(rx('w1d1e1', '5', '7.5').sets[0].weight).toBe(140);
+    expect(rx('w1d1e2', '8', '8').sets[0].weight).toBe(120);
+  });
+
+  it('is the bug it replaces: with no slot, both read the top set', () => {
+    expect(rx(undefined, '8', '8').sets[0].weight).toBe(140);
+  });
+
+  it('falls back to the lift when the slot has no history of its own', () => {
+    // A slot id that was never logged — e.g. the program was reloaded and the
+    // ids moved. Returning nothing would be worse than returning the lift.
+    const fresh = rx('some-new-id', '5', '7.5');
+    expect(fresh.sets[0].weight).toBe(140);
+    expect(fresh.basis).not.toBe('sheet');
+  });
+
+  it('keeps the load model pooled across both slots on purpose', () => {
+    // The curve describes strength on the movement; a 5 at 140 and an 8 at 120
+    // are both honest points on it. Splitting by slot would halve the sample.
+    const model = buildLoadModel(twoSlots, 'BACK SQUAT', T0 + DAY);
+    expect(model.samples).toBe(3);
+  });
+
+  it('measures each slot\'s own fade, not the two pooled together', () => {
+    // Four outings. The top-set slot is done as three straight sets with no
+    // fade; the back-off slot fades hard. Pooled, each would contaminate the
+    // other and neither profile would describe anything real.
+    const many: WorkoutSession[] = [];
+    for (let i = 0; i < 4; i++) {
+      const when = new Date(T0 - i * 7 * DAY).toISOString();
+      many.push({
+        id: `s${i}`,
+        dayId: 'w1d1',
+        dayName: 'Full Body 1',
+        date: when,
+        completedAt: when,
+        entries: [
+          { exerciseId: 'w1d1e1', name: 'BACK SQUAT', target: {}, notes: '', sets: [set(`a${i}`, 140, 5, 8), set(`b${i}`, 140, 5, 8), set(`c${i}`, 140, 5, 8)] },
+          { exerciseId: 'w1d1e2', name: 'BACK SQUAT', target: {}, notes: '', sets: [set(`d${i}`, 120, 8, 8), set(`e${i}`, 108, 8, 8), set(`f${i}`, 96, 8, 8)] },
+        ],
+      } as unknown as WorkoutSession);
+    }
+    const now = new Date(T0 + DAY);
+    const flat = dropOff(many, 'BACK SQUAT', now, 90, 'w1d1e1');
+    const fades = dropOff(many, 'BACK SQUAT', now, 90, 'w1d1e2');
+    expect(flat.assumed).toBe(false);
+    expect(flat.factors.every((f) => Math.abs(f - 1) < 0.01)).toBe(true);
+    expect(fades.factors[1]).toBeLessThan(0.95);
+    expect(fades.factors[2]).toBeLessThan(fades.factors[1]);
   });
 });
